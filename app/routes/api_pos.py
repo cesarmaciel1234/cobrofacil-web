@@ -391,6 +391,26 @@ def api_pos_resolver_empresa():
     )
 
 
+@api_bp.route("/pos/jefe", methods=["GET"])
+def api_pos_jefe():
+    """Reporte, jefe, contabilidad, admin, proveedor, promedio o ticket. Con filtro multi-sucursal."""
+    from app.services.pos_jefe import panel
+
+    nombre = (request.args.get("panel") or "reporte").strip().lower()
+    sucursal_id = request.args.get("sucursal_id", type=int)
+    if nombre not in ("reporte", "jefe", "contabilidad", "admin", "cartera", "clientes", "proveedor", "promedio", "ticket"):
+        return jsonify({"error": "Panel desconocido"}), 400
+    return jsonify(panel(nombre, sucursal_id=sucursal_id))
+
+
+@api_bp.route("/pos/sucursales", methods=["GET"])
+def api_pos_sucursales():
+    """Lista de sucursales activas registradas en la base espejo."""
+    from app.services.pos_base import listar_sucursales
+
+    return jsonify({"ok": True, "sucursales": listar_sucursales()})
+
+
 @api_bp.route("/pos/sync/status", methods=["GET"])
 def api_pos_sync_status():
     """

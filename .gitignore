@@ -1,5 +1,7 @@
 master_total.db
+master_total_*.db
 carniceria_master.db
+*.db
 __pycache__/
 *.py[cod]
 .env

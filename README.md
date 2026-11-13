@@ -2,6 +2,54 @@
 
 Dashboard ejecutivo Flask para distribuidoras de carne.
 
+## Dos proyectos
+
+Cobro Fácil (`C:\Users\cesar\OneDrive\Desktop\tpv pro 2026`) y este CRM son proyectos distintos. Cobro Fácil ya está terminado y funciona. Su cerebro no se toca: la lógica que haga falta se copia y se pega acá.
+
+El envío sí vive en el servidor de Cobro Fácil, como módulo aparte (`crm_salida`). Ese módulo solo manda la base. No forma parte del cerebro.
+
+Este CRM es el proyecto nuevo. Todas las sucursales mandan su libro a Neon (`neondb`). Render es la cara y lo muestra. Neon guarda. Render no es la base.
+
+La web es el negocio para auditar sin ir al local: contabilidad, cartera de clientes y el panel del jefe. Neon es el espejo. Render es la interfaz.
+
+En el plan gratis el libro no sale en cada venta. La tienda hace unos 70 tickets por día y el envío completo tarda cerca de una hora. El módulo mira cada 15 minutos y, si hubo cambios, manda como mucho una vez cada 3 horas. Entre medio Neon y Render se duermen y no gastan el cupo.
+
+Estamos en prueba, en el plan gratis. Más adelante se puede alquilar la base y el dominio.
+
+La casa queda en cinco áreas. La barra de todos los días sigue siendo cuatro botones: **Reporte** (solo el reporte), **Proveedor**, **Promedio** y **Ticket** (el historial).
+
+| Área | Qué mira |
+|------|----------|
+| Dirección | Panel del jefe, reporte y promedio |
+| Comercial | Clientes, cartera y tickets |
+| Abastecimiento | Proveedores y compras |
+| Tesorería | Cobranzas y pagos |
+| Control | Auditoría, antigüedad y márgenes |
+
+## Tres Pilares Ejecutivos y Multi-Sucursal
+
+El CRM cuenta con una arquitectura ejecutiva autónoma multi-sucursal alimentada por el espejo en Neon PostgreSQL:
+
+1. **🏢 Selector Multi-Sucursal Global**:
+   - Barra en cabecera que descubre automáticamente las sucursales conectadas (`/api/pos/sucursales`).
+   - Permite alternar con un clic entre **Consolidado (Todas)** y cada local específico (`Sucursal 1`, `Sucursal 2`, etc.).
+
+2. **👑 JEFE / DIRECCIÓN**:
+   - Tarjetas KPI: Ventas Totales del Día, Tickets Emitidos, Ticket Promedio y Medio de Pago Líder.
+   - **Comparativa Multi-Sucursal**: Ventas, tickets, promedio y % de participación de cada local.
+   - **Ranking de Cortes de Carne / Productos**: Tabla ordenada por recaudación, kilos/cantidad vendida y operaciones.
+
+3. **💰 CONTABILIDAD / TESORERÍA**:
+   - Tarjetas de Caja: Ventas Totales, Cobros Fiado (Cta. Cte.), Gastos del Día y **Resultado Operativo Neto** (`Ventas + Cobros - Gastos`).
+   - **Arqueo por Medios de Pago**: Desglose transaccional de Efectivo, QR MercadoPago, Transferencias bancarias y Tarjetas con porcentaje sobre el total.
+   - **Detalle de Cobranzas del Día**: Entradas de pagos de clientes.
+   - **Detalle de Gastos de Caja**: Registro de salidas con categoría, motivo y monto.
+
+4. **👥 ADMIN / CARTERA & MORA**:
+   - Tarjetas de Fiado: Deuda Total en la Calle, Total Saldo a Favor, Cuentas Activas con Deuda y Cuentas al Día.
+   - **Top Deudores y Control de Límites**: Tabla de cuentas con saldo deudor, DNI/CUIT, límite acordado, semáforo de estado (`Normal`, `⚠️ AL LÍMITE`, `⛔ EXCEDIDO`) y botón de cobro rápido directo a WhatsApp.
+   - Enlace a la Cartera Móvil PWA interactiva con cálculo de intereses.
+
 ## Programa principal (tu captura)
 
 ```powershell

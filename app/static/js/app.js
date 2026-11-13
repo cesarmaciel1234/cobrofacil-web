@@ -304,7 +304,13 @@ const $ = id => document.getElementById(id);
             'cliente-detalle': ['Perfil de Cliente', 'Detalle corporativo y facturación', 'Perfil'],
             'nueva-venta': ['Registrar Venta', 'Emitir remito o factura a cuenta corriente', 'Ventas'],
             'finanzas-aging': ['Antigüedad de deuda', 'Análisis de vencimiento de facturas', 'Deuda'],
-            'finanzas-margenes': ['Márgenes de venta', 'Rentabilidad y costos de remitos', 'Márgenes']
+            'finanzas-margenes': ['Márgenes de venta', 'Rentabilidad y costos de remitos', 'Márgenes'],
+            reporte: ['Reporte', 'Cerebro Jefe, sin el historial de tickets', 'Reporte'],
+            proveedor: ['Proveedor', 'Proveedores del libro de Cobro Fácil', 'Proveedor'],
+            promedio: ['Promedio', 'Ticket medio del día', 'Promedio'],
+            ticket: ['Ticket', 'Historial de tickets del día', 'Ticket'],
+            contabilidad: ['Contabilidad', 'Caja, cobros y gastos del espejo', 'Contabilidad'],
+            admin: ['Admin Cartera', 'Cartera de clientes, mora y límites de fiado', 'Admin']
         };
 
         function plazoTexto(e) {
@@ -2154,6 +2160,393 @@ const $ = id => document.getElementById(id);
                     </div>`;
         }
 
+        function plataJefe(n) {
+            return '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function textoJefe(valor) {
+            return String(valor ?? '').replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            }[c]));
+        }
+
+        let activeSucursalId = null;
+
+        async function cargarSucursalesSelector() {
+            try {
+                const res = await fetch('/api/pos/sucursales');
+                const data = await res.json();
+                const sucursales = data.sucursales || [];
+                const cont = $('sucursalPillsContainer');
+                if (!cont) return;
+
+                let html = `<button type="button" class="btn btn-sm ${activeSucursalId === null ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="todas" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">Consolidado (Todas)</button>`;
+
+                sucursales.forEach(s => {
+                    const isAct = activeSucursalId === s.id;
+                    html += `<button type="button" class="btn btn-sm ${isAct ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="${s.id}" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">📍 ${textoJefe(s.nombre)}</button>`;
+                });
+                cont.innerHTML = html;
+
+                cont.querySelectorAll('.sucursal-pill').forEach(btn => {
+                    btn.onclick = () => {
+                        const val = btn.dataset.sucursal;
+                        activeSucursalId = val === 'todas' ? null : parseInt(val, 10);
+                        cargarSucursalesSelector();
+                        const activeView = document.querySelector('.view.active');
+                        const vName = activeView ? activeView.id.replace('view-', '') : 'dashboard';
+                        if (['reporte', 'dashboard', 'contabilidad', 'admin', 'proveedor', 'promedio', 'ticket'].includes(vName)) {
+                            cargarJefe(vName === 'dashboard' ? 'reporte' : vName);
+                        }
+                    };
+                });
+            } catch (e) {
+                console.error('Error cargando sucursales:', e);
+            }
+        }
+
+        async function cargarJefe(panel) {
+            let dato = { libro: false };
+            try {
+                let url = '/api/pos/jefe?panel=' + encodeURIComponent(panel);
+                if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                    url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
+                }
+                const res = await fetch(url);
+                dato = await res.json();
+            } catch (e) {
+                dato = { libro: false };
+            }
+            const resumen = dato.resumen || {};
+            const aviso = dato.libro
+                ? ''
+                : 'El libro de Cobro Fácil todavía no llegó a la nube para esta sucursal. Cuando termine el envío, este número sale de ahí.';
+
+            // 1. CONTABILIDAD & CAJA
+            if (panel === 'contabilidad' && $('contaCuerpo')) {
+                const c = dato.contabilidad || {};
+                const cartera = dato.cartera || {};
+                $('contaDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
+                if (!dato.libro) {
+                    $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
+                } else {
+                    const resultadoColor = (c.resultado >= 0) ? '#16a34a' : '#dc2626';
+
+                    let html = `
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px;">
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Ventas del Día</div>
+                            <div style="font-size:1.6rem; font-weight:800; color:#0f172a; margin-top:4px;">${plataJefe(c.ventas)}</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:2px;">${c.tickets || 0} tickets emitidos</div>
+                        </div>
+                        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#166534; text-transform:uppercase; letter-spacing:0.04em;">Cobros Fiado (Cta Cte)</div>
+                            <div style="font-size:1.6rem; font-weight:800; color:#15803d; margin-top:4px;">${plataJefe(c.cobros)}</div>
+                            <div style="font-size:12px; color:#166534; margin-top:2px;">Entradas directas a caja</div>
+                        </div>
+                        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#991b1b; text-transform:uppercase; letter-spacing:0.04em;">Gastos de Caja</div>
+                            <div style="font-size:1.6rem; font-weight:800; color:#b91c1c; margin-top:4px;">${plataJefe(c.gastos)}</div>
+                            <div style="font-size:12px; color:#991b1b; margin-top:2px;">${(c.detalle_gastos || []).length} egresos registrados</div>
+                        </div>
+                        <div style="background:#f8fafc; border:2px solid ${resultadoColor}; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.04em;">Resultado Operativo</div>
+                            <div style="font-size:1.6rem; font-weight:900; color:${resultadoColor}; margin-top:4px;">${plataJefe(c.resultado)}</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Ventas + Cobros - Gastos</div>
+                        </div>
+                    </div>`;
+
+                    const medios = c.medios_pago || [];
+                    const totalMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0) || 1;
+                    html += `
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
+                        <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                            <span>💳 Arqueo por Medio de Pago</span>
+                            <span style="font-size:12px; font-weight:600; color:#64748b;">Total: ${plataJefe(totalMedios)}</span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                            <table class="data-table" style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
+                                        <th style="padding:10px 14px; text-align:left;">Medio de Pago</th>
+                                        <th style="padding:10px 14px; text-align:right;">Operaciones</th>
+                                        <th style="padding:10px 14px; text-align:right;">Monto</th>
+                                        <th style="padding:10px 14px; text-align:right;">Participación</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                    if (medios.length === 0) {
+                        html += `<tr><td colspan="4" style="padding:12px; text-align:center; color:#64748b;">Sin movimientos de pago ese día.</td></tr>`;
+                    } else {
+                        medios.forEach(m => {
+                            const pct = Math.round((m.monto / totalMedios) * 100);
+                            html += `
+                            <tr style="border-bottom:1px solid #f1f5f9;">
+                                <td style="padding:10px 14px; font-weight:700; color:#1e293b;">${textoJefe(m.medio)}</td>
+                                <td style="padding:10px 14px; text-align:right; color:#64748b;">${m.tickets} tickets</td>
+                                <td style="padding:10px 14px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(m.monto)}</td>
+                                <td style="padding:10px 14px; text-align:right;">
+                                    <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">${pct}%</span>
+                                </td>
+                            </tr>`;
+                        });
+                    }
+                    html += `</tbody></table></div></div>`;
+
+                    html += `
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">📥 Cobros de Fiado del Día (${(c.detalle_cobros || []).length})</div>
+                            <div style="max-height:260px; overflow-y:auto;">`;
+                    if ((c.detalle_cobros || []).length === 0) {
+                        html += `<p style="color:#64748b; font-size:13px; margin:0;">Sin cobros de cuenta corriente registrados ese día.</p>`;
+                    } else {
+                        c.detalle_cobros.forEach(cob => {
+                            html += `<div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:13px;">
+                                <span style="color:#334155;">${textoJefe(cob.descripcion)}</span>
+                                <strong style="color:#16a34a;">+${plataJefe(cob.monto)}</strong>
+                            </div>`;
+                        });
+                    }
+                    html += `</div></div>
+
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">📤 Gastos de Caja del Día (${(c.detalle_gastos || []).length})</div>
+                            <div style="max-height:260px; overflow-y:auto;">`;
+                    if ((c.detalle_gastos || []).length === 0) {
+                        html += `<p style="color:#64748b; font-size:13px; margin:0;">Sin gastos de caja registrados ese día.</p>`;
+                    } else {
+                        c.detalle_gastos.forEach(g => {
+                            html += `<div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:13px;">
+                                <span><strong style="color:#475569;">${textoJefe(g.categoria)}:</strong> ${textoJefe(g.detalle)}</span>
+                                <strong style="color:#dc2626;">-${plataJefe(g.monto)}</strong>
+                            </div>`;
+                        });
+                    }
+                    html += `</div></div></div>`;
+
+                    $('contaCuerpo').innerHTML = html;
+                }
+            }
+
+            // 2. JEFE / REPORTE
+            if (panel === 'reporte' && $('reporteCuerpo')) {
+                $('reporteDia').textContent = resumen.dia ? (resumen.es_hoy ? 'Hoy · ' + resumen.dia : 'Libro · ' + resumen.dia) : 'Cerebro Jefe';
+                if (!dato.libro) {
+                    $('reporteCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
+                } else {
+                    const des = dato.desglose_sucursales || [];
+                    const rank = dato.ranking_cortes || [];
+                    const totalVentas = resumen.ventas || 1;
+
+                    let html = `
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px;">
+                        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#1e40af; text-transform:uppercase; letter-spacing:0.04em;">Ventas Totales</div>
+                            <div style="font-size:1.8rem; font-weight:800; color:#1d4ed8; margin-top:4px;">${plataJefe(resumen.ventas)}</div>
+                            <div style="font-size:12px; color:#1e40af; margin-top:2px;">Facturación consolidada del día</div>
+                        </div>
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Tickets Emitidos</div>
+                            <div style="font-size:1.8rem; font-weight:800; color:#0f172a; margin-top:4px;">${resumen.tickets}</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Clientes atendidos en mostrador</div>
+                        </div>
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Ticket Promedio</div>
+                            <div style="font-size:1.8rem; font-weight:800; color:#0f172a; margin-top:4px;">${plataJefe(resumen.promedio)}</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Gasto promedio por ticket</div>
+                        </div>
+                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
+                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Medio de Pago Líder</div>
+                            <div style="font-size:1.4rem; font-weight:800; color:#0f172a; margin-top:6px;">${textoJefe(resumen.pago) || 'Efectivo'}</div>
+                            <div style="font-size:12px; color:#64748b; margin-top:4px;">Mayor volumen transaccional</div>
+                        </div>
+                    </div>`;
+
+                    if (des.length > 0) {
+                        html += `
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
+                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                                <span>🏢 Rendimiento Multi-Sucursal</span>
+                                <span style="font-size:12px; font-weight:600; color:#64748b;">${des.length} locales sincronizados</span>
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table class="data-table" style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
+                                            <th style="padding:10px 14px; text-align:left;">Sucursal</th>
+                                            <th style="padding:10px 14px; text-align:right;">Ventas</th>
+                                            <th style="padding:10px 14px; text-align:right;">Tickets</th>
+                                            <th style="padding:10px 14px; text-align:right;">Promedio</th>
+                                            <th style="padding:10px 14px; text-align:right;">Participación</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                        des.forEach(s => {
+                            const pct = Math.round((s.ventas / totalVentas) * 100);
+                            html += `
+                            <tr style="border-bottom:1px solid #f1f5f9;">
+                                <td style="padding:10px 14px; font-weight:700; color:#1e293b;">📍 ${textoJefe(s.nombre)}</td>
+                                <td style="padding:10px 14px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(s.ventas)}</td>
+                                <td style="padding:10px 14px; text-align:right; color:#64748b;">${s.tickets}</td>
+                                <td style="padding:10px 14px; text-align:right; color:#475569;">${plataJefe(s.promedio)}</td>
+                                <td style="padding:10px 14px; text-align:right;">
+                                    <span style="background:#dbeafe; color:#1d4ed8; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700;">${pct}%</span>
+                                </td>
+                            </tr>`;
+                        });
+                        html += `</tbody></table></div></div>`;
+                    }
+
+                    if (rank.length > 0) {
+                        html += `
+                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                                <span>🥩 Ranking de Cortes y Productos Más Vendidos</span>
+                                <span style="font-size:12px; font-weight:600; color:#64748b;">Top ${rank.length} productos</span>
+                            </div>
+                            <div style="overflow-x:auto;">
+                                <table class="data-table" style="width:100%; border-collapse:collapse;">
+                                    <thead>
+                                        <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
+                                            <th style="padding:10px 14px; text-align:center; width:45px;">#</th>
+                                            <th style="padding:10px 14px; text-align:left;">Producto / Corte</th>
+                                            <th style="padding:10px 14px; text-align:right;">Kilos / Cantidad</th>
+                                            <th style="padding:10px 14px; text-align:right;">Total Recaudado</th>
+                                            <th style="padding:10px 14px; text-align:right;">Operaciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>`;
+                        rank.forEach((item, idx) => {
+                            const badgeColor = idx === 0 ? '#fbbf24' : (idx === 1 ? '#94a3b8' : (idx === 2 ? '#b45309' : '#f1f5f9'));
+                            const textColor = idx < 3 ? '#fff' : '#475569';
+                            html += `
+                            <tr style="border-bottom:1px solid #f1f5f9;">
+                                <td style="padding:10px 14px; text-align:center;">
+                                    <span style="display:inline-block; width:24px; height:24px; line-height:24px; border-radius:50%; background:${badgeColor}; color:${textColor}; font-size:11px; font-weight:800;">${idx + 1}</span>
+                                </td>
+                                <td style="padding:10px 14px; font-weight:700; color:#1e293b;">${textoJefe(item.producto)}</td>
+                                <td style="padding:10px 14px; text-align:right; font-weight:600; color:#475569;">${item.cantidad.toLocaleString('es-AR')} kg</td>
+                                <td style="padding:10px 14px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(item.total)}</td>
+                                <td style="padding:10px 14px; text-align:right; color:#64748b;">${item.operaciones}</td>
+                            </tr>`;
+                        });
+                        html += `</tbody></table></div></div>`;
+                    }
+
+                    $('reporteCuerpo').innerHTML = html;
+                }
+            }
+
+            // 3. ADMIN / CARTERA
+            if (panel === 'admin' && $('adminCuerpo')) {
+                const cartera = dato.cartera || {};
+                const deudores = cartera.top_deudores || [];
+                $('adminDia').textContent = `Espejo de clientes · ${cartera.total_cuentas || 0} cuentas en sistema`;
+
+                let html = `
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px;">
+                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:700; color:#991b1b; text-transform:uppercase; letter-spacing:0.04em;">Deuda Total en la Calle</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#b91c1c; margin-top:4px;">${plataJefe(cartera.deuda_total || cartera.deuda)}</div>
+                        <div style="font-size:12px; color:#991b1b; margin-top:2px;">${cartera.con_deuda || 0} cuentas con deuda activa</div>
+                    </div>
+                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:700; color:#166534; text-transform:uppercase; letter-spacing:0.04em;">Saldo a Favor Total</div>
+                        <div style="font-size:1.8rem; font-weight:800; color:#15803d; margin-top:4px;">${plataJefe(cartera.saldo_a_favor_total || 0)}</div>
+                        <div style="font-size:12px; color:#166534; margin-top:2px;">${cartera.a_favor || 0} clientes con pago a cuenta</div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Cuentas al Día</div>
+                        <div style="font-size:1.8rem; font-weight:800; color:#0f172a; margin-top:4px;">${cartera.al_dia || 0}</div>
+                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Sin saldo pendiente</div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
+                        <a href="/cartera" class="btn btn-primary" style="width:100%; text-align:center; padding:10px 14px; border-radius:10px; font-weight:700; text-decoration:none;">
+                            📱 Abrir Cartera Móvil
+                        </a>
+                        <span style="font-size:11px; color:#64748b; margin-top:6px;">Vista interactiva con intereses</span>
+                    </div>
+                </div>`;
+
+                html += `
+                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                    <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                        <span>👥 Top Cuentas Morosas & Límites de Crédito</span>
+                        <span style="font-size:12px; font-weight:600; color:#64748b;">${deudores.length} cuentas con saldo</span>
+                    </div>
+                    <div style="overflow-x:auto;">
+                        <table class="data-table" style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
+                                    <th style="padding:10px 14px; text-align:left;">Cliente</th>
+                                    <th style="padding:10px 14px; text-align:left;">DNI / CUIT</th>
+                                    <th style="padding:10px 14px; text-align:right;">Saldo Deudor</th>
+                                    <th style="padding:10px 14px; text-align:right;">Límite Acordado</th>
+                                    <th style="padding:10px 14px; text-align:center;">Estado Límite</th>
+                                    <th style="padding:10px 14px; text-align:center;">Cobranza</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                if (deudores.length === 0) {
+                    html += `<tr><td colspan="6" style="padding:14px; text-align:center; color:#64748b;">¡Excelente! No hay clientes con deuda registrada.</td></tr>`;
+                } else {
+                    deudores.forEach(d => {
+                        const excedido = d.limite > 0 && d.deuda > d.limite;
+                        const alLimite = d.limite > 0 && !excedido && (d.deuda / d.limite >= 0.85);
+                        let badge = `<span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;">Normal</span>`;
+                        if (excedido) {
+                            badge = `<span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800;">⛔ EXCEDIDO</span>`;
+                        } else if (alLimite) {
+                            badge = `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">⚠️ AL LÍMITE</span>`;
+                        }
+
+                        const telLimpio = (d.telefono || '').replace(/\D/g, '');
+                        const wspBtn = telLimpio.length >= 8
+                            ? `<a href="https://wa.me/549${telLimpio}?text=Hola%20${encodeURIComponent(d.nombre)},%20te%20escribimos%20de%20la%20administracion%20por%20tu%20saldo%20pendiente%20de%20${encodeURIComponent(plataJefe(d.deuda))}" target="_blank" style="background:#22c55e; color:#fff; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">📲 Cobrar</a>`
+                            : `<span style="color:#94a3b8; font-size:12px;">Sin tel</span>`;
+
+                        html += `
+                        <tr style="border-bottom:1px solid #f1f5f9;">
+                            <td style="padding:10px 14px; font-weight:700; color:#1e293b;">${textoJefe(d.nombre)}</td>
+                            <td style="padding:10px 14px; color:#64748b; font-size:12px;">${textoJefe(d.dni) || '—'}</td>
+                            <td style="padding:10px 14px; text-align:right; font-weight:900; color:#b91c1c;">${plataJefe(d.deuda)}</td>
+                            <td style="padding:10px 14px; text-align:right; color:#475569;">${d.limite > 0 ? plataJefe(d.limite) : 'Sin límite'}</td>
+                            <td style="padding:10px 14px; text-align:center;">${badge}</td>
+                            <td style="padding:10px 14px; text-align:center;">${wspBtn}</td>
+                        </tr>`;
+                    });
+                }
+                html += `</tbody></table></div></div>`;
+
+                $('adminCuerpo').innerHTML = html;
+            }
+
+            // 4. PROVEEDOR
+            if (panel === 'proveedor' && $('proveedorCuerpo')) {
+                const lista = dato.proveedores || [];
+                $('proveedorCount').textContent = lista.length ? lista.length + ' en el libro' : 'Del libro de Cobro Fácil';
+                $('proveedorCuerpo').innerHTML = lista.length
+                    ? lista.map(p => `<div style="display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid #f1f5f9;"><strong>${textoJefe(p.nombre)}</strong><span>${plataJefe(p.deuda)}</span></div>`).join('')
+                    : `<p>${aviso || 'No hay proveedores en el libro.'}</p>`;
+            }
+
+            // 5. PROMEDIO
+            if (panel === 'promedio' && $('promedioCuerpo')) {
+                $('promedioCuerpo').innerHTML = dato.libro
+                    ? `<div style="font-size:2rem; font-weight:800;">${plataJefe(resumen.promedio)}</div><p style="color:#64748b;">${resumen.tickets} tickets · venta ${plataJefe(resumen.ventas)} · ${resumen.dia}</p>`
+                    : `<p>${aviso}</p>`;
+            }
+
+            // 6. TICKET
+            if (panel === 'ticket' && $('ticketCuerpo')) {
+                const filas = dato.tickets || [];
+                $('ticketCuerpo').innerHTML = filas.length
+                    ? filas.map(t => `<tr><td>${textoJefe((t.fecha || '').slice(11, 16))}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(t.pago)}</td><td>${plataJefe(t.total)}</td></tr>`).join('')
+                    : `<tr><td colspan="4">${aviso || 'Sin tickets en ese día.'}</td></tr>`;
+            }
+        }
+
         function switchView(name) {
             if (name === 'usuarios' && sessionUser.role !== 'admin') {
                 toast('Solo administradores pueden gestionar usuarios', true);
@@ -2171,13 +2564,21 @@ const $ = id => document.getElementById(id);
             document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
             document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
             
+            const jefeVistas = ['dashboard', 'reporte', 'proveedor', 'promedio', 'ticket', 'contabilidad', 'admin'];
             if ($('dashboardBar')) {
-                if (name === 'home' || name === 'dashboard' || name === 'deudas') {
+                if (name === 'home' || name === 'deudas') {
                     $('dashboardBar').classList.remove('field-hidden');
                 } else {
                     $('dashboardBar').classList.add('field-hidden');
                 }
             }
+            if ($('jefeBar')) {
+                $('jefeBar').classList.toggle('field-hidden', !jefeVistas.includes(name));
+                document.querySelectorAll('.jefe-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.jefe === name);
+                });
+            }
+            if (['reporte', 'proveedor', 'promedio', 'ticket', 'contabilidad', 'admin'].includes(name)) cargarJefe(name);
             if ($('cobranzasBar')) {
                 if (name === 'cobranzas') {
                     $('cobranzasBar').classList.remove('field-hidden');
@@ -2230,6 +2631,12 @@ const $ = id => document.getElementById(id);
 
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', () => switchView(btn.dataset.view));
+        });
+        document.querySelectorAll('.jefe-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchView(btn.dataset.jefe));
+        });
+        document.querySelectorAll('.corp-area').forEach(btn => {
+            btn.addEventListener('click', () => switchView(btn.dataset.corp));
         });
 
         $('btnTogglePro').addEventListener('click', () => {
@@ -3681,6 +4088,7 @@ const $ = id => document.getElementById(id);
             try {
                 wireCrmModules();
                 initBackupUi();
+                cargarSucursalesSelector();
                 await CrmLoader.runBoot();
             } catch (e) {
                 console.error('boot:', e);

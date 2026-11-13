@@ -110,19 +110,60 @@ def resumen_base() -> list[dict]:
     ]
 
 
-def filas_de(tabla: str) -> tuple[list[str], list[list]]:
+def listar_sucursales() -> list[dict]:
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        rows = conn.execute(
+            """
+            SELECT DISTINCT sucursal_id, sucursal_nombre
+            FROM pos_base
+            WHERE sucursal_id IS NOT NULL
+            ORDER BY sucursal_id
+            """
+        ).fetchall()
+    return [
+        {
+            "id": int(r["sucursal_id"]),
+            "nombre": r["sucursal_nombre"] or f"Sucursal {r['sucursal_id']}",
+        }
+        for r in rows
+    ]
+
+
+def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], list[list]]:
     if not _TABLA.match(tabla or ""):
         return [], []
     with get_db() as conn:
         ensure_tenant_migrations(conn)
-        partes = conn.execute(
-            "SELECT columnas, filas FROM pos_base WHERE tabla = ? ORDER BY parte",
-            (tabla,),
-        ).fetchall()
+        if sucursal_id is not None:
+            partes = conn.execute(
+                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id = ? ORDER BY parte",
+                (tabla, int(sucursal_id)),
+            ).fetchall()
+        else:
+            partes = conn.execute(
+                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? ORDER BY sucursal_id, parte",
+                (tabla,),
+            ).fetchall()
     if not partes:
         return [], []
-    columnas = json.loads(partes[0]["columnas"])
+    columnas = list(json.loads(partes[0]["columnas"]))
+    tiene_suc = "sucursal_id" in [c.lower() for c in columnas]
+    if not tiene_suc:
+        columnas.append("sucursal_id")
+        columnas.append("sucursal_nombre")
+
     filas: list[list] = []
     for parte in partes:
-        filas.extend(json.loads(parte["filas"]))
+        sid = parte["sucursal_id"]
+        snom = parte["sucursal_nombre"]
+        part_filas = json.loads(parte["filas"])
+        if not tiene_suc:
+            for f in part_filas:
+                f_copy = list(f)
+                f_copy.append(sid)
+                f_copy.append(snom)
+                filas.append(f_copy)
+        else:
+            filas.extend(part_filas)
     return columnas, filas

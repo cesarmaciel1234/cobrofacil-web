@@ -1,0 +1,14 @@
+---
+description: Cobro Fácil y este CRM son proyectos separados. El cerebro no se toca; el envío es un módulo aparte.
+alwaysApply: true
+---
+
+# Proyectos separados
+
+`C:\Users\cesar\OneDrive\Desktop\crm-frigorifico` y Cobro Fácil (`C:\Users\cesar\OneDrive\Desktop\tpv pro 2026`) son proyectos distintos.
+
+Cobro Fácil ya está terminado y funciona. Su cerebro (ventas, tickets, historial, caja) no se edita desde este proyecto. La lógica que haga falta se copia y se pega acá. El original queda donde está.
+
+La excepción es un módulo aparte, `src/central_red_global/servidor/crm_salida/`. Vive en el servidor de Cobro Fácil y su único trabajo es mandar la base. No es el cerebro. No se reinicia el servidor que ya está abierto.
+
+Este CRM es la cara de todas las sucursales. Cada sucursal manda su libro a Neon (`neondb`). Render lo muestra. Neon guarda. Render no es la base.

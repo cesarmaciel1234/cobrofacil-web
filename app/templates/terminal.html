@@ -249,37 +249,65 @@
             </div>
         </div>
         <nav class="nav">
-            <div class="nav-label">Gerencia</div>
+            <div class="nav-label">Dirección</div>
             <button type="button" class="nav-item active" data-view="home">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
                 Inicio
             </button>
+            <button type="button" class="nav-item" data-view="reporte">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>
+                👑 Panel del Jefe
+            </button>
+            <button type="button" class="nav-item" data-view="contabilidad">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16l3-4 3 2 4-6"/></svg>
+                💰 Contabilidad & Caja
+            </button>
+            <button type="button" class="nav-item" data-view="admin">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+                👥 Admin & Cartera
+            </button>
             <button type="button" class="nav-item" data-view="dashboard">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-                Panel del jefe
+                Salud & Balance
             </button>
-            
+            <button type="button" class="nav-item" data-view="promedio">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l5-6 4 3 7-8"/></svg>
+                Promedio
+            </button>
+
             <div class="nav-label" style="margin-top:12px">Comercial</div>
-            <button type="button" class="nav-item" data-view="ventas-express" data-write-only>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
-                Ventas express
-            </button>
             <button type="button" class="nav-item" data-view="clientes">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-                Clientes (CRM)
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
+                Directorio Clientes
+            </button>
+            <button type="button" class="nav-item" data-view="ticket">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8zM8 8V6a4 4 0 018 0v2"/></svg>
+                Ticket
             </button>
             <button type="button" class="nav-item" data-view="remitos">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
                 Historial de venta
             </button>
-            
-            <div class="nav-label" style="margin-top:12px">Operaciones</div>
+            <button type="button" class="nav-item" data-view="ventas-express" data-write-only>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
+                Ventas express
+            </button>
+
+            <div class="nav-label" style="margin-top:12px">Abastecimiento</div>
+            <button type="button" class="nav-item" data-view="proveedor">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h13l3 5v5h-2M3 7v10h2M16 17a2 2 0 104 0M7 17a2 2 0 104 0"/></svg>
+                Proveedor
+            </button>
             <button type="button" class="nav-item" data-view="compra-bulk" data-write-only>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M3 13l5-5 5 5 8-8"/></svg>
                 Compra bulk
             </button>
-            
+
             <div class="nav-label" style="margin-top:12px">Tesorería</div>
+            <button type="button" class="nav-item" data-view="contabilidad">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16l3-4 3 2 4-6"/></svg>
+                Contabilidad
+            </button>
             <button type="button" class="nav-item" data-view="cobranzas">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
                 Cobranzas
@@ -296,7 +324,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 Historial de pagos
             </button>
-            <div class="nav-label" style="margin-top:12px">Analíticas</div>
+            <div class="nav-label" style="margin-top:12px">Control</div>
             <button type="button" class="nav-item" data-view="finanzas-aging">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 Antigüedad de deuda
@@ -305,12 +333,12 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M12 18V6M17 9H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
                 Márgenes de venta
             </button>
-            
-            <div class="nav-label" style="margin-top:12px">Sistema</div>
             <button type="button" class="nav-item" data-view="auditoria">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                Auditoría (Historial)
+                Auditoría
             </button>
+
+            <div class="nav-label" style="margin-top:12px">Casa central</div>
 
 
             
@@ -327,7 +355,7 @@
         </div>
         <div class="sidebar-foot" style="flex-direction: column; align-items: stretch; gap: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <span>Distribuidora de carne</span>
+                <span>Casa central</span>
                 <span class="version-tag">v{{ app_version }} PRO</span>
             </div>
             <button type="button" class="btn btn-ghost btn-sm" id="btnBackup" style="width:100%; color:#3b82f6;">⛁ Backup / Nube</button>
@@ -394,6 +422,22 @@
                 </button>
             </div>
         </header>
+        <!-- Selector Multi-Sucursal Global -->
+        <div class="branch-selector-bar" id="branchSelectorBar" style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                <span style="font-size:12px; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:6px;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 7V3h12v4M9 11h2M13 11h2M9 15h2M13 15h2"/></svg>
+                    Sucursal:
+                </span>
+                <div id="sucursalPillsContainer" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                    <button type="button" class="btn btn-sm btn-primary sucursal-pill active" data-sucursal="todas" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">Consolidado (Todas)</button>
+                </div>
+            </div>
+            <div style="font-size:12px; color:#64748b; font-weight:600; display:flex; align-items:center; gap:6px;" id="sucursalStatusLabel">
+                <span style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block;"></span>
+                <span>Espejo Nube · Neon PostgreSQL</span>
+            </div>
+        </div>
 
         <div class="content">
             <!-- VIEW: Home -->
@@ -422,6 +466,17 @@
 
             <!-- VIEW: Dashboard -->
             <div class="view" id="view-dashboard">
+                <div class="card" style="margin-bottom:18px">
+                    <div class="card-head"><h2>Casa central</h2><span>El espejo está en Neon. Desde acá se audita sin ir al local.</span></div>
+                    <div class="corp-map">
+                        <button type="button" class="corp-area" data-corp="dashboard"><strong>Dirección</strong><span>Salud, reporte y promedio</span></button>
+                        <button type="button" class="corp-area" data-corp="clientes"><strong>Comercial</strong><span>Clientes, cartera y tickets</span></button>
+                        <button type="button" class="corp-area" data-corp="proveedor"><strong>Abastecimiento</strong><span>Proveedores y compras</span></button>
+                        <button type="button" class="corp-area" data-corp="contabilidad"><strong>Tesorería</strong><span>Contabilidad, caja y gastos</span></button>
+                        <button type="button" class="corp-area" data-corp="auditoria"><strong>Control</strong><span>Auditoría y márgenes</span></button>
+                        <a class="corp-area" href="/cartera"><strong>Cartera</strong><span>Deuda de cada cliente</span></a>
+                    </div>
+                </div>
                 <div class="kpi-grid" id="kpiGrid">
 
                     <div class="kpi gold">
@@ -473,6 +528,43 @@
                 <div class="card" style="margin-top:18px">
                     <div class="card-head"><h2>Últimos remitos de venta</h2><span>Operaciones recientes</span></div>
                     <div class="table-wrap"><table class="data-table home-table"><thead><tr><th>Info</th><th>Operación</th><th>Venta</th><th>Estado</th></tr></thead><tbody id="tblRemitosDash"></tbody></table></div>
+                </div>
+            </div>
+
+            <div class="view" id="view-contabilidad">
+                <div class="card">
+                    <div class="card-head"><h2>Contabilidad & Caja</h2><span id="contaDia">Espejo de la caja</span></div>
+                    <div class="card-body" id="contaCuerpo" style="padding:20px; line-height:1.5;">Cargando el libro…</div>
+                </div>
+            </div>
+            <div class="view" id="view-admin">
+                <div class="card">
+                    <div class="card-head"><h2>Administración & Cartera</h2><span id="adminDia">Espejo de clientes y fiado</span></div>
+                    <div class="card-body" id="adminCuerpo" style="padding:20px; line-height:1.5;">Cargando cartera…</div>
+                </div>
+            </div>
+            <div class="view" id="view-reporte">
+                <div class="card">
+                    <div class="card-head"><h2>Reporte</h2><span id="reporteDia">Cerebro Jefe</span></div>
+                    <div class="card-body" id="reporteCuerpo" style="padding:20px; line-height:1.5;">Cargando el libro de Cobro Fácil…</div>
+                </div>
+            </div>
+            <div class="view" id="view-proveedor">
+                <div class="card">
+                    <div class="card-head"><h2>Proveedor</h2><span id="proveedorCount">Del libro de Cobro Fácil</span></div>
+                    <div class="card-body" id="proveedorCuerpo" style="padding:8px 20px 20px;">Cargando…</div>
+                </div>
+            </div>
+            <div class="view" id="view-promedio">
+                <div class="card">
+                    <div class="card-head"><h2>Promedio</h2><span>Ticket medio del día</span></div>
+                    <div class="card-body" id="promedioCuerpo" style="padding:20px;">Cargando…</div>
+                </div>
+            </div>
+            <div class="view" id="view-ticket">
+                <div class="card">
+                    <div class="card-head"><h2>Ticket</h2><span>Historial del día</span></div>
+                    <div class="table-wrap"><table class="data-table"><thead><tr><th>Hora</th><th>Ticket</th><th>Pago</th><th>Total</th></tr></thead><tbody id="ticketCuerpo"></tbody></table></div>
                 </div>
             </div>
 
@@ -1265,6 +1357,14 @@
 
 
 
+    <nav class="dashboard-bar jefe-bar field-hidden" id="jefeBar" aria-label="Esenciales del jefe">
+        <button type="button" class="jefe-btn" data-jefe="reporte"><span class="label">👑 Jefe</span><span class="sub">Ventas & Cortes</span></button>
+        <button type="button" class="jefe-btn" data-jefe="contabilidad"><span class="label">💰 Contabilidad</span><span class="sub">Caja & Arqueo</span></button>
+        <button type="button" class="jefe-btn" data-jefe="admin"><span class="label">👥 Admin</span><span class="sub">Cartera & Fiado</span></button>
+        <button type="button" class="jefe-btn" data-jefe="ticket"><span class="label">🎟️ Tickets</span><span class="sub">Historial</span></button>
+        <button type="button" class="jefe-btn" data-jefe="proveedor"><span class="label">📦 Proveedor</span><span class="sub">Compras</span></button>
+    </nav>
+
     <div class="dashboard-bar field-hidden" id="dashboardBar">
         <div class="kpi-item">
             <span class="label">SANGRE/DÍA</span>
@@ -1374,6 +1474,27 @@
                 padding: 4px 2px !important;
             }
         }
+        .corp-map { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 8px 16px 16px; }
+        @media (min-width: 720px) { .corp-map { grid-template-columns: 1fr 1fr; } }
+        .corp-area { text-align: left; border: 1px solid #e2e8f0; background: #f8fafc; border-radius: 14px; padding: 14px 16px; cursor: pointer; font: inherit; text-decoration: none; color: inherit; display: block; }
+        .corp-area strong { display: block; color: #0f172a; font-size: 0.95rem; }
+        .corp-area span { display: block; color: #64748b; font-size: 0.78rem; margin-top: 4px; }
+        .jefe-bar { gap: 6px; padding: 10px 12px; }
+        .jefe-btn {
+            flex: 1;
+            min-width: 0;
+            border: 0;
+            background: transparent;
+            border-radius: 14px;
+            padding: 8px 4px;
+            cursor: pointer;
+            font: inherit;
+        }
+        .jefe-btn .label { display: block; color: #0f172a; font-weight: 800; }
+        .jefe-btn .sub { display: block; }
+        .jefe-btn.active { background: #0f172a; }
+        .jefe-btn.active .label,
+        .jefe-btn.active .sub { color: #fff; }
         .kpi-item {
             display: flex;
             flex-direction: column;
