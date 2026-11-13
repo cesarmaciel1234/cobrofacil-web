@@ -310,7 +310,9 @@ const $ = id => document.getElementById(id);
             promedio: ['Promedio', 'Ticket medio del día', 'Promedio'],
             ticket: ['Ticket', 'Historial de tickets del día', 'Ticket'],
             contabilidad: ['Contabilidad', 'Caja, cobros y gastos del espejo', 'Contabilidad'],
-            admin: ['Admin Cartera', 'Cartera de clientes, mora y límites de fiado', 'Admin']
+            admin: ['Admin Cartera', 'Cartera de clientes, mora y límites de fiado', 'Admin'],
+            digitales: ['Cobros Digitales MP', 'Auditoría de Mercado Pago, QR y Point', 'Digital'],
+            pedidos: ['Pedidos al Frigorífico', 'Faltantes de stock y mensaje WhatsApp', 'Pedidos']
         };
 
         function plazoTexto(e) {
@@ -2438,88 +2440,268 @@ const $ = id => document.getElementById(id);
                 }
             }
 
-            // 3. ADMIN / CARTERA
-            if (panel === 'admin' && $('adminCuerpo')) {
-                const cartera = dato.cartera || {};
-                const deudores = cartera.top_deudores || [];
-                $('adminDia').textContent = `Espejo de clientes · ${cartera.total_cuentas || 0} cuentas en sistema`;
+            // 3. COBROS DIGITALES (MERCADO PAGO & TARJETAS) - RECONCILIACIÓN EN TIEMPO REAL
+            if (panel === 'digitales' && $('digitalesCuerpo')) {
+                const dig = dato.digitales || {};
+                $('digitalesDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Mercado Pago · QR · Tarjetas';
 
                 let html = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px;">
-                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:700; color:#991b1b; text-transform:uppercase; letter-spacing:0.04em;">Deuda Total en la Calle</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#b91c1c; margin-top:4px;">${plataJefe(cartera.deuda_total || cartera.deuda)}</div>
-                        <div style="font-size:12px; color:#991b1b; margin-top:2px;">${cartera.con_deuda || 0} cuentas con deuda activa</div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; margin-bottom:18px;">
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">BRUTO MP</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#0f172a; margin-top:2px;">${plataJefe(dig.bruto_mp)}</div>
+                        <div style="font-size:11px; color:#64748b;">Total cobrado digital</div>
                     </div>
-                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:700; color:#166534; text-transform:uppercase; letter-spacing:0.04em;">Saldo a Favor Total</div>
-                        <div style="font-size:1.8rem; font-weight:800; color:#15803d; margin-top:4px;">${plataJefe(cartera.saldo_a_favor_total || 0)}</div>
-                        <div style="font-size:12px; color:#166534; margin-top:2px;">${cartera.a_favor || 0} clientes con pago a cuenta</div>
+                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#166534; text-transform:uppercase;">NETO MP</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#15803d; margin-top:2px;">${plataJefe(dig.neto_mp)}</div>
+                        <div style="font-size:11px; color:#166534;">Líquido a cobrar</div>
                     </div>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Cuentas al Día</div>
-                        <div style="font-size:1.8rem; font-weight:800; color:#0f172a; margin-top:4px;">${cartera.al_dia || 0}</div>
-                        <div style="font-size:12px; color:#64748b; margin-top:2px;">Sin saldo pendiente</div>
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#1e40af; text-transform:uppercase;">TICKETS DIGITALES</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#1d4ed8; margin-top:2px;">${plataJefe(dig.tickets_digitales)}</div>
+                        <div style="font-size:11px; color:#1e40af;">Emitidos en TPV</div>
                     </div>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px; display:flex; flex-direction:column; justify-content:center; align-items:center;">
-                        <a href="/cartera" class="btn btn-primary" style="width:100%; text-align:center; padding:10px 14px; border-radius:10px; font-weight:700; text-decoration:none;">
-                            📱 Abrir Cartera Móvil
-                        </a>
-                        <span style="font-size:11px; color:#64748b; margin-top:6px;">Vista interactiva con intereses</span>
+                    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#15803d; text-transform:uppercase;">FIRMADOS EN TICKET</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#16a34a; margin-top:2px;">${plataJefe(dig.firmados_ticket)}</div>
+                        <div style="font-size:11px; color:#15803d;">Cobros cerrados</div>
+                    </div>
+                    <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#92400e; text-transform:uppercase;">SIN FIRMAR / F9</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#b45309; margin-top:2px;">${plataJefe(dig.sin_firmar)}</div>
+                        <div style="font-size:11px; color:#92400e;">Pendiente de firma</div>
+                    </div>
+                    <div style="background:#fef2f2; border:2px solid #ef4444; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#991b1b; text-transform:uppercase;">MP SIN TICKET</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#dc2626; margin-top:2px;">${plataJefe(dig.sin_ticket)}</div>
+                        <div style="font-size:11px; color:#991b1b; font-weight:700;">🚨 Alerta de auditoría</div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#475569; text-transform:uppercase;">CLIENTE (COBROS)</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#0f172a; margin-top:2px;">${plataJefe(dig.cliente_cobros)}</div>
+                        <div style="font-size:11px; color:#475569;">Cobranzas fiado</div>
+                    </div>
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
+                        <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">CANCELADOS</div>
+                        <div style="font-size:1.4rem; font-weight:900; color:#64748b; margin-top:2px;">${plataJefe(dig.cancelados)}</div>
+                        <div style="font-size:11px; color:#64748b;">Operaciones nulas</div>
                     </div>
                 </div>`;
 
+                const txs = dig.transacciones || [];
                 html += `
                 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
                     <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                        <span>👥 Top Cuentas Morosas & Límites de Crédito</span>
-                        <span style="font-size:12px; font-weight:600; color:#64748b;">${deudores.length} cuentas con saldo</span>
+                        <span>📋 Libro de Auditoría Transaccional Digital (${txs.length})</span>
+                        <span style="font-size:12px; color:#64748b;">Reconciliación bancaria en vivo</span>
                     </div>
                     <div style="overflow-x:auto;">
                         <table class="data-table" style="width:100%; border-collapse:collapse;">
                             <thead>
                                 <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
-                                    <th style="padding:10px 14px; text-align:left;">Cliente</th>
-                                    <th style="padding:10px 14px; text-align:left;">DNI / CUIT</th>
-                                    <th style="padding:10px 14px; text-align:right;">Saldo Deudor</th>
-                                    <th style="padding:10px 14px; text-align:right;">Límite Acordado</th>
-                                    <th style="padding:10px 14px; text-align:center;">Estado Límite</th>
-                                    <th style="padding:10px 14px; text-align:center;">Cobranza</th>
+                                    <th style="padding:10px 12px; text-align:left;">Fecha</th>
+                                    <th style="padding:10px 12px; text-align:left;">ID Pago</th>
+                                    <th style="padding:10px 12px; text-align:left;">Cuenta / Token</th>
+                                    <th style="padding:10px 12px; text-align:left;">Concepto</th>
+                                    <th style="padding:10px 12px; text-align:right;">Monto</th>
+                                    <th style="padding:10px 12px; text-align:center;">Estado</th>
+                                    <th style="padding:10px 12px; text-align:center;">Ticket Venta</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
+                if (txs.length === 0) {
+                    html += `<tr><td colspan="7" style="padding:16px; text-align:center; color:#64748b;">Sin movimientos digitales registrados hoy.</td></tr>`;
+                } else {
+                    txs.forEach(t => {
+                        let stBadge = `<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">FIRMADO</span>`;
+                        if (t.estado.includes('SIN TICKET')) {
+                            stBadge = `<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800;">🚨 SIN TICKET</span>`;
+                        } else if (t.estado.includes('SIN FIRMAR')) {
+                            stBadge = `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">SIN FIRMAR</span>`;
+                        }
+                        html += `
+                        <tr style="border-bottom:1px solid #f1f5f9; font-size:13px;">
+                            <td style="padding:10px 12px; color:#475569;">${textoJefe((t.fecha || '').slice(0, 16))}</td>
+                            <td style="padding:10px 12px; font-family:monospace; color:#334155;">${textoJefe(t.id_pago)}</td>
+                            <td style="padding:10px 12px; color:#1e293b; font-weight:600;">${textoJefe(t.cuenta)}</td>
+                            <td style="padding:10px 12px; color:#334155;">${textoJefe(t.concepto)}</td>
+                            <td style="padding:10px 12px; text-align:right; font-weight:900; color:#0f172a;">${plataJefe(t.monto)}</td>
+                            <td style="padding:10px 12px; text-align:center;">${stBadge}</td>
+                            <td style="padding:10px 12px; text-align:center; font-family:monospace; color:#2563eb; font-weight:700;">#${textoJefe(t.ticket_venta)}</td>
+                        </tr>`;
+                    });
+                }
+                html += `</tbody></table></div></div>`;
+
+                $('digitalesCuerpo').innerHTML = html;
+            }
+
+            // 4. ADMIN / CARTERA & FIADO (CON MORA, INTERÉS Y BOTÓN WHATSAPP)
+            if (panel === 'admin' && $('adminCuerpo')) {
+                const cartera = dato.cartera || {};
+                const deudores = cartera.top_deudores || [];
+                $('adminDia').textContent = `Espejo en tiempo real · ${cartera.total_cuentas || 0} cuentas registradas`;
+
+                let html = `
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:18px;">
+                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">CARTERA EN LA CALLE</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#15803d; margin-top:4px;">${plataJefe(cartera.cartera_en_calle || cartera.deuda_total)}</div>
+                        <div style="font-size:12px; color:#166534;">${cartera.cuentas_activas || cartera.con_deuda} cuentas activas · colocación total</div>
+                    </div>
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">CUENTAS ACTIVAS</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#1d4ed8; margin-top:4px;">${cartera.cuentas_activas || cartera.con_deuda}</div>
+                        <div style="font-size:12px; color:#1e40af;">de ${cartera.total_cuentas || 0} clientes registrados</div>
+                    </div>
+                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:800; color:#991b1b; text-transform:uppercase;">CARTERA EN RIESGO</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#b91c1c; margin-top:4px;">${plataJefe(cartera.cartera_en_riesgo || 0)}</div>
+                        <div style="font-size:12px; color:#991b1b;">${cartera.cuentas_en_riesgo || 0} en riesgo/mora · interés simple</div>
+                    </div>
+                    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">COBROS DEL MES</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#16a34a; margin-top:4px;">${plataJefe(cartera.cobros_del_mes || 0)}</div>
+                        <div style="font-size:12px; color:#166534;">Abonado este mes a caja</div>
+                    </div>
+                </div>
+
+                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+                        <div style="font-size:14px; font-weight:800; color:#1e293b;">
+                            👥 Cartera de Clientes y Crédito Barrial
+                        </div>
+                        <a href="/cartera" class="btn btn-sm btn-primary" style="text-decoration:none; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:700;">
+                            📲 Ver Cartera PWA Completa
+                        </a>
+                    </div>
+
+                    <div style="overflow-x:auto;">
+                        <table class="data-table" style="width:100%; border-collapse:collapse;">
+                            <thead>
+                                <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
+                                    <th style="padding:10px 12px; text-align:left;">ID</th>
+                                    <th style="padding:10px 12px; text-align:left;">DNI / CUIT</th>
+                                    <th style="padding:10px 12px; text-align:left;">Nombre</th>
+                                    <th style="padding:10px 12px; text-align:left;">Tipo</th>
+                                    <th style="padding:10px 12px; text-align:center;">Estado</th>
+                                    <th style="padding:10px 12px; text-align:right;">Deuda</th>
+                                    <th style="padding:10px 12px; text-align:right;">Mantenimiento</th>
+                                    <th style="padding:10px 12px; text-align:center;">Días</th>
+                                    <th style="padding:10px 12px; text-align:center;">Tarifa</th>
+                                    <th style="padding:10px 12px; text-align:center;">Acciones</th>
                                 </tr>
                             </thead>
                             <tbody>`;
                 if (deudores.length === 0) {
-                    html += `<tr><td colspan="6" style="padding:14px; text-align:center; color:#64748b;">¡Excelente! No hay clientes con deuda registrada.</td></tr>`;
+                    html += `<tr><td colspan="10" style="padding:16px; text-align:center; color:#64748b;">No hay clientes con deuda registrada.</td></tr>`;
                 } else {
                     deudores.forEach(d => {
-                        const excedido = d.limite > 0 && d.deuda > d.limite;
-                        const alLimite = d.limite > 0 && !excedido && (d.deuda / d.limite >= 0.85);
-                        let badge = `<span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;">Normal</span>`;
-                        if (excedido) {
-                            badge = `<span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800;">⛔ EXCEDIDO</span>`;
-                        } else if (alLimite) {
-                            badge = `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">⚠️ AL LÍMITE</span>`;
-                        }
+                        const stBadge = d.en_riesgo
+                            ? `<span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800;">Atención</span>`
+                            : `<span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;">Normal</span>`;
 
                         const telLimpio = (d.telefono || '').replace(/\D/g, '');
                         const wspBtn = telLimpio.length >= 8
-                            ? `<a href="https://wa.me/549${telLimpio}?text=Hola%20${encodeURIComponent(d.nombre)},%20te%20escribimos%20de%20la%20administracion%20por%20tu%20saldo%20pendiente%20de%20${encodeURIComponent(plataJefe(d.deuda))}" target="_blank" style="background:#22c55e; color:#fff; padding:4px 10px; border-radius:8px; font-size:12px; font-weight:700; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">📲 Cobrar</a>`
-                            : `<span style="color:#94a3b8; font-size:12px;">Sin tel</span>`;
+                            ? `<a href="https://wa.me/549${telLimpio}?text=Hola%20${encodeURIComponent(d.nombre)},%20te%20escribimos%20de%20la%20administracion.%20Tu%20saldo%20actual%20es%20de%20${encodeURIComponent(plataJefe(d.deuda))}%20(%2B%20${encodeURIComponent(plataJefe(d.mantenimiento))}%20de%20mantenimiento).%20Favor%20confirmar%20cuando%20puedas%20pasar%20a%20abonar.%20Gracias!" target="_blank" style="background:#22c55e; color:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">📲 Cobrar</a>`
+                            : `<span style="color:#94a3b8; font-size:11px;">Sin tel</span>`;
 
                         html += `
-                        <tr style="border-bottom:1px solid #f1f5f9;">
-                            <td style="padding:10px 14px; font-weight:700; color:#1e293b;">${textoJefe(d.nombre)}</td>
-                            <td style="padding:10px 14px; color:#64748b; font-size:12px;">${textoJefe(d.dni) || '—'}</td>
-                            <td style="padding:10px 14px; text-align:right; font-weight:900; color:#b91c1c;">${plataJefe(d.deuda)}</td>
-                            <td style="padding:10px 14px; text-align:right; color:#475569;">${d.limite > 0 ? plataJefe(d.limite) : 'Sin límite'}</td>
-                            <td style="padding:10px 14px; text-align:center;">${badge}</td>
-                            <td style="padding:10px 14px; text-align:center;">${wspBtn}</td>
+                        <tr style="border-bottom:1px solid #f1f5f9; font-size:13px;">
+                            <td style="padding:10px 12px; color:#64748b; font-family:monospace;">${textoJefe(d.id)}</td>
+                            <td style="padding:10px 12px; color:#64748b;">${textoJefe(d.dni) || 'Sin DNI'}</td>
+                            <td style="padding:10px 12px; font-weight:700; color:#1e293b;">${textoJefe(d.nombre)}</td>
+                            <td style="padding:10px 12px; color:#475569;">${textoJefe(d.tipo)}</td>
+                            <td style="padding:10px 12px; text-align:center;">${stBadge}</td>
+                            <td style="padding:10px 12px; text-align:right; font-weight:900; color:#047857;">${plataJefe(d.deuda)}</td>
+                            <td style="padding:10px 12px; text-align:right; font-weight:700; color:#b45309;">+${plataJefe(d.mantenimiento)}</td>
+                            <td style="padding:10px 12px; text-align:center; color:#64748b;">${d.dias} días</td>
+                            <td style="padding:10px 12px; text-align:center; font-weight:700; color:#475569;">${d.tarifa}</td>
+                            <td style="padding:10px 12px; text-align:center;">${wspBtn}</td>
                         </tr>`;
                     });
                 }
                 html += `</tbody></table></div></div>`;
 
                 $('adminCuerpo').innerHTML = html;
+            }
+
+            // 5. PEDIDOS AL FRIGORÍFICO (ABASTECIMIENTO & WHATSAPP)
+            if (panel === 'pedidos' && $('pedidosCuerpo')) {
+                const ped = dato.pedidos || {};
+                const faltantes = ped.faltantes || [];
+                $('pedidosDia').textContent = `Reposición sugerida · Inversión estimada: ${plataJefe(ped.inversion_estimada || 0)}`;
+
+                let html = `
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:18px;">
+                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:800; color:#991b1b; text-transform:uppercase;">ARTÍCULOS EN QUIEBRE</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#dc2626; margin-top:4px;">${ped.articulos_en_quiebre || 0}</div>
+                        <div style="font-size:12px; color:#991b1b;">Alarma de inventario bajo stock</div>
+                    </div>
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">PROVEEDORES CON PEDIDO</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#1d4ed8; margin-top:4px;">${ped.proveedores_con_pedido || 0}</div>
+                        <div style="font-size:12px; color:#1e40af;">Distribuidores a contactar</div>
+                    </div>
+                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
+                        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">INVERSIÓN ESTIMADA</div>
+                        <div style="font-size:1.8rem; font-weight:900; color:#15803d; margin-top:4px;">${plataJefe(ped.inversion_estimada || 0)}</div>
+                        <div style="font-size:12px; color:#166534;">Presupuesto sugerido de reposición</div>
+                    </div>
+                </div>
+
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px;">
+                    <!-- Tabla de Artículos a Pedir -->
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                        <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">
+                            🥩 Faltantes y Stock a Pedir (${faltantes.length})
+                        </div>
+                        <div style="max-height:380px; overflow-y:auto;">
+                            <table class="data-table" style="width:100%; border-collapse:collapse;">
+                                <thead>
+                                    <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
+                                        <th style="padding:8px 10px; text-align:left;">Producto</th>
+                                        <th style="padding:8px 10px; text-align:center;">Stock</th>
+                                        <th style="padding:8px 10px; text-align:center;">Mín</th>
+                                        <th style="padding:8px 10px; text-align:center; font-weight:800; color:#dc2626;">A Pedir</th>
+                                        <th style="padding:8px 10px; text-align:right;">Subtotal</th>
+                                    </tr>
+                                </thead>
+                                <tbody>`;
+                if (faltantes.length === 0) {
+                    html += `<tr><td colspan="5" style="padding:16px; text-align:center; color:#64748b;">¡Excelente! Todo el stock está por encima del mínimo.</td></tr>`;
+                } else {
+                    faltantes.forEach(item => {
+                        html += `
+                        <tr style="border-bottom:1px solid #f1f5f9; font-size:12px;">
+                            <td style="padding:8px 10px; font-weight:700; color:#1e293b;">${textoJefe(item.producto)}</td>
+                            <td style="padding:8px 10px; text-align:center; color:#64748b;">${item.stock_actual}</td>
+                            <td style="padding:8px 10px; text-align:center; color:#64748b;">${item.minimo}</td>
+                            <td style="padding:8px 10px; text-align:center; font-weight:900; color:#dc2626; background:#fef2f2; border-radius:6px;">${item.a_pedir}</td>
+                            <td style="padding:8px 10px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(item.subtotal)}</td>
+                        </tr>`;
+                    });
+                }
+                html += `</tbody></table></div></div>
+
+                    <!-- Mensaje de WhatsApp Listo -->
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; display:flex; flex-direction:column;">
+                        <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:8px;">
+                            📲 Mensaje de WhatsApp Listo para el Frigorífico
+                        </div>
+                        <div style="font-size:12px; color:#64748b; margin-bottom:10px;">
+                            Generado automáticamente según el quiebre de stock del negocio.
+                        </div>
+                        <textarea id="txtWspPedido" readonly style="flex:1; min-height:220px; font-family:monospace; font-size:12px; padding:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; resize:none; line-height:1.5;">${textoJefe(ped.mensaje_whatsapp || '')}</textarea>
+                        <button type="button" class="btn btn-primary" onclick="navigator.clipboard.writeText($('txtWspPedido').value); alert('¡Mensaje copiado al portapapeles! Abrí WhatsApp y pegalo.');" style="margin-top:12px; padding:12px; border-radius:10px; font-weight:800; background:#16a34a; border-color:#16a34a; font-size:14px; display:flex; align-items:center; justify-content:center; gap:8px;">
+                            📋 Copiar para WhatsApp
+                        </button>
+                    </div>
+                </div>`;
+
+                $('pedidosCuerpo').innerHTML = html;
             }
 
             // 4. PROVEEDOR
@@ -2563,8 +2745,11 @@ const $ = id => document.getElementById(id);
             if (!titles[name]) return;
             document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
             document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+            document.querySelectorAll('.pwa-nav-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.pwaView === name);
+            });
             
-            const jefeVistas = ['dashboard', 'reporte', 'proveedor', 'promedio', 'ticket', 'contabilidad', 'admin'];
+            const jefeVistas = ['dashboard', 'reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket'];
             if ($('dashboardBar')) {
                 if (name === 'home' || name === 'deudas') {
                     $('dashboardBar').classList.remove('field-hidden');
@@ -2578,7 +2763,7 @@ const $ = id => document.getElementById(id);
                     btn.classList.toggle('active', btn.dataset.jefe === name);
                 });
             }
-            if (['reporte', 'proveedor', 'promedio', 'ticket', 'contabilidad', 'admin'].includes(name)) cargarJefe(name);
+            if (['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) cargarJefe(name);
             if ($('cobranzasBar')) {
                 if (name === 'cobranzas') {
                     $('cobranzasBar').classList.remove('field-hidden');
@@ -2631,6 +2816,9 @@ const $ = id => document.getElementById(id);
 
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', () => switchView(btn.dataset.view));
+        });
+        document.querySelectorAll('.pwa-nav-btn').forEach(btn => {
+            btn.addEventListener('click', () => switchView(btn.dataset.pwaView));
         });
         document.querySelectorAll('.jefe-btn').forEach(btn => {
             btn.addEventListener('click', () => switchView(btn.dataset.jefe));

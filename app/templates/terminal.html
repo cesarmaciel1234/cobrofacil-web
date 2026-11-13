@@ -98,17 +98,42 @@
         .footer-segment .val-warning { color: var(--warning); }
         .footer-segment .val-success { color: var(--success); }
         
+        .bottom-pwa-bar { display: none; }
         @media (max-width: 768px) {
-            .terminal-footer {
-                bottom: 15px;
-                padding: 8px 16px;
-                gap: 16px;
-                width: 90%;
-                max-width: 400px;
+            .terminal-footer { display: none !important; }
+            .bottom-pwa-bar {
+                display: flex !important;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                height: calc(60px + env(safe-area-inset-bottom, 0px));
+                padding-bottom: env(safe-area-inset-bottom, 0px);
+                background: rgba(15, 23, 42, 0.95);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                z-index: 250;
+                justify-content: space-around;
+                align-items: center;
             }
-            .footer-segment span[id] {
-                font-size: 1rem;
+            .pwa-nav-btn {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                background: transparent;
+                border: none;
+                color: #94a3b8;
+                font-size: 10px;
+                font-weight: 700;
+                gap: 2px;
+                padding: 6px 8px;
+                cursor: pointer;
+                transition: all 0.2s;
             }
+            .pwa-nav-btn.active { color: #38bdf8; }
+            .content { padding-bottom: 75px !important; }
         }
         
         /* 3D Premium Cards for Nuevo Registro */
@@ -249,93 +274,40 @@
             </div>
         </div>
         <nav class="nav">
-            <div class="nav-label">Dirección</div>
-            <button type="button" class="nav-item active" data-view="home">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><path d="M9 22V12h6v10"/></svg>
-                Inicio
-            </button>
-            <button type="button" class="nav-item" data-view="reporte">
+            <div class="nav-label">Mando Ejecutivo</div>
+            <button type="button" class="nav-item active" data-view="reporte">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>
-                👑 Panel del Jefe
+                👑 Ventas & Cortes
+            </button>
+            <button type="button" class="nav-item" data-view="digitales">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h2M10 15h4"/></svg>
+                📱 Cobros Digitales MP
             </button>
             <button type="button" class="nav-item" data-view="contabilidad">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16l3-4 3 2 4-6"/></svg>
-                💰 Contabilidad & Caja
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5H9.5a2.5 2.5 0 000 5h5a2.5 2.5 0 010 5H8"/></svg>
+                💰 Caja & Tesorería
             </button>
             <button type="button" class="nav-item" data-view="admin">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-                👥 Admin & Cartera
+                👥 Cartera & Fiado
             </button>
-            <button type="button" class="nav-item" data-view="dashboard">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
-                Salud & Balance
-            </button>
-            <button type="button" class="nav-item" data-view="promedio">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16l5-6 4 3 7-8"/></svg>
-                Promedio
+            <button type="button" class="nav-item" data-view="pedidos">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h13l3 5v5h-2M3 7v10h2M16 17a2 2 0 104 0M7 17a2 2 0 104 0"/></svg>
+                📦 Pedidos al Frigorífico
             </button>
 
-            <div class="nav-label" style="margin-top:12px">Comercial</div>
-            <button type="button" class="nav-item" data-view="clientes">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                Directorio Clientes
-            </button>
+            <div class="nav-label" style="margin-top:16px">Herramientas</div>
             <button type="button" class="nav-item" data-view="ticket">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8zM8 8V6a4 4 0 018 0v2"/></svg>
-                Ticket
+                🎟️ Tickets Recientes
             </button>
-            <button type="button" class="nav-item" data-view="remitos">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-                Historial de venta
-            </button>
-            <button type="button" class="nav-item" data-view="ventas-express" data-write-only>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6"/></svg>
-                Ventas express
-            </button>
-
-            <div class="nav-label" style="margin-top:12px">Abastecimiento</div>
-            <button type="button" class="nav-item" data-view="proveedor">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h13l3 5v5h-2M3 7v10h2M16 17a2 2 0 104 0M7 17a2 2 0 104 0"/></svg>
-                Proveedor
-            </button>
-            <button type="button" class="nav-item" data-view="compra-bulk" data-write-only>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M3 13l5-5 5 5 8-8"/></svg>
-                Compra bulk
-            </button>
-
-            <div class="nav-label" style="margin-top:12px">Tesorería</div>
-            <button type="button" class="nav-item" data-view="contabilidad">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16l3-4 3 2 4-6"/></svg>
-                Contabilidad
-            </button>
-            <button type="button" class="nav-item" data-view="cobranzas">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                Cobranzas
-            </button>
-            <button type="button" class="nav-item" data-view="pago-central">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h2M10 15h4"/></svg>
-                Pago centralizado
-            </button>
-            <button type="button" class="nav-item" data-view="registro" data-write-only>
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v8M8 12h8"/></svg>
-                Nueva deuda
-            </button>
-            <button type="button" class="nav-item" data-view="historial-pagos">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Historial de pagos
-            </button>
-            <div class="nav-label" style="margin-top:12px">Control</div>
-            <button type="button" class="nav-item" data-view="finanzas-aging">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v4l3 3M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Antigüedad de deuda
-            </button>
-            <button type="button" class="nav-item" data-view="finanzas-margenes">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="20" rx="2" ry="2"/><path d="M12 18V6M17 9H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
-                Márgenes de venta
-            </button>
-            <button type="button" class="nav-item" data-view="auditoria">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                Auditoría
+            <a class="nav-item" href="/cartera" style="text-decoration:none;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                📲 Cartera Móvil PWA
+            </a>
+            <button type="button" class="nav-item" data-view="dashboard">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
+                🏛️ Balance Corporativo
             </button>
 
             <div class="nav-label" style="margin-top:12px">Casa central</div>
@@ -539,8 +511,22 @@
             </div>
             <div class="view" id="view-admin">
                 <div class="card">
-                    <div class="card-head"><h2>Administración & Cartera</h2><span id="adminDia">Espejo de clientes y fiado</span></div>
+                    <div class="card-head"><h2>Cartera de Clientes & Crédito (Fiado)</h2><span id="adminDia">Espejo en tiempo real de cuentas y saldos</span></div>
                     <div class="card-body" id="adminCuerpo" style="padding:20px; line-height:1.5;">Cargando cartera…</div>
+                </div>
+            </div>
+            <!-- VIEW: Cobros Digitales MP -->
+            <div class="view" id="view-digitales">
+                <div class="card">
+                    <div class="card-head"><h2>Auditoría de Cobros Digitales</h2><span id="digitalesDia">Mercado Pago · QR · Point Smart · Tarjetas</span></div>
+                    <div class="card-body" id="digitalesCuerpo" style="padding:20px; line-height:1.5;">Cargando cobros digitales…</div>
+                </div>
+            </div>
+            <!-- VIEW: Pedidos al Frigorífico -->
+            <div class="view" id="view-pedidos">
+                <div class="card">
+                    <div class="card-head"><h2>Realizar Pedido de Reposición</h2><span id="pedidosDia">Faltantes y mensaje de WhatsApp para el frigorífico</span></div>
+                    <div class="card-body" id="pedidosCuerpo" style="padding:20px; line-height:1.5;">Cargando faltantes de stock…</div>
                 </div>
             </div>
             <div class="view" id="view-reporte">
@@ -1357,12 +1343,37 @@
 
 
 
+    <!-- Barra de Navegación Rápida Jefe (Desktop) -->
     <nav class="dashboard-bar jefe-bar field-hidden" id="jefeBar" aria-label="Esenciales del jefe">
-        <button type="button" class="jefe-btn" data-jefe="reporte"><span class="label">👑 Jefe</span><span class="sub">Ventas & Cortes</span></button>
-        <button type="button" class="jefe-btn" data-jefe="contabilidad"><span class="label">💰 Contabilidad</span><span class="sub">Caja & Arqueo</span></button>
-        <button type="button" class="jefe-btn" data-jefe="admin"><span class="label">👥 Admin</span><span class="sub">Cartera & Fiado</span></button>
-        <button type="button" class="jefe-btn" data-jefe="ticket"><span class="label">🎟️ Tickets</span><span class="sub">Historial</span></button>
-        <button type="button" class="jefe-btn" data-jefe="proveedor"><span class="label">📦 Proveedor</span><span class="sub">Compras</span></button>
+        <button type="button" class="jefe-btn" data-jefe="reporte"><span class="label">👑 Ventas</span><span class="sub">Ventas & Cortes</span></button>
+        <button type="button" class="jefe-btn" data-jefe="digitales"><span class="label">📱 Digital</span><span class="sub">Mercado Pago</span></button>
+        <button type="button" class="jefe-btn" data-jefe="contabilidad"><span class="label">💰 Caja</span><span class="sub">Caja & Arqueo</span></button>
+        <button type="button" class="jefe-btn" data-jefe="admin"><span class="label">👥 Cartera</span><span class="sub">Cartera & Fiado</span></button>
+        <button type="button" class="jefe-btn" data-jefe="pedidos"><span class="label">📦 Pedidos</span><span class="sub">Frigorífico</span></button>
+    </nav>
+
+    <!-- Barra de Navegación Inferior Móvil PWA (Estilo App Nativa iPhone / Android) -->
+    <nav class="bottom-pwa-bar" id="bottomPwaBar" aria-label="Navegación Móvil PWA">
+        <button type="button" class="pwa-nav-btn active" data-pwa-view="reporte">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>
+            <span>Ventas</span>
+        </button>
+        <button type="button" class="pwa-nav-btn" data-pwa-view="digitales">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h2M10 15h4"/></svg>
+            <span>Digital</span>
+        </button>
+        <button type="button" class="pwa-nav-btn" data-pwa-view="contabilidad">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5H9.5a2.5 2.5 0 000 5h5a2.5 2.5 0 010 5H8"/></svg>
+            <span>Caja</span>
+        </button>
+        <button type="button" class="pwa-nav-btn" data-pwa-view="admin">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
+            <span>Cartera</span>
+        </button>
+        <button type="button" class="pwa-nav-btn" data-pwa-view="pedidos">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h13l3 5v5h-2M3 7v10h2M16 17a2 2 0 104 0M7 17a2 2 0 104 0"/></svg>
+            <span>Pedidos</span>
+        </button>
     </nav>
 
     <div class="dashboard-bar field-hidden" id="dashboardBar">

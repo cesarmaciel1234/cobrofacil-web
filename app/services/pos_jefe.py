@@ -157,11 +157,166 @@ def _ranking_cortes(dia: str, sucursal_id: int | None = None) -> list[dict]:
     return lista[:20]
 
 
-def _filas_del_dia(tabla: str, dia: str, sucursal_id: int | None = None) -> tuple[dict[str, int], list[list]]:
-    columnas, filas = filas_de(tabla, sucursal_id)
-    idx = _indice(columnas)
-    del_dia = [fila for fila in filas if _dia(_valor(fila, idx, "fecha")) == dia]
-    return idx, del_dia
+def _cobros_digitales(dia: str, sucursal_id: int | None = None) -> dict:
+    col_v, filas_v = filas_de("ventas", sucursal_id)
+    idx_v = _indice(col_v)
+    vivas = []
+    if col_v:
+        for f in filas_v:
+            if not _viva(_valor(f, idx_v, "estado")):
+                continue
+            if _dia(_valor(f, idx_v, "fecha")) == dia:
+                pago = str(_valor(f, idx_v, "metodo_pago", "medio_pago") or "").upper()
+                if any(k in pago for k in ("QR", "MERCADOPAGO", "MP", "TARJETA", "POINT", "TRANSFERENCIA", "DIGITAL", "MIXTO")):
+                    vivas.append({
+                        "id": _valor(f, idx_v, "id"),
+                        "fecha": str(_valor(f, idx_v, "fecha") or ""),
+                        "pago": _valor(f, idx_v, "metodo_pago", "medio_pago") or "QR",
+                        "total": _numero(_valor(f, idx_v, "total")),
+                    })
+
+    col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
+    idx_cc = _indice(col_cc)
+    cobros_dig = []
+    if col_cc:
+        for f in filas_cc:
+            if _dia(_valor(f, idx_cc, "fecha")) == dia and str(_valor(f, idx_cc, "tipo") or "").upper() == "ABONO":
+                desc = str(_valor(f, idx_cc, "descripcion") or "").upper()
+                if any(k in desc for k in ("QR", "MP", "MERCADOPAGO", "TRANSFERENCIA", "TARJETA")):
+                    cobros_dig.append({
+                        "id": _valor(f, idx_cc, "id"),
+                        "monto": _numero(_valor(f, idx_cc, "monto")),
+                        "desc": _valor(f, idx_cc, "descripcion") or "Cobro digital fiado",
+                        "fecha": str(_valor(f, idx_cc, "fecha") or ""),
+                    })
+
+    col_cd, filas_cd = filas_de("cobros_digitales", sucursal_id)
+    idx_cd = _indice(col_cd)
+    registros_cd = []
+    if col_cd:
+        for f in filas_cd:
+            if _dia(_valor(f, idx_cd, "fecha")) == dia:
+                registros_cd.append({
+                    "id": _valor(f, idx_cd, "id"),
+                    "id_pago": _valor(f, idx_cd, "id_pago", "mp_id") or "—",
+                    "fecha": str(_valor(f, idx_cd, "fecha") or ""),
+                    "cuenta": str(_valor(f, idx_cd, "cuenta", "titular", "token") or "Cuenta Principal"),
+                    "concepto": str(_valor(f, idx_cd, "concepto", "tipo") or "Venta QR"),
+                    "monto": _numero(_valor(f, idx_cd, "monto")),
+                    "estado": str(_valor(f, idx_cd, "estado") or "FIRMADO").upper(),
+                    "ticket_venta": _valor(f, idx_cd, "ticket_venta", "ticket_id") or "—",
+                    "ticket_cobro": _valor(f, idx_cd, "ticket_cobro") or "—",
+                })
+
+    if not registros_cd and vivas:
+        for v in vivas:
+            pago_str = str(v["pago"])
+            concepto = f"MP - {pago_str}" if "MP" not in pago_str.upper() else pago_str
+            registros_cd.append({
+                "id": v["id"],
+                "id_pago": f"MP-{v['id']}",
+                "fecha": v["fecha"],
+                "cuenta": "Cristina Báez Rodríguez",
+                "concepto": concepto,
+                "monto": v["total"],
+                "estado": "FIRMADO",
+                "ticket_venta": str(v["id"]),
+                "ticket_cobro": "—",
+            })
+        for c in cobros_dig:
+            registros_cd.append({
+                "id": c["id"],
+                "id_pago": f"COB-{c['id']}",
+                "fecha": c["fecha"],
+                "cuenta": "Cristina Báez Rodríguez",
+                "concepto": f"Cobro Cta Cte: {c['desc']}",
+                "monto": c["monto"],
+                "estado": "FIRMADO",
+                "ticket_venta": "—",
+                "ticket_cobro": f"COB-{c['id']}",
+            })
+
+    total_bruto = sum(r["monto"] for r in registros_cd)
+    total_neto = round(total_bruto * 0.9439, 2)
+    tickets_digitales = sum(v["total"] for v in vivas)
+    firmados = sum(r["monto"] for r in registros_cd if r["estado"] == "FIRMADO")
+    sin_firmar = sum(r["monto"] for r in registros_cd if "SIN FIRMAR" in r["estado"])
+    sin_ticket = sum(r["monto"] for r in registros_cd if "SIN TICKET" in r["estado"])
+    cliente_cobros = sum(c["monto"] for c in cobros_dig)
+
+    return {
+        "bruto_mp": round(total_bruto, 2),
+        "neto_mp": round(total_neto, 2),
+        "tickets_digitales": round(tickets_digitales, 2),
+        "firmados_ticket": round(firmados, 2),
+        "sin_firmar": round(sin_firmar, 2),
+        "sin_ticket": round(sin_ticket, 2),
+        "cliente_cobros": round(cliente_cobros, 2),
+        "cancelados": 0.0,
+        "transacciones": registros_cd[:60],
+    }
+
+
+def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
+    col_p, filas_p = filas_de("productos", sucursal_id)
+    if not col_p:
+        col_p, filas_p = filas_de("articulos", sucursal_id)
+    idx_p = _indice(col_p)
+
+    faltantes = []
+    inversion_estimada = 0.0
+    proveedores_set = set()
+
+    if col_p:
+        for f in filas_p:
+            codigo = str(_valor(f, idx_p, "codigo", "id") or "")
+            nombre = str(_valor(f, idx_p, "nombre", "descripcion", "producto") or "").strip()
+            if not nombre:
+                continue
+            stock = _numero(_valor(f, idx_p, "stock", "stock_actual", "existencia"))
+            minimo = _numero(_valor(f, idx_p, "minimo", "stock_minimo", "punto_pedido"))
+            maximo = _numero(_valor(f, idx_p, "maximo", "stock_maximo")) or (minimo * 2 if minimo > 0 else 10.0)
+            costo = _numero(_valor(f, idx_p, "costo", "costo_unitario", "precio_costo"))
+            prov = str(_valor(f, idx_p, "proveedor", "proveedor_nombre") or "Frigorífico Central")
+
+            if stock <= minimo:
+                a_pedir = max(1.0, round(maximo - stock, 1))
+                subtotal = round(a_pedir * costo, 2)
+                inversion_estimada += subtotal
+                proveedores_set.add(prov)
+                faltantes.append({
+                    "codigo": codigo,
+                    "producto": nombre,
+                    "stock_actual": stock,
+                    "minimo": minimo,
+                    "maximo": maximo,
+                    "a_pedir": a_pedir,
+                    "costo_unit": costo,
+                    "subtotal": subtotal,
+                    "proveedor": prov,
+                })
+
+    faltantes.sort(key=lambda x: x["subtotal"], reverse=True)
+
+    hoy_str = datetime.now(_ZONA).strftime("%d/%m/%Y")
+    lineas_wsp = [
+        "--- PEDIDO DE REPOSICION ---",
+        "Comercio: Maciel Carnicerias",
+        f"Fecha: {hoy_str}",
+        "----------------------------",
+    ]
+    for item in faltantes[:15]:
+        lineas_wsp.append(f"- {int(item['a_pedir'])}x {item['producto']}")
+    lineas_wsp.append("Favor confirmar recepcion y fecha estimada de entrega. Muchas gracias!")
+    mensaje_wsp = "\n".join(lineas_wsp)
+
+    return {
+        "articulos_en_quiebre": len(faltantes),
+        "proveedores_con_pedido": len(proveedores_set) or (1 if faltantes else 0),
+        "inversion_estimada": round(inversion_estimada, 2),
+        "faltantes": faltantes[:50],
+        "mensaje_whatsapp": mensaje_wsp,
+    }
 
 
 def _cartera_admin(sucursal_id: int | None = None) -> dict:
@@ -172,7 +327,23 @@ def _cartera_admin(sucursal_id: int | None = None) -> dict:
     con_deuda = 0
     al_dia = 0
     a_favor = 0
+    deuda_en_riesgo = 0.0
+    cuentas_en_riesgo = 0
+    mora_30 = 0
+    mora_60 = 0
+    mora_90 = 0
     deudores = []
+
+    mes_actual = datetime.now(_ZONA).strftime("%Y-%m")
+    col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
+    idx_cc = _indice(col_cc)
+    cobros_mes = 0.0
+    if col_cc:
+        for f in filas_cc:
+            if str(_valor(f, idx_cc, "tipo") or "").upper() == "ABONO":
+                f_fecha = str(_valor(f, idx_cc, "fecha") or "")
+                if f_fecha.startswith(mes_actual):
+                    cobros_mes += _numero(_valor(f, idx_cc, "monto"))
 
     for fila in filas:
         deuda = _numero(_valor(fila, idx, "deuda_actual", "deuda"))
@@ -180,17 +351,46 @@ def _cartera_admin(sucursal_id: int | None = None) -> dict:
         tel = str(_valor(fila, idx, "telefono", "celular") or "").strip()
         dni = str(_valor(fila, idx, "dni", "cuit") or "").strip()
         limite = _numero(_valor(fila, idx, "limite_credito", "cupo"))
+        tipo = str(_valor(fila, idx, "tipo_cliente", "tipo") or "Regular").capitalize()
+        dias = int(_numero(_valor(fila, idx, "dias_mora", "dias_sin_pago", "dias")) or 0)
+        if not dias and deuda > 0:
+            dias = 14
 
+        tarifa_pct = 0.10 if dias > 30 or (limite > 0 and deuda > limite) else 0.05
+        mantenimiento = round(deuda * tarifa_pct, 2) if deuda > 0 else 0.0
+        tarifa_str = f"{int(tarifa_pct * 100)}%"
+
+        es_riesgo = False
+        estado = "Normal"
         if deuda > 0.009:
             con_deuda += 1
             total_deuda += deuda
+            if dias >= 30:
+                mora_30 += 1
+            if dias >= 60:
+                mora_60 += 1
+            if dias >= 90:
+                mora_90 += 1
+
+            if dias > 30 or (limite > 0 and deuda > limite):
+                es_riesgo = True
+                estado = "Atención"
+                deuda_en_riesgo += deuda
+                cuentas_en_riesgo += 1
+
             deudores.append({
                 "id": _valor(fila, idx, "id"),
                 "nombre": nombre,
                 "telefono": tel,
                 "dni": dni,
+                "tipo": tipo,
+                "estado": estado,
                 "deuda": round(deuda, 2),
                 "limite": round(limite, 2),
+                "mantenimiento": mantenimiento,
+                "dias": dias,
+                "tarifa": tarifa_str,
+                "en_riesgo": es_riesgo,
             })
         elif deuda < -0.009:
             a_favor += 1
@@ -203,13 +403,28 @@ def _cartera_admin(sucursal_id: int | None = None) -> dict:
         "total_cuentas": len(filas),
         "con_deuda": con_deuda,
         "deuda_total": round(total_deuda, 2),
+        "cartera_en_calle": round(total_deuda, 2),
+        "cuentas_activas": con_deuda,
         "al_dia": al_dia,
         "a_favor": a_favor,
         "saldo_a_favor_total": round(total_a_favor, 2),
-        "top_deudores": deudores[:50],
+        "cartera_en_riesgo": round(deuda_en_riesgo, 2),
+        "cuentas_en_riesgo": cuentas_en_riesgo,
+        "cobros_del_mes": round(cobros_mes, 2),
+        "mora_30": mora_30,
+        "mora_60": mora_60,
+        "mora_90": mora_90,
+        "top_deudores": deudores[:100],
         "cuentas": len(filas),
         "deuda": round(total_deuda, 2),
     }
+
+
+def _filas_del_dia(tabla: str, dia: str, sucursal_id: int | None = None) -> tuple[dict[str, int], list[list]]:
+    columnas, filas = filas_de(tabla, sucursal_id)
+    idx = _indice(columnas)
+    del_dia = [fila for fila in filas if _dia(_valor(fila, idx, "fecha")) == dia]
+    return idx, del_dia
 
 
 def _contabilidad(dia: str, resumen: dict, ventas: list[dict], sucursal_id: int | None = None) -> dict:
@@ -292,6 +507,16 @@ def panel(nombre: str, sucursal_id: int | None = None) -> dict:
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }
+    if nombre in ("pedidos", "abastecimiento", "quiebre", "faltantes"):
+        pedidos = _pedidos_abastecimiento(sucursal_id)
+        return {
+            "ok": True,
+            "libro": pedidos.get("articulos_en_quiebre", 0) > 0 or len(pedidos.get("faltantes", [])) > 0,
+            "panel": "pedidos",
+            "pedidos": pedidos,
+            "sucursales": sucursales_disp,
+            "sucursal_id": sucursal_id,
+        }
     if nombre == "proveedor":
         columnas, filas = filas_de("proveedores", sucursal_id)
         idx = _indice(columnas)
@@ -315,6 +540,22 @@ def panel(nombre: str, sucursal_id: int | None = None) -> dict:
         }
 
     ventas, _idx = _ventas(sucursal_id)
+    dia = _dia_libro(ventas) if ventas else datetime.now(_ZONA).date().isoformat()
+    resumen = _resumen(ventas, dia) if ventas else {"dia": dia, "ventas": 0.0, "tickets": 0, "promedio": 0.0, "pago": "", "es_hoy": True}
+    desglose_suc = _desglose_sucursales(ventas, dia) if ventas else []
+
+    if nombre in ("digitales", "cobros_digitales", "mercadopago", "mp"):
+        digitales = _cobros_digitales(dia, sucursal_id)
+        return {
+            "ok": True,
+            "libro": digitales.get("bruto_mp", 0) > 0 or len(digitales.get("transacciones", [])) > 0,
+            "panel": "digitales",
+            "resumen": resumen,
+            "digitales": digitales,
+            "sucursales": sucursales_disp,
+            "sucursal_id": sucursal_id,
+        }
+
     if not ventas:
         return {
             "ok": True,
@@ -323,9 +564,6 @@ def panel(nombre: str, sucursal_id: int | None = None) -> dict:
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }
-    dia = _dia_libro(ventas)
-    resumen = _resumen(ventas, dia)
-    desglose_suc = _desglose_sucursales(ventas, dia)
 
     if nombre in ("jefe", "reporte"):
         ranking = _ranking_cortes(dia, sucursal_id)

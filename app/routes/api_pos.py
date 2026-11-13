@@ -398,7 +398,7 @@ def api_pos_jefe():
 
     nombre = (request.args.get("panel") or "reporte").strip().lower()
     sucursal_id = request.args.get("sucursal_id", type=int)
-    if nombre not in ("reporte", "jefe", "contabilidad", "admin", "cartera", "clientes", "proveedor", "promedio", "ticket"):
+    if nombre not in ("reporte", "jefe", "contabilidad", "admin", "cartera", "clientes", "digitales", "cobros_digitales", "pedidos", "abastecimiento", "proveedor", "promedio", "ticket"):
         return jsonify({"error": "Panel desconocido"}), 400
     return jsonify(panel(nombre, sucursal_id=sucursal_id))
 

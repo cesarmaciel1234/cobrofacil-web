@@ -142,3 +142,43 @@ def test_api_panel_admin_cartera(client):
     assert len(deudores) == 1
     assert deudores[0]["nombre"] == "SILVIA Regular"
     assert deudores[0]["deuda"] == 23513.85
+    assert deudores[0]["tarifa"] == "10%"
+    assert deudores[0]["en_riesgo"] is True
+
+
+def test_api_panel_digitales(client):
+    _cargar_datos_muestra()
+    r = client.get("/api/pos/jefe?panel=digitales")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["libro"] is True
+    dig = d["digitales"]
+    assert dig["bruto_mp"] >= 45000.0
+    assert dig["neto_mp"] > 0
+    assert len(dig["transacciones"]) >= 1
+
+
+def test_api_panel_pedidos(client):
+    guardar_parte(
+        tabla="productos",
+        sucursal_id=1,
+        sucursal_nombre="Casa Central",
+        columnas=["id", "codigo", "nombre", "stock", "minimo", "maximo", "costo"],
+        filas=[
+            [1, "1250", "Mondongo", 0.0, 5.0, 15.0, 10000.0],
+            [2, "656461", "Leña", 0.0, 5.0, 10.0, 7000.0],
+            [3, "7798342990167", "Pan premium", 5.0, 5.0, 15.0, 2000.0],
+        ],
+        parte=1,
+        partes=1,
+    )
+    r = client.get("/api/pos/jefe?panel=pedidos")
+    assert r.status_code == 200
+    d = r.get_json()
+    assert d["ok"] is True
+    assert d["libro"] is True
+    ped = d["pedidos"]
+    assert ped["articulos_en_quiebre"] == 3
+    assert ped["inversion_estimada"] > 0
+    assert "Mondongo" in ped["mensaje_whatsapp"]
