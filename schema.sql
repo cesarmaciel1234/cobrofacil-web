@@ -62,8 +62,22 @@ CREATE TABLE IF NOT EXISTS clientes (
     direccion TEXT,
     email TEXT,
     created_at TEXT DEFAULT (datetime('now', 'localtime')),
-    fecha_ultimo_pago TEXT
+    fecha_ultimo_pago TEXT,
+    updated_at_utc TEXT,
+    pos_id INTEGER,
+    pos_uid TEXT,
+    deuda_pos REAL NOT NULL DEFAULT 0,
+    tipo_cliente TEXT,
+    estado_cuenta TEXT,
+    pos_actualizado_en TEXT,
+    sucursal_id INTEGER,
+    sucursal_nombre TEXT,
+    plazo_dias INTEGER
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_sucursal_uid
+    ON clientes(COALESCE(sucursal_id, 0), pos_uid)
+    WHERE pos_uid IS NOT NULL AND pos_uid <> '';
 
 CREATE TABLE IF NOT EXISTS remitos_carga (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -147,4 +161,30 @@ CREATE INDEX IF NOT EXISTS idx_remitos_cliente ON remitos_carga(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_remitos_cliente_pagado ON remitos_carga(cliente_id, pagado);
 CREATE INDEX IF NOT EXISTS idx_pagos_cliente ON pagos_clientes(cliente_id);
 CREATE INDEX IF NOT EXISTS idx_aplicacion_pago ON aplicacion_pagos(pago_id);
+
+-- Configuración de integración con servidor POS
+CREATE TABLE IF NOT EXISTS pos_config (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    server_url TEXT NOT NULL DEFAULT '',
+    api_key TEXT NOT NULL DEFAULT '',
+    sync_interval_minutes INTEGER NOT NULL DEFAULT 30,
+    auto_sync INTEGER NOT NULL DEFAULT 0,
+    last_sync_at TEXT,
+    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+    updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+);
+
+-- Log de sincronización con POS
+CREATE TABLE IF NOT EXISTS pos_sync_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sync_type TEXT NOT NULL CHECK(sync_type IN ('clientes', 'proveedores', 'ventas', 'full')),
+    direction TEXT NOT NULL CHECK(direction IN ('push', 'pull')),
+    status TEXT NOT NULL CHECK(status IN ('success', 'error', 'partial', 'in_progress')),
+    records_processed INTEGER NOT NULL DEFAULT 0,
+    records_success INTEGER NOT NULL DEFAULT 0,
+    records_error INTEGER NOT NULL DEFAULT 0,
+    error_message TEXT,
+    started_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    completed_at TEXT
+);
 

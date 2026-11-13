@@ -516,17 +516,17 @@ def _run_migrations(conn):
     cliente_cols = {
         "fecha_ultimo_pago": "TEXT",
         "saldo_inicial": "REAL NOT NULL DEFAULT 0.0",
+        "updated_at_utc": "TEXT",
+        "pos_id": "INTEGER",
+        "pos_uid": "TEXT",
+        "deuda_pos": "REAL NOT NULL DEFAULT 0",
+        "tipo_cliente": "TEXT",
+        "estado_cuenta": "TEXT",
+        "pos_actualizado_en": "TEXT",
+        "sucursal_id": "INTEGER",
+        "sucursal_nombre": "TEXT",
+        "plazo_dias": "INTEGER",
     }
-    if _table_exists(conn, "clientes"):
-        if is_pg:
-            cliente_existing = _pg_column_names(conn, "clientes")
-        else:
-            cliente_existing = {row[1] for row in conn.execute("PRAGMA table_info(clientes)")}
-        for name, col_type in cliente_cols.items():
-            if name not in cliente_existing:
-                pg_type = "DOUBLE PRECISION DEFAULT 0.0" if col_type.startswith("REAL") else col_type
-                final_type = pg_type if is_pg else col_type
-                conn.execute(f"ALTER TABLE clientes ADD COLUMN {name} {final_type}")
 
     # Migración de clientes
     conn.executescript(
@@ -543,6 +543,22 @@ def _run_migrations(conn):
         );
         """
     )
+    if _table_exists(conn, "clientes"):
+        if is_pg:
+            cliente_existing = _pg_column_names(conn, "clientes")
+        else:
+            cliente_existing = {row[1] for row in conn.execute("PRAGMA table_info(clientes)")}
+        for name, col_type in cliente_cols.items():
+            if name not in cliente_existing:
+                pg_type = "DOUBLE PRECISION DEFAULT 0.0" if col_type.startswith("REAL") else col_type
+                final_type = pg_type if is_pg else col_type
+                conn.execute(f"ALTER TABLE clientes ADD COLUMN {name} {final_type}")
+        conn.execute("DROP INDEX IF EXISTS idx_clientes_pos_uid")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_sucursal_uid "
+            "ON clientes(COALESCE(sucursal_id, 0), pos_uid) "
+            "WHERE pos_uid IS NOT NULL AND pos_uid <> ''"
+        )
 
     # Migración de compras_bulk
     conn.executescript(
@@ -608,7 +624,7 @@ def _run_migrations(conn):
             bulk_existing = {row[0] for row in conn.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'compras_bulk'")}
         else:
             bulk_existing = {row[1] for row in conn.execute("PRAGMA table_info(compras_bulk)")}
-        
+
         if "costo_reparto" not in bulk_existing:
             pg_type = "DOUBLE PRECISION"
             final_type = pg_type if is_pg else "REAL"
@@ -616,6 +632,16 @@ def _run_migrations(conn):
         for col in ["numero_lote", "fecha_vencimiento", "proveedor"]:
             if col not in bulk_existing:
                 conn.execute(f"ALTER TABLE compras_bulk ADD COLUMN {col} TEXT")
+
+    # Migración de entidades_bancarias (updated_at_utc para sync)
+    if _table_exists(conn, "entidades_bancarias"):
+        if is_pg:
+            banco_existing = {row[0] for row in conn.execute("SELECT column_name FROM information_schema.columns WHERE table_name = 'entidades_bancarias'")}
+        else:
+            banco_existing = {row[1] for row in conn.execute("PRAGMA table_info(entidades_bancarias)")}
+
+        if "updated_at_utc" not in banco_existing:
+            conn.execute("ALTER TABLE entidades_bancarias ADD COLUMN updated_at_utc TEXT")
 
     # Migración de remitos_fracciones (costo_logistica_porcion)
     if _table_exists(conn, "remitos_fracciones"):
@@ -745,6 +771,30 @@ def _run_migrations(conn):
         );
         CREATE INDEX IF NOT EXISTS idx_sync_changelog_cursor ON sync_changelog(id);
         CREATE INDEX IF NOT EXISTS idx_sync_entity_uuid ON sync_changelog(entity, entity_uuid);
+        CREATE TABLE IF NOT EXISTS pos_config (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            server_url TEXT NOT NULL DEFAULT '',
+            api_key TEXT NOT NULL DEFAULT '',
+            sync_interval_minutes INTEGER NOT NULL DEFAULT 30,
+            auto_sync INTEGER NOT NULL DEFAULT 0,
+            last_sync_at TEXT,
+            created_at TEXT DEFAULT (datetime('now', 'localtime')),
+            updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+        );
+        CREATE TABLE IF NOT EXISTS pos_sync_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sync_type TEXT NOT NULL CHECK(sync_type IN ('clientes', 'proveedores', 'ventas', 'full')),
+            direction TEXT NOT NULL CHECK(direction IN ('push', 'pull')),
+            status TEXT NOT NULL CHECK(status IN ('success', 'error', 'partial', 'in_progress')),
+            records_processed INTEGER NOT NULL DEFAULT 0,
+            records_success INTEGER NOT NULL DEFAULT 0,
+            records_error INTEGER NOT NULL DEFAULT 0,
+            error_message TEXT,
+            started_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+            completed_at TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_pos_sync_log_type ON pos_sync_log(sync_type);
+        CREATE INDEX IF NOT EXISTS idx_pos_sync_log_status ON pos_sync_log(status);
         """
     )
 

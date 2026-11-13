@@ -238,6 +238,12 @@ def pos():
     return render_template("pos.html")
 
 
+@views_bp.route("/cartera")
+def cartera():
+    """Vista de cartera de clientes estilo Cobro Fácil POS."""
+    return render_template("cartera_clientes.html")
+
+
 @views_bp.route("/manifest.json")
 def serve_manifest():
     return send_from_directory(os.path.join(current_app.root_path, 'static'), 'manifest.json', mimetype='application/json')

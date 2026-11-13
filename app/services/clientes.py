@@ -67,12 +67,16 @@ def list_clientes(limit: int | None = None, offset: int = 0, *, solo_con_saldo: 
             f"""
             SELECT c.id, c.nombre, c.scoring, c.techo_deuda, c.saldo_actual, c.saldo_inicial, c.created_at, c.fecha_ultimo_pago,
                    c.telefono, c.cuit, c.direccion, c.email,
+                   c.deuda_pos, c.tipo_cliente, c.estado_cuenta, c.pos_id, c.pos_uid,
+                   c.sucursal_id, c.sucursal_nombre, c.plazo_dias,
                    MIN(r.fecha) as oldest_unpaid
             FROM clientes c
             LEFT JOIN remitos_carga r ON c.id = r.cliente_id AND r.pagado = 0
             {saldo_filter}
             GROUP BY c.id, c.nombre, c.scoring, c.techo_deuda, c.saldo_actual, c.saldo_inicial, c.created_at, c.fecha_ultimo_pago,
-                     c.telefono, c.cuit, c.direccion, c.email
+                     c.telefono, c.cuit, c.direccion, c.email,
+                     c.deuda_pos, c.tipo_cliente, c.estado_cuenta, c.pos_id, c.pos_uid,
+                     c.sucursal_id, c.sucursal_nombre, c.plazo_dias
             ORDER BY c.nombre ASC
             {limit_clause}
             """
@@ -144,6 +148,14 @@ def list_clientes(limit: int | None = None, offset: int = 0, *, solo_con_saldo: 
             "cuit": r.get("cuit"),
             "direccion": r.get("direccion"),
             "email": r.get("email"),
+            "deuda_pos": r.get("deuda_pos") or 0,
+            "tipo_cliente": r.get("tipo_cliente") or "regular",
+            "estado_cuenta": r.get("estado_cuenta") or "activo",
+            "pos_id": r.get("pos_id"),
+            "pos_uid": r.get("pos_uid"),
+            "sucursal_id": r.get("sucursal_id"),
+            "sucursal_nombre": r.get("sucursal_nombre") or "",
+            "plazo_dias": r.get("plazo_dias"),
             "created_at": r["created_at"],
             "fecha_ultimo_pago": r.get("fecha_ultimo_pago"),
             "oldest_unpaid": r.get("oldest_unpaid"),
