@@ -108,3 +108,21 @@ def resumen_base() -> list[dict]:
         }
         for r in rows
     ]
+
+
+def filas_de(tabla: str) -> tuple[list[str], list[list]]:
+    if not _TABLA.match(tabla or ""):
+        return [], []
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        partes = conn.execute(
+            "SELECT columnas, filas FROM pos_base WHERE tabla = ? ORDER BY parte",
+            (tabla,),
+        ).fetchall()
+    if not partes:
+        return [], []
+    columnas = json.loads(partes[0]["columnas"])
+    filas: list[list] = []
+    for parte in partes:
+        filas.extend(json.loads(parte["filas"]))
+    return columnas, filas

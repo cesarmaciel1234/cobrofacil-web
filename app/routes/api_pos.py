@@ -325,6 +325,17 @@ def api_pos_base_tabla():
     return jsonify(resultado)
 
 
+@api_bp.route("/pos/historial", methods=["GET"])
+def api_pos_historial():
+    """Libro de cuenta de un cliente de Cobro Fácil, con días y mantenimiento."""
+    from app.services.pos_historial import resumen_cliente, resumen_todos
+
+    pos_id = request.args.get("pos_id")
+    if not pos_id:
+        return jsonify({"clientes": resumen_todos()})
+    return jsonify(resumen_cliente(pos_id, request.args.get("deuda", type=float)))
+
+
 @api_bp.route("/pos/sync/logs", methods=["GET"])
 def api_pos_sync_logs():
     """

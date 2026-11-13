@@ -293,6 +293,57 @@
         }
         .fact span { display: block; color: #94a3b8; font-size: 11px; font-weight: 700; }
         .fact strong { display: block; margin-top: 2px; }
+        .sheet.historial {
+            top: 10px;
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            width: min(1120px, calc(100% - 12px));
+            bottom: 10px;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+            overflow: hidden;
+        }
+        .hist-head, .hist-foot {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 14px;
+        }
+        .hist-head { border-bottom: 1px solid #e5e7eb; }
+        .hist-head h3 { margin: 0; font-size: 1rem; }
+        .hist-close {
+            margin-left: auto;
+            border: 0;
+            background: transparent;
+            font-size: 22px;
+            cursor: pointer;
+            color: #64748b;
+        }
+        .hist-who { padding: 10px 14px 0; font-weight: 800; }
+        .hist-who span { font-weight: 600; color: #64748b; font-size: 13px; }
+        .hist-scroll { overflow: auto; flex: 1; }
+        .hist-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 860px; }
+        .hist-table th {
+            position: sticky; top: 0; background: #f1f5f9; color: #334155;
+            font-size: 11px; text-align: left; padding: 10px 8px;
+        }
+        .hist-table td { padding: 10px 8px; border-top: 1px solid #eef2f7; white-space: nowrap; }
+        .hist-table .num { text-align: right; font-variant-numeric: tabular-nums; }
+        .venta { color: #dc2626; font-weight: 700; }
+        .cobro { color: #047857; font-weight: 700; }
+        .cobro-row td { background: #ecfdf5; }
+        .dias-mora { color: #d97706; font-weight: 800; }
+        .mant { color: #b45309; font-weight: 700; }
+        .hist-foot { border-top: 1px solid #e5e7eb; flex-wrap: wrap; }
+        .hist-foot p { margin: 0; color: #64748b; font-size: 12px; font-weight: 700; flex: 1; }
+        .badge-mant, .badge-total {
+            border-radius: 8px; padding: 6px 12px; font-weight: 800; font-size: 13px;
+        }
+        .badge-mant { background: #fef3c7; color: #92400e; }
+        .badge-total { background: #fef2f2; color: #dc2626; border: 2px solid #fecaca; }
         .sheet-close {
             margin-top: 14px;
             width: 100%;
@@ -375,6 +426,13 @@
         let allClients = [];
         let currentFilter = 'all';
         let cobrosMes = 0;
+        let interesPorCliente = {};
+
+        function formatCents(amount) {
+            return new Intl.NumberFormat('es-AR', {
+                style: 'currency', currency: 'ARS', minimumFractionDigits: 2, maximumFractionDigits: 2
+            }).format(Number(amount) || 0);
+        }
 
         function formatMoney(amount) {
             return new Intl.NumberFormat('es-AR', {
@@ -413,6 +471,10 @@
             return tipo.includes('express') || tipo.includes('expres');
         }
 
+        const TASA_BASE = 5;
+        const TASA_APAL = 5;
+        const PLAZO_BASE = 30;
+
         function calculateDaysSincePayment(fechaUltimoPago) {
             if (!fechaUltimoPago) return null;
             const lastPayment = new Date(fechaUltimoPago);
@@ -439,6 +501,20 @@
 
         function enRiesgo(client) {
             return getClientStatus(client).class === 'hot';
+        }
+
+        function interesCuenta(client) {
+            const real = interesPorCliente[String(client.pos_id)];
+            if (real && Number.isFinite(Number(real.mantenimiento))) {
+                return { monto: Number(real.mantenimiento), pct: 0, real: true };
+            }
+            const saldo = deudaVisible(client);
+            if (saldo <= 0.009) return { monto: 0, pct: 0, real: false };
+            const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
+            const plazoCliente = Number(client.plazo_dias);
+            const plazo = Number.isFinite(plazoCliente) && plazoCliente > 0 ? plazoCliente : PLAZO_BASE;
+            const pct = days !== null && days > plazo ? TASA_BASE + TASA_APAL : TASA_BASE;
+            return { monto: Math.round(saldo * pct) / 100, pct, real: false };
         }
 
         function sucursalDe(client) {
@@ -506,12 +582,10 @@
             emptyState.hidden = true;
             box.innerHTML = clients.map(client => {
                 const saldo = deudaVisible(client);
-                const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
                 const status = getClientStatus(client);
                 const tipo = esExpress(client) ? 'EXPRESS' : String(client.tipo_cliente || 'CLIENTE').replaceAll('_', ' ').toUpperCase();
-                const late = saldo > 0 && days !== null
-                    ? `<span class="late">${days} días<br>retraso</span>`
-                    : `<span class="late ok">${esc(status.label)}</span>`;
+                const interes = interesCuenta(client);
+                const late = `<span class="late ${interes.monto > 0 ? '' : 'ok'}">${formatCents(interes.monto)}<br>interés</span>`;
                 const plazo = client.plazo_dias == null || client.plazo_dias === '' ? '—' : `${esc(client.plazo_dias)} días`;
                 return `
                     <article class="debt-card" data-id="${esc(client.id)}">
@@ -575,28 +649,68 @@
             }).length;
         }
 
-        function abrirFicha(id) {
+        function formatPos(amount) {
+            const n = Number(amount) || 0;
+            const sign = n < 0 ? '-' : '';
+            return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function filaHistorial(fila) {
+            const clase = fila.es_cobro ? 'cobro' : (fila.es_venta ? 'venta' : '');
+            const dias = fila.dias == null ? '—' : `${fila.dias} d`;
+            const mant = fila.es_interes ? 'Asentado' : (fila.mantenimiento == null ? '—' : formatPos(fila.mantenimiento));
+            return `<tr class="${fila.es_cobro ? 'cobro-row' : ''}">
+                <td>${esc(fila.fecha)}</td>
+                <td class="${clase}">${esc(fila.etiqueta)}</td>
+                <td class="num ${clase}">${formatPos(fila.monto)}</td>
+                <td class="num">${formatPos(fila.saldo)}</td>
+                <td>${esc(fila.ticket)}</td>
+                <td>${esc(fila.detalle)}</td>
+                <td class="${fila.dias > 30 ? 'dias-mora' : ''}">${dias}</td>
+                <td class="num ${fila.mantenimiento > 0 ? 'mant' : ''}">${mant}</td>
+            </tr>`;
+        }
+
+        async function abrirFicha(id) {
             const client = allClients.find(item => String(item.id) === String(id));
             if (!client) return;
-            const saldo = deudaVisible(client);
-            const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
             const host = document.getElementById('sheetHost');
             host.hidden = false;
             host.innerHTML = `
                 <div class="sheet-back" data-close="1"></div>
-                <section class="sheet" role="dialog" aria-modal="true">
-                    <h3>${esc(client.nombre)}</h3>
-                    <p>${esc(sucursalDe(client))} · ${esc(client.estado_cuenta || 'activo')}</p>
-                    <div class="facts">
-                        <div class="fact"><span>A cobrar</span><strong>${formatMoney(saldo)}</strong></div>
-                        <div class="fact"><span>Límite</span><strong>${formatMoney(client.techo_deuda || 0)}</strong></div>
-                        <div class="fact"><span>Plazo</span><strong>${client.plazo_dias == null || client.plazo_dias === '' ? '—' : esc(client.plazo_dias) + ' días'}</strong></div>
-                        <div class="fact"><span>Desde el último cobro</span><strong>${days === null ? 'Sin cobro' : days + ' días'}</strong></div>
-                        <div class="fact"><span>DNI</span><strong>${esc(client.cuit || '—')}</strong></div>
-                        <div class="fact"><span>Teléfono</span><strong>${esc(client.telefono || '—')}</strong></div>
-                    </div>
-                    <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+                <section class="sheet historial" role="dialog" aria-modal="true">
+                    <div class="hist-head"><h3>Historial del cliente</h3><button class="hist-close" type="button" data-close="1" aria-label="Cerrar">×</button></div>
+                    <div class="hist-who">${esc(client.nombre)} <span>${esc(client.tipo_cliente || 'regular')}</span></div>
+                    <div class="hist-scroll"><p style="padding:16px;color:#64748b">Cargando el libro…</p></div>
                 </section>`;
+            if (client.pos_id == null) {
+                host.querySelector('.hist-scroll').innerHTML = '<p style="padding:16px;color:#64748b">Esta cuenta todavía no tiene el libro de Cobro Fácil.</p>';
+                return;
+            }
+            try {
+                const dato = await fetch(`${API_BASE}/pos/historial?pos_id=${encodeURIComponent(client.pos_id)}&deuda=${encodeURIComponent(deudaVisible(client))}`).then(r => r.json());
+                const movs = dato.movimientos || [];
+                if (!movs.length) {
+                    host.querySelector('.hist-scroll').innerHTML = '<p style="padding:16px;color:#64748b">El libro de esta cuenta todavía no llegó a la nube.</p>';
+                    return;
+                }
+                host.querySelector('.historial').insertAdjacentHTML('beforeend', `
+                    <div class="hist-foot">
+                        <p>${esc(dato.resumen || '')}</p>
+                        <span class="badge-mant">Mantenimiento: +${formatPos(dato.mantenimiento)}</span>
+                        <span class="badge-total">TOTAL ESTIMADO: ${formatPos(dato.total_estimado)}</span>
+                    </div>`);
+                host.querySelector('.hist-scroll').innerHTML = `
+                    <table class="hist-table">
+                        <thead><tr>
+                            <th>Fecha</th><th>Tipo</th><th>Monto</th><th>Saldo</th>
+                            <th>Ticket / cobro</th><th>Descripción</th><th>Días</th><th>Mantenimiento</th>
+                        </tr></thead>
+                        <tbody>${movs.map(filaHistorial).join('')}</tbody>
+                    </table>`;
+            } catch (_) {
+                host.querySelector('.hist-scroll').innerHTML = '<p style="padding:16px;color:#64748b">No se pudo leer el historial.</p>';
+            }
         }
 
         function cerrarFicha() {
@@ -612,6 +726,12 @@
             llenarSucursales();
             updateMetrics();
             filterClients();
+            fetch(`${API_BASE}/pos/historial`).then(r => r.ok ? r.json() : null).then(extra => {
+                interesPorCliente = {};
+                for (const item of (extra && extra.clientes) || []) interesPorCliente[String(item.pos_id)] = item;
+                updateMetrics();
+                filterClients();
+            }).catch(() => {});
         }
 
         document.getElementById('filterTabs').addEventListener('click', (event) => {
