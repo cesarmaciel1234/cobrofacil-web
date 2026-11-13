@@ -139,8 +139,16 @@ CREATE TABLE IF NOT EXISTS pagos_clientes (
     cliente_id INTEGER NOT NULL,
     monto REAL NOT NULL CHECK(monto > 0),
     fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+    pos_pago_id INTEGER,
+    medio_pago TEXT,
+    descripcion TEXT,
+    sucursal_id INTEGER,
     FOREIGN KEY (cliente_id) REFERENCES clientes(id)
 );
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pagos_pos
+    ON pagos_clientes(COALESCE(sucursal_id, 0), pos_pago_id)
+    WHERE pos_pago_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS aplicacion_pagos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -187,4 +195,19 @@ CREATE TABLE IF NOT EXISTS pos_sync_log (
     started_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
     completed_at TEXT
 );
+
+CREATE TABLE IF NOT EXISTS pos_base (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sucursal_id INTEGER,
+    sucursal_nombre TEXT,
+    tabla TEXT NOT NULL,
+    parte INTEGER NOT NULL DEFAULT 1,
+    columnas TEXT NOT NULL,
+    filas TEXT NOT NULL,
+    cantidad INTEGER NOT NULL DEFAULT 0,
+    actualizado_en TEXT
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
+    ON pos_base(COALESCE(sucursal_id, 0), tabla, parte);
 

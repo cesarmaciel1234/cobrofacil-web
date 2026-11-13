@@ -795,6 +795,19 @@ def _run_migrations(conn):
         );
         CREATE INDEX IF NOT EXISTS idx_pos_sync_log_type ON pos_sync_log(sync_type);
         CREATE INDEX IF NOT EXISTS idx_pos_sync_log_status ON pos_sync_log(status);
+        CREATE TABLE IF NOT EXISTS pos_base (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sucursal_id INTEGER,
+            sucursal_nombre TEXT,
+            tabla TEXT NOT NULL,
+            parte INTEGER NOT NULL DEFAULT 1,
+            columnas TEXT NOT NULL,
+            filas TEXT NOT NULL,
+            cantidad INTEGER NOT NULL DEFAULT 0,
+            actualizado_en TEXT
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
+            ON pos_base(COALESCE(sucursal_id, 0), tabla, parte);
         """
     )
 
@@ -834,6 +847,23 @@ def _ensure_performance_indexes(conn) -> None:
     if _table_exists(conn, "pagos_clientes"):
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_pagos_cliente ON pagos_clientes(cliente_id)"
+        )
+        if type(conn).__name__ == "PostgresConnWrapper":
+            pago_existentes = _pg_column_names(conn, "pagos_clientes")
+        else:
+            pago_existentes = {row[1] for row in conn.execute("PRAGMA table_info(pagos_clientes)")}
+        for name, col_type in {
+            "pos_pago_id": "INTEGER",
+            "medio_pago": "TEXT",
+            "descripcion": "TEXT",
+            "sucursal_id": "INTEGER",
+        }.items():
+            if name not in pago_existentes:
+                conn.execute(f"ALTER TABLE pagos_clientes ADD COLUMN {name} {col_type}")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_pagos_pos "
+            "ON pagos_clientes(COALESCE(sucursal_id, 0), pos_pago_id) "
+            "WHERE pos_pago_id IS NOT NULL"
         )
     if _table_exists(conn, "aplicacion_pagos"):
         conn.execute(

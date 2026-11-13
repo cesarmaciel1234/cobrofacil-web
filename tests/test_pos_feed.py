@@ -175,3 +175,43 @@ def test_config_no_devuelve_la_clave(auth_client):
     assert body["api_key"] == ""
     assert body["api_key_configurada"] is True
     assert body["server_url"] == "http://192.168.0.8:3306"
+
+
+def test_la_base_se_guarda_aparte_y_sin_claves(auth_client):
+    primera = auth_client.post(
+        "/api/pos/base/tabla",
+        json={
+            "tabla": "usuarios",
+            "columnas": ["id", "nombre", "password"],
+            "filas": [[1, "caja", "no-debe-quedar"]],
+            "parte": 1,
+            "partes": 1,
+            "sucursal_id": 1,
+            "sucursal": "Maciel",
+        },
+    )
+    assert primera.status_code == 200
+    segunda = auth_client.post(
+        "/api/pos/base/tabla",
+        json={
+            "tabla": "usuarios",
+            "columnas": ["id", "nombre", "password"],
+            "filas": [[2, "caja", "tampoco"]],
+            "parte": 1,
+            "partes": 1,
+            "sucursal_id": 1,
+            "sucursal": "Maciel",
+        },
+    )
+    assert segunda.status_code == 200
+    resumen = auth_client.get("/api/pos/base").get_json()
+    tabla = next(item for item in resumen["tablas"] if item["tabla"] == "usuarios")
+    assert tabla["filas"] == 1
+    assert tabla["sucursal"] == "Maciel"
+    assert auth_client.get("/api/clientes").get_json() == []
+    from app.database import get_db
+    import json
+    with auth_client.application.app_context():
+        with get_db() as conn:
+            guardadas = json.loads(conn.execute("SELECT filas FROM pos_base").fetchone()["filas"])
+    assert guardadas == [[2, "caja", None]]

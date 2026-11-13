@@ -291,6 +291,40 @@ def api_pos_proveedores_export():
     return jsonify({"proveedores": proveedores, "total": len(proveedores)})
 
 
+@api_bp.route("/pos/base", methods=["GET"])
+def api_pos_base():
+    """Lista las tablas de Cobro Fácil que ya están en la nube."""
+    from app.services.pos_base import resumen_base
+
+    tablas = resumen_base()
+    return jsonify({
+        "tablas": tablas,
+        "cantidad": len(tablas),
+        "filas": sum(item["filas"] for item in tablas),
+    })
+
+
+@api_bp.route("/pos/base/tabla", methods=["POST"])
+def api_pos_base_tabla():
+    """Guarda una parte de una tabla. La primera parte reemplaza la copia anterior."""
+    from app.services.pos_base import guardar_parte
+
+    data = request.get_json(silent=True) or {}
+    try:
+        resultado = guardar_parte(
+            str(data.get("tabla") or ""),
+            data.get("columnas") or [],
+            data.get("filas") or [],
+            data.get("parte") or 1,
+            data.get("partes") or 1,
+            data.get("sucursal_id"),
+            data.get("sucursal") or data.get("sucursal_nombre"),
+        )
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+    return jsonify(resultado)
+
+
 @api_bp.route("/pos/sync/logs", methods=["GET"])
 def api_pos_sync_logs():
     """
