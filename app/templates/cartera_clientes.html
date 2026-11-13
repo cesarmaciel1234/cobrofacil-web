@@ -2,484 +2,395 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cartera de Clientes - CRM Frigorífico</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#f8fafc">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Cartera">
+    <link rel="manifest" href="/manifest.json">
+    <title>Cartera de Clientes</title>
     <style>
         :root {
-            --bg-base: #f8fafc;
-            --bg-surface: #ffffff;
-            --bg-hover: #f1f5f9;
-            --primary: #2563eb;
-            --primary-light: #3b82f6;
-            --text-primary: #1e293b;
-            --text-secondary: #64748b;
-            --text-muted: #94a3b8;
-            --border: #e2e8f0;
-            --success: #10b981;
-            --warning: #f59e0b;
+            --ink: #111827;
+            --muted: #64748b;
+            --line: #e5e7eb;
+            --card: #0f172a;
             --danger: #ef4444;
-            --radius-md: 8px;
-            --radius-lg: 12px;
-            --shadow: 0 1px 3px rgba(0,0,0,0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.1);
+            --risk: #ea580c;
+            --ok: #059669;
+            --bar: rgba(255, 255, 255, 0.92);
         }
-
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-
+        * { box-sizing: border-box; }
+        html, body { margin: 0; padding: 0; }
         body {
-            background-color: var(--bg-base);
-            color: var(--text-primary);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            font-size: 14px;
-            line-height: 1.5;
             min-height: 100vh;
+            background: #e7ebf0;
+            color: var(--ink);
+            font-family: "Segoe UI", system-ui, sans-serif;
         }
-
-        .container {
-            max-width: 1400px;
+        .shell {
+            width: min(480px, 100%);
+            min-height: 100vh;
             margin: 0 auto;
-            padding: 20px;
+            background: #f8fafc;
+            position: relative;
+            box-shadow: 0 0 40px rgba(15, 23, 42, 0.06);
         }
-
-        /* Header */
-        .header {
+        button, input, select { font: inherit; }
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: calc(10px + env(safe-area-inset-top, 0px)) 12px 10px;
+            background: rgba(248, 250, 252, 0.94);
+            backdrop-filter: blur(16px);
+            border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+        }
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            border: 0;
+            border-radius: 12px;
+            background: #e8edf3;
+            color: var(--ink);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+        }
+        .icon-btn.blue { background: #2563eb; color: #fff; }
+        .brand {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            min-width: 0;
+        }
+        .brand strong {
+            font-size: 15px;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .weather {
+            min-width: 52px;
+            height: 40px;
+            padding: 0 10px;
+            border-radius: 12px;
+            background: #2b2b2b;
+            color: #fff;
+            font-weight: 800;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .page {
+            padding: 18px 16px calc(132px + env(safe-area-inset-bottom, 0px));
+        }
+        h1 {
+            margin: 0 0 14px;
+            font-size: 1.7rem;
+            letter-spacing: -0.03em;
+        }
+        .tools {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .tools input, .tools select {
+            width: 100%;
+            height: 44px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: #fff;
+            padding: 0 14px;
+            outline: none;
+        }
+        .chips {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            padding-bottom: 14px;
+            scrollbar-width: none;
+        }
+        .chips::-webkit-scrollbar { display: none; }
+        .chip {
+            border: 1px solid var(--line);
+            background: #fff;
+            color: #475569;
+            border-radius: 999px;
+            padding: 8px 12px;
+            white-space: nowrap;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 650;
+        }
+        .chip.active { background: #111827; color: #fff; border-color: #111827; }
+        .cards {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 14px;
+        }
+        .debt-card {
+            background: linear-gradient(160deg, #1e293b, #0f172a);
+            color: #fff;
+            border-radius: 22px;
+            padding: 18px 18px 16px;
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 16px 30px -18px rgba(15, 23, 42, 0.7);
+            cursor: pointer;
+            text-align: left;
+            width: 100%;
+        }
+        .card-top, .card-foot {
             display: flex;
             justify-content: space-between;
-            align-items: center;
-            margin-bottom: 24px;
-            padding-bottom: 16px;
-            border-bottom: 2px solid var(--border);
+            gap: 12px;
+            align-items: flex-start;
         }
-
-        .header h1 {
-            font-size: 24px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .header .subtitle {
-            font-size: 14px;
-            color: var(--text-secondary);
-            margin-top: 4px;
-        }
-
-        /* Metrics Cards */
-        .metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .metric-card {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 20px;
-            box-shadow: var(--shadow);
-        }
-
-        .metric-card.highlight {
-            border: 2px solid var(--primary);
-            background: linear-gradient(135deg, #eff6ff 0%, #ffffff 100%);
-        }
-
-        .metric-card.warning {
-            border: 2px solid var(--warning);
-            background: linear-gradient(135deg, #fffbeb 0%, #ffffff 100%);
-        }
-
-        .metric-card.danger {
-            border: 2px solid var(--danger);
-            background: linear-gradient(135deg, #fef2f2 0%, #ffffff 100%);
-        }
-
-        .metric-label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 8px;
-        }
-
-        .metric-value {
-            font-size: 28px;
-            font-weight: 700;
-            color: var(--text-primary);
-        }
-
-        .metric-sub {
-            font-size: 12px;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        /* Search and Filters */
-        .filters-bar {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 16px;
-            margin-bottom: 16px;
-            box-shadow: var(--shadow);
-        }
-
-        .search-box {
-            width: 100%;
-            max-width: 400px;
-            margin-bottom: 16px;
-        }
-
-        .search-box input {
-            width: 100%;
-            padding: 10px 16px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-
-        .search-box input:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-        }
-
-        .sucursal-select {
-            min-width: 220px;
-            padding: 10px 16px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            font-size: 14px;
-            background: var(--bg-surface);
-            color: inherit;
-            outline: none;
-        }
-
-        .filter-tabs {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-
-        .filter-tab {
-            padding: 8px 16px;
-            background: var(--bg-base);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-md);
-            font-size: 13px;
-            font-weight: 500;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .filter-tab:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        .filter-tab.active {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
-        }
-
-        .filter-tab .count {
-            background: rgba(0,0,0,0.1);
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-size: 11px;
-            margin-left: 4px;
-        }
-
-        /* Table */
-        .table-container {
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            overflow: hidden;
-            box-shadow: var(--shadow);
-        }
-
-        .data-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-
-        .data-table th,
-        .data-table td {
-            padding: 12px 16px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .data-table th {
-            background: var(--bg-base);
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .data-table tr:hover {
-            background: var(--bg-hover);
-        }
-
-        .text-right { text-align: right; }
-        .text-center { text-align: center; }
-
-        .badge {
-            display: inline-block;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 11px;
-            font-weight: 600;
-            text-transform: uppercase;
-        }
-
-        .badge-success {
-            background: #dcfce7;
-            color: #166534;
-        }
-
-        .badge-warning {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .badge-danger {
-            background: #fee2e2;
-            color: #991b1b;
-        }
-
-        .badge-neutral {
-            background: #f1f5f9;
-            color: #475569;
-        }
-
-        .money {
-            font-family: 'Courier New', monospace;
-            font-weight: 600;
-        }
-
-        .money.positive { color: var(--success); }
-        .money.negative { color: var(--danger); }
-
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: var(--radius-md);
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-        }
-
-        .btn-primary:hover {
-            background: var(--primary-light);
-        }
-
-        .btn-sm {
-            padding: 6px 12px;
-            font-size: 12px;
-        }
-
-        .btn-icon {
-            background: transparent;
-            border: 1px solid var(--border);
-            color: var(--text-secondary);
-            padding: 6px 10px;
-        }
-
-        .btn-icon:hover {
-            background: var(--bg-hover);
-            color: var(--text-primary);
-        }
-
-        /* Actions Menu */
-        .actions-cell {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        /* Empty State */
-        .empty-state {
-            padding: 40px;
-            text-align: center;
-            color: var(--text-muted);
-        }
-
-        .empty-state svg {
+        .who { display: flex; gap: 12px; min-width: 0; }
+        .avatar {
             width: 48px;
             height: 48px;
-            margin-bottom: 16px;
-            opacity: 0.5;
+            border-radius: 14px;
+            background: rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: none;
         }
-
-        /* Responsive */
-        @media (max-width: 768px) {
-            .metrics-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .filter-tabs {
-                overflow-x: auto;
-                flex-wrap: nowrap;
-            }
-
-            .filter-tab {
-                flex-shrink: 0;
-            }
-
-            .data-table {
-                font-size: 12px;
-            }
-
-            .data-table th,
-            .data-table td {
-                padding: 8px 12px;
-            }
+        .who h2 {
+            margin: 0;
+            font-size: 1.15rem;
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+        }
+        .pill {
+            display: inline-block;
+            margin-top: 6px;
+            padding: 3px 8px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.1);
+            color: #cbd5e1;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .late {
+            background: #ffe4e6;
+            color: #e11d48;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 800;
+            line-height: 1.15;
+            text-align: center;
+            flex: none;
+        }
+        .late.ok { background: #dcfce7; color: #15803d; }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 16px 0 14px;
+            padding: 14px 12px;
+            border-radius: 16px;
+            background: rgba(0,0,0,0.22);
+        }
+        .metrics span { display: block; color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; }
+        .metrics strong { display: block; margin-top: 4px; font-size: 15px; font-weight: 650; }
+        .card-foot { align-items: flex-end; padding-top: 8px; }
+        .amount-label { color: #94a3b8; font-size: 11px; font-weight: 700; letter-spacing: 0.04em; }
+        .amount { display: block; margin-top: 2px; font-size: 1.7rem; font-weight: 800; letter-spacing: -0.04em; }
+        .amount.hot { color: #fecaca; }
+        .amount.cool { color: #86efac; }
+        .foot-note { color: #94a3b8; font-size: 12px; text-align: right; line-height: 1.35; }
+        .empty {
+            padding: 48px 12px;
+            text-align: center;
+            color: var(--muted);
+        }
+        .bar {
+            position: fixed;
+            left: 50%;
+            transform: translateX(-50%);
+            width: min(456px, calc(100% - 24px));
+            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+            z-index: 30;
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 2px;
+            padding: 14px 6px 12px;
+            border-radius: 22px;
+            background: var(--bar);
+            backdrop-filter: blur(18px);
+            border: 1px solid rgba(255,255,255,0.7);
+            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+        }
+        .bar button {
+            border: 0;
+            background: transparent;
+            padding: 2px 2px;
+            cursor: pointer;
+            min-width: 0;
+        }
+        .bar button.on { background: rgba(15, 23, 42, 0.05); border-radius: 14px; }
+        .bar small {
+            display: block;
+            color: #64748b;
+            font-size: 9px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+        .bar b {
+            display: block;
+            margin-top: 3px;
+            font-size: 0.95rem;
+            letter-spacing: -0.03em;
+            color: #0f172a;
+        }
+        .bar .sub {
+            display: block;
+            margin-top: 2px;
+            color: #94a3b8;
+            font-size: 9px;
+            font-weight: 650;
+        }
+        #barDeuda { color: var(--risk); }
+        #barRiesgo { color: var(--danger); }
+        #barCobros { color: var(--ok); }
+        .sheet-back {
+            position: fixed;
+            inset: 0;
+            background: rgba(15, 23, 42, 0.35);
+            z-index: 40;
+        }
+        .sheet {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 41;
+            background: #fff;
+            border-radius: 24px 24px 0 0;
+            padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
+            box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.16);
+        }
+        .sheet h3 { margin: 0 0 4px; font-size: 1.25rem; }
+        .sheet p { margin: 0 0 14px; color: var(--muted); }
+        .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        .fact {
+            background: #f8fafc;
+            border-radius: 14px;
+            padding: 10px 12px;
+        }
+        .fact span { display: block; color: #94a3b8; font-size: 11px; font-weight: 700; }
+        .fact strong { display: block; margin-top: 2px; }
+        .sheet-close {
+            margin-top: 14px;
+            width: 100%;
+            height: 46px;
+            border: 0;
+            border-radius: 14px;
+            background: #111827;
+            color: #fff;
+            font-weight: 700;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>Cartera de Clientes y Crédito</h1>
-                <div class="subtitle">Gestión de cuentas corrientes y seguimiento de cobranzas</div>
-            </div>
-            <button class="btn btn-primary" onclick="window.location.href='/'">
-                ← Volver al Dashboard
-            </button>
+<div class="shell">
+    <header class="topbar">
+        <button class="icon-btn" type="button" onclick="location.href='/'" aria-label="Volver">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        </button>
+        <div class="brand">
+            <span id="diaIcon" aria-hidden="true">☀️</span>
+            <strong id="empresaNombre">CARTERA</strong>
         </div>
+        <span class="weather" id="clima">--°</span>
+        <button class="icon-btn blue" type="button" onclick="loadClients()" aria-label="Actualizar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        </button>
+    </header>
 
-        <!-- Metrics -->
-        <div class="metrics-grid">
-            <div class="metric-card highlight">
-                <div class="metric-label">Cartera en la Calle</div>
-                <div class="metric-value money" id="metricCartera">$0</div>
-                <div class="metric-sub" id="metricCuentasActivas">0 cuentas activas</div>
-            </div>
-
-            <div class="metric-card">
-                <div class="metric-label">Cuentas Activas</div>
-                <div class="metric-value" id="metricActivas">0</div>
-                <div class="metric-sub" id="metricTotalRegistradas">de 0 registradas</div>
-            </div>
-
-            <div class="metric-card danger">
-                <div class="metric-label">Cartera en Riesgo</div>
-                <div class="metric-value money" id="metricRiesgo">$0</div>
-                <div class="metric-sub" id="metricEnRiesgo">0 en riesgo/vencidos</div>
-            </div>
-
-            <div class="metric-card">
-                <div class="metric-label">Cobros del Mes</div>
-                <div class="metric-value money positive" id="metricCobros">$0</div>
-                <div class="metric-sub">Últimos 30 días</div>
-            </div>
+    <main class="page">
+        <h1>Cartera de clientes</h1>
+        <div class="tools">
+            <input id="searchInput" type="search" placeholder="Buscar nombre o DNI" oninput="filterClients()">
+            <select id="sucursalFiltro" onchange="updateMetrics(); filterClients();">
+                <option value="">Todas las sucursales</option>
+            </select>
         </div>
-
-        <!-- Filters -->
-        <div class="filters-bar">
-            <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:16px;">
-                <div class="search-box" style="margin-bottom:0;">
-                    <input type="text" id="searchInput" placeholder="Buscar por nombre o DNI..." onkeyup="filterClients()">
-                </div>
-                <select id="sucursalFiltro" class="sucursal-select" onchange="updateMetrics(); filterClients();">
-                    <option value="">Todas las sucursales</option>
-                </select>
-            </div>
-
-            <div class="filter-tabs" id="filterTabs">
-                <button class="filter-tab active" data-filter="all">
-                    Todos <span class="count" id="countAll">0</span>
-                </button>
-                <button class="filter-tab" data-filter="saldo">
-                    Con saldo <span class="count" id="countSaldo">0</span>
-                </button>
-                <button class="filter-tab" data-filter="al_dia">
-                    Al día <span class="count" id="countAlDia">0</span>
-                </button>
-                <button class="filter-tab" data-filter="saldo_favor">
-                    Saldo a favor <span class="count" id="countSaldoFavor">0</span>
-                </button>
-                <button class="filter-tab" data-filter="expres">
-                    Express <span class="count" id="countExpress">0</span>
-                </button>
-                <button class="filter-tab" data-filter="criticos">
-                    Críticos <span class="count" id="countCriticos">0</span>
-                </button>
-                <button class="filter-tab" data-filter="30+">
-                    30+ días <span class="count" id="count30">0</span>
-                </button>
-                <button class="filter-tab" data-filter="60+">
-                    60+ días <span class="count" id="count60">0</span>
-                </button>
-                <button class="filter-tab" data-filter="90+">
-                    90+ días <span class="count" id="count90">0</span>
-                </button>
-            </div>
+        <div class="chips" id="filterTabs">
+            <button class="chip active" data-filter="all" type="button">Todos <span id="countAll">0</span></button>
+            <button class="chip" data-filter="saldo" type="button">Con deuda <span id="countSaldo">0</span></button>
+            <button class="chip" data-filter="criticos" type="button">Riesgo <span id="countCriticos">0</span></button>
+            <button class="chip" data-filter="al_dia" type="button">Al día <span id="countAlDia">0</span></button>
+            <button class="chip" data-filter="expres" type="button">Express <span id="countExpress">0</span></button>
+            <button class="chip" data-filter="30+" type="button">30+ <span id="count30">0</span></button>
+            <button class="chip" data-filter="60+" type="button">60+ <span id="count60">0</span></button>
+            <button class="chip" data-filter="90+" type="button">90+ <span id="count90">0</span></button>
         </div>
+        <div class="cards" id="cards"></div>
+        <div class="empty" id="emptyState" hidden>No hay clientes en este filtro.</div>
+    </main>
 
-        <!-- Table -->
-        <div class="table-container">
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>ID</th>
-                        <th>DNI</th>
-                        <th>Nombre</th>
-                        <th>Sucursal</th>
-                        <th>Tipo</th>
-                        <th>Estado</th>
-                        <th class="text-right">Deuda</th>
-                        <th class="text-right">Mantenimiento</th>
-                        <th class="text-center">Días</th>
-                        <th class="text-center">Plazo</th>
-                        <th class="text-center">Acciones</th>
-                    </tr>
-                </thead>
-                <tbody id="clientsTableBody">
-                    <!-- Data loaded via JS -->
-                </tbody>
-            </table>
-            <div id="emptyState" class="empty-state" style="display: none;">
-                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                </svg>
-                <p>No se encontraron clientes</p>
-            </div>
-        </div>
-    </div>
+    <nav class="bar" aria-label="Resumen de cartera">
+        <button type="button" data-filter="saldo" id="goDeuda">
+            <small>DEUDA</small>
+            <b id="barDeuda">$0</b>
+            <span class="sub" id="barDeudaSub">0 cuentas</span>
+        </button>
+        <button type="button" data-filter="criticos" id="goRiesgo">
+            <small>DEUDA RIESGO</small>
+            <b id="barRiesgo">$0</b>
+            <span class="sub" id="barRiesgoSub">0 cuentas</span>
+        </button>
+        <button type="button" id="goCobros">
+            <small>COBROS</small>
+            <b id="barCobros">$0</b>
+            <span class="sub">del mes</span>
+        </button>
+        <button type="button" data-filter="all" id="goClientes">
+            <small>CLIENTES</small>
+            <b id="barClientes">0</b>
+            <span class="sub" id="barClientesSub">en la calle</span>
+        </button>
+    </nav>
+
+    <div id="sheetHost" hidden></div>
+</div>
 
     <script>
-        // Configuration
         const API_BASE = '/api';
-
-        // State
         let allClients = [];
         let currentFilter = 'all';
-        let searchQuery = '';
+        let cobrosMes = 0;
 
-        // Format money
         function formatMoney(amount) {
             return new Intl.NumberFormat('es-AR', {
-                style: 'currency',
-                currency: 'ARS',
-                minimumFractionDigits: 2
-            }).format(amount);
+                style: 'currency', currency: 'ARS', maximumFractionDigits: 0
+            }).format(Number(amount) || 0);
+        }
+
+        function formatCompact(amount) {
+            const n = Number(amount) || 0;
+            const sign = n < 0 ? '-' : '';
+            const abs = Math.abs(n);
+            if (abs >= 1000000) {
+                const millions = (abs / 1000000).toFixed(abs >= 10000000 ? 1 : 1).replace('.', ',');
+                return sign + '$' + millions + 'M';
+            }
+            return sign + formatMoney(abs);
         }
 
         function esc(value) {
@@ -488,7 +399,6 @@
             }[ch]));
         }
 
-        // Si el cliente vino de Cobro Fácil, la deuda es deuda_actual de esa base.
         function deudaVisible(client) {
             if (client.pos_uid || client.pos_id != null) {
                 const deuda = Number(client.deuda_pos);
@@ -503,7 +413,6 @@
             return tipo.includes('express') || tipo.includes('expres');
         }
 
-        // Calculate days since last payment. Null = nunca pagó.
         function calculateDaysSincePayment(fechaUltimoPago) {
             if (!fechaUltimoPago) return null;
             const lastPayment = new Date(fechaUltimoPago);
@@ -513,17 +422,23 @@
             return Math.floor(diffTime / (1000 * 60 * 60 * 24));
         }
 
-        // Get client status
         function getClientStatus(cliente) {
             const saldo = deudaVisible(cliente);
-            const techo = cliente.techo_deuda || 0;
+            const techo = Number(cliente.techo_deuda) || 0;
             const scoring = cliente.scoring || 'A';
+            if (saldo <= 0) return { label: 'Al día', class: 'ok' };
+            if (String(cliente.estado_cuenta || '').toLowerCase() === 'suspendido') return { label: 'Suspendido', class: 'hot' };
+            if (techo > 0 && saldo >= techo * 0.9) return { label: 'Atención', class: 'hot' };
+            if (scoring === 'C' || scoring === 'D') return { label: 'Crítico', class: 'hot' };
+            if (techo > 0 && saldo >= techo * 0.6) return { label: 'Atención', class: 'hot' };
+            const days = calculateDaysSincePayment(cliente.fecha_ultimo_pago);
+            const plazo = Number(cliente.plazo_dias);
+            if (Number.isFinite(plazo) && plazo > 0 && days !== null && days > plazo) return { label: 'Vencido', class: 'hot' };
+            return { label: 'Regular', class: '' };
+        }
 
-            if (saldo <= 0) return { label: 'Al día', class: 'badge-success' };
-            if (saldo >= techo * 0.9) return { label: 'Atención', class: 'badge-danger' };
-            if (scoring === 'C' || scoring === 'D') return { label: 'Crítico', class: 'badge-danger' };
-            if (saldo >= techo * 0.6) return { label: 'Atención', class: 'badge-warning' };
-            return { label: 'Regular', class: 'badge-neutral' };
+        function enRiesgo(client) {
+            return getClientStatus(client).class === 'hot';
         }
 
         function sucursalDe(client) {
@@ -539,130 +454,113 @@
         function llenarSucursales() {
             const select = document.getElementById('sucursalFiltro');
             const previa = select.value;
-            const nombres = [...new Set(allClients.map(sucursalDe))].sort((a, b) => a.localeCompare(b));
+            const nombres = [...new Set(allClients.map(sucursalDe))].sort((a, b) => a.localeCompare(b, 'es'));
             select.innerHTML = '<option value="">Todas las sucursales</option>' +
                 nombres.map(nombre => `<option value="${esc(nombre)}">${esc(nombre)}</option>`).join('');
-            if ([...select.options].some(opcion => opcion.value === previa)) {
-                select.value = previa;
-            }
+            if ([...select.options].some(opcion => opcion.value === previa)) select.value = previa;
         }
 
-        // Filter clients
-        function filterClients() {
-            searchQuery = document.getElementById('searchInput').value.toLowerCase();
+        function setFilter(filter) {
+            currentFilter = filter;
+            document.querySelectorAll('.chip').forEach(item => {
+                item.classList.toggle('active', item.dataset.filter === filter);
+            });
+            document.querySelectorAll('.bar button').forEach(item => {
+                item.classList.toggle('on', item.dataset.filter === filter);
+            });
+            filterClients();
+        }
 
+        function filterClients() {
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
             const filtered = clientesDeSucursal().filter(client => {
-                // Search filter
                 const matchesSearch = !searchQuery ||
                     (client.nombre && client.nombre.toLowerCase().includes(searchQuery)) ||
-                    (client.cuit && client.cuit.toLowerCase().includes(searchQuery));
-
-                // Category filter
-                let matchesCategory = true;
+                    (client.cuit && String(client.cuit).toLowerCase().includes(searchQuery));
                 const saldo = deudaVisible(client);
                 const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
-                const status = getClientStatus(client);
-
+                let matchesCategory = true;
                 switch (currentFilter) {
-                    case 'saldo':
-                        matchesCategory = saldo > 0;
-                        break;
-                    case 'al_dia':
-                        matchesCategory = saldo <= 0;
-                        break;
-                    case 'saldo_favor':
-                        matchesCategory = saldo < 0;
-                        break;
-                    case 'expres':
-                        matchesCategory = esExpress(client);
-                        break;
-                    case 'criticos':
-                        matchesCategory = status.label === 'Crítico' || status.label === 'Atención';
-                        break;
-                    case '30+':
-                        matchesCategory = days !== null && days >= 30;
-                        break;
-                    case '60+':
-                        matchesCategory = days !== null && days >= 60;
-                        break;
-                    case '90+':
-                        matchesCategory = days !== null && days >= 90;
-                        break;
+                    case 'saldo': matchesCategory = saldo > 0; break;
+                    case 'al_dia': matchesCategory = saldo <= 0; break;
+                    case 'expres': matchesCategory = esExpress(client); break;
+                    case 'criticos': matchesCategory = enRiesgo(client); break;
+                    case '30+': matchesCategory = days !== null && days >= 30; break;
+                    case '60+': matchesCategory = days !== null && days >= 60; break;
+                    case '90+': matchesCategory = days !== null && days >= 90; break;
                 }
-
                 return matchesSearch && matchesCategory;
             });
-
-            renderTable(filtered);
+            filtered.sort((a, b) => deudaVisible(b) - deudaVisible(a));
+            renderCards(filtered);
         }
 
-        // Render table
-        function renderTable(clients) {
-            const tbody = document.getElementById('clientsTableBody');
+        function renderCards(clients) {
+            const box = document.getElementById('cards');
             const emptyState = document.getElementById('emptyState');
-
-            if (clients.length === 0) {
-                tbody.innerHTML = '';
-                emptyState.style.display = 'block';
+            if (!clients.length) {
+                box.innerHTML = '';
+                emptyState.hidden = false;
                 return;
             }
-
-            emptyState.style.display = 'none';
-
-            tbody.innerHTML = clients.map(client => {
-                const status = getClientStatus(client);
-                const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
+            emptyState.hidden = true;
+            box.innerHTML = clients.map(client => {
                 const saldo = deudaVisible(client);
-                const tipo = client.tipo_cliente || 'regular';
-
+                const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
+                const status = getClientStatus(client);
+                const tipo = esExpress(client) ? 'EXPRESS' : String(client.tipo_cliente || 'CLIENTE').replaceAll('_', ' ').toUpperCase();
+                const late = saldo > 0 && days !== null
+                    ? `<span class="late">${days} días<br>retraso</span>`
+                    : `<span class="late ok">${esc(status.label)}</span>`;
+                const plazo = client.plazo_dias == null || client.plazo_dias === '' ? '—' : `${esc(client.plazo_dias)} días`;
                 return `
-                    <tr>
-                        <td>${esc(client.id)}</td>
-                        <td>${esc(client.cuit || 'Sin DNI')}</td>
-                        <td>${esc(client.nombre)}</td>
-                        <td>${esc(sucursalDe(client))}</td>
-                        <td><span class="badge badge-neutral">${esc(tipo)}</span></td>
-                        <td><span class="badge ${status.class}">${status.label}</span></td>
-                        <td class="text-right money ${saldo > 0 ? 'negative' : 'positive'}">${formatMoney(saldo)}</td>
-                        <td class="text-right money">${formatMoney(client.techo_deuda || 0)}</td>
-                        <td class="text-center">${days === null ? '—' : days + ' días'}</td>
-                        <td class="text-center">${client.plazo_dias == null || client.plazo_dias === '' ? '—' : esc(client.plazo_dias) + ' días'}</td>
-                        <td class="text-center">
-                            <div class="actions-cell">
-                                <button class="btn btn-primary btn-sm" onclick="abonarCliente(${client.id})">Abonar</button>
-                                <button class="btn btn-icon btn-sm" onclick="verDetalle(${client.id})">⋮</button>
+                    <article class="debt-card" data-id="${esc(client.id)}">
+                        <div class="card-top">
+                            <div class="who">
+                                <div class="avatar" aria-hidden="true">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.8"><path d="M20 21a8 8 0 10-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+                                </div>
+                                <div>
+                                    <h2>${esc(client.nombre)}</h2>
+                                    <span class="pill">${esc(tipo)}</span>
+                                </div>
                             </div>
-                        </td>
-                    </tr>
-                `;
+                            ${late}
+                        </div>
+                        <div class="metrics">
+                            <div><span>DEUDA</span><strong>${formatCompact(saldo)}</strong></div>
+                            <div><span>LÍMITE</span><strong>${formatCompact(client.techo_deuda || 0)}</strong></div>
+                            <div><span>PLAZO</span><strong>${plazo}</strong></div>
+                        </div>
+                        <div class="card-foot">
+                            <div>
+                                <span class="amount-label">A COBRAR</span>
+                                <span class="amount ${saldo > 0 ? 'hot' : 'cool'}">${formatCompact(saldo)}</span>
+                            </div>
+                            <div class="foot-note">${esc(sucursalDe(client))}<br>${esc(status.label)}</div>
+                        </div>
+                    </article>`;
             }).join('');
         }
 
-        // Update metrics
         function updateMetrics() {
             const base = clientesDeSucursal();
-            const carteraTotal = base.reduce((sum, c) => sum + deudaVisible(c), 0);
-            const cuentasActivas = base.filter(c => deudaVisible(c) > 0).length;
-            const enRiesgo = base.filter(c => {
-                const status = getClientStatus(c);
-                return status.label === 'Crítico' || status.label === 'Atención';
-            });
-            const carteraRiesgo = enRiesgo.reduce((sum, c) => sum + deudaVisible(c), 0);
-
-            document.getElementById('metricCartera').textContent = formatMoney(carteraTotal);
-            document.getElementById('metricCuentasActivas').textContent = `${cuentasActivas} cuentas activas`;
-            document.getElementById('metricActivas').textContent = cuentasActivas;
-            document.getElementById('metricTotalRegistradas').textContent = `de ${base.length} registradas`;
-            document.getElementById('metricRiesgo').textContent = formatMoney(carteraRiesgo);
-            document.getElementById('metricEnRiesgo').textContent = `${enRiesgo.length} en riesgo/vencidos`;
-
-            // Update filter counts
+            const conDeuda = base.filter(c => deudaVisible(c) > 0);
+            const riesgo = base.filter(enRiesgo);
+            const deuda = conDeuda.reduce((sum, c) => sum + deudaVisible(c), 0);
+            const deudaRiesgo = riesgo.reduce((sum, c) => sum + Math.max(deudaVisible(c), 0), 0);
+            document.getElementById('barDeuda').textContent = formatCompact(deuda);
+            document.getElementById('barDeudaSub').textContent = `${conDeuda.length} cuentas`;
+            document.getElementById('barRiesgo').textContent = formatCompact(deudaRiesgo);
+            document.getElementById('barRiesgoSub').textContent = `${riesgo.length} cuentas`;
+            document.getElementById('barCobros').textContent = formatCompact(cobrosMes);
+            document.getElementById('barClientes').textContent = String(base.length);
+            document.getElementById('barClientesSub').textContent = conDeuda.length ? `${conDeuda.length} con deuda` : 'en la calle';
             document.getElementById('countAll').textContent = base.length;
-            document.getElementById('countSaldo').textContent = base.filter(c => deudaVisible(c) > 0).length;
+            document.getElementById('countSaldo').textContent = conDeuda.length;
             document.getElementById('countAlDia').textContent = base.filter(c => deudaVisible(c) <= 0).length;
-            document.getElementById('countSaldoFavor').textContent = base.filter(c => deudaVisible(c) < 0).length;
             document.getElementById('countExpress').textContent = base.filter(esExpress).length;
-            document.getElementById('countCriticos').textContent = enRiesgo.length;
+            document.getElementById('countCriticos').textContent = riesgo.length;
             document.getElementById('count30').textContent = base.filter(c => {
                 const days = calculateDaysSincePayment(c.fecha_ultimo_pago);
                 return days !== null && days >= 30;
@@ -677,40 +575,97 @@
             }).length;
         }
 
-        // Load clients
+        function abrirFicha(id) {
+            const client = allClients.find(item => String(item.id) === String(id));
+            if (!client) return;
+            const saldo = deudaVisible(client);
+            const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
+            const host = document.getElementById('sheetHost');
+            host.hidden = false;
+            host.innerHTML = `
+                <div class="sheet-back" data-close="1"></div>
+                <section class="sheet" role="dialog" aria-modal="true">
+                    <h3>${esc(client.nombre)}</h3>
+                    <p>${esc(sucursalDe(client))} · ${esc(client.estado_cuenta || 'activo')}</p>
+                    <div class="facts">
+                        <div class="fact"><span>A cobrar</span><strong>${formatMoney(saldo)}</strong></div>
+                        <div class="fact"><span>Límite</span><strong>${formatMoney(client.techo_deuda || 0)}</strong></div>
+                        <div class="fact"><span>Plazo</span><strong>${client.plazo_dias == null || client.plazo_dias === '' ? '—' : esc(client.plazo_dias) + ' días'}</strong></div>
+                        <div class="fact"><span>Desde el último cobro</span><strong>${days === null ? 'Sin cobro' : days + ' días'}</strong></div>
+                        <div class="fact"><span>DNI</span><strong>${esc(client.cuit || '—')}</strong></div>
+                        <div class="fact"><span>Teléfono</span><strong>${esc(client.telefono || '—')}</strong></div>
+                    </div>
+                    <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+                </section>`;
+        }
+
+        function cerrarFicha() {
+            const host = document.getElementById('sheetHost');
+            host.hidden = true;
+            host.innerHTML = '';
+        }
+
         async function loadClients() {
+            const response = await fetch(`${API_BASE}/clientes`);
+            const data = await response.json();
+            allClients = data.clientes || data || [];
+            llenarSucursales();
+            updateMetrics();
+            filterClients();
+        }
+
+        document.getElementById('filterTabs').addEventListener('click', (event) => {
+            const tab = event.target.closest('.chip');
+            if (!tab) return;
+            setFilter(tab.dataset.filter);
+        });
+        document.querySelector('.bar').addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (!button || !button.dataset.filter) return;
+            setFilter(button.dataset.filter);
+        });
+        document.getElementById('cards').addEventListener('click', (event) => {
+            const card = event.target.closest('.debt-card');
+            if (card) abrirFicha(card.dataset.id);
+        });
+        document.getElementById('sheetHost').addEventListener('click', (event) => {
+            if (event.target.closest('[data-close]')) cerrarFicha();
+        });
+
+        async function cargarMarca() {
             try {
-                const response = await fetch(`${API_BASE}/clientes`);
-                const data = await response.json();
-                allClients = data.clientes || data || [];
-                llenarSucursales();
-                updateMetrics();
-                filterClients();
-            } catch (error) {
-                console.error('Error loading clients:', error);
+                const data = await fetch('/auth/session').then(r => r.ok ? r.json() : null);
+                const nombre = (data && data.empresa_nombre) || '';
+                if (nombre) document.getElementById('empresaNombre').textContent = nombre.toUpperCase();
+            } catch (_) {}
+            const hora = new Date().getHours();
+            document.getElementById('diaIcon').textContent = hora >= 19 || hora < 7 ? '🌙' : '☀️';
+        }
+
+        function cargarClima() {
+            const pintar = (lat, lon) => {
+                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
+                    .then(r => r.json())
+                    .then(data => {
+                        const temp = data.current_weather && data.current_weather.temperature;
+                        if (Number.isFinite(temp)) document.getElementById('clima').textContent = Math.round(temp) + '°';
+                    })
+                    .catch(() => {});
+            };
+            if ('geolocation' in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    pos => pintar(pos.coords.latitude, pos.coords.longitude),
+                    () => pintar(-32.45, -60.88),
+                    { timeout: 4000 }
+                );
+            } else {
+                pintar(-32.45, -60.88);
             }
         }
 
-        // Filter tab click
-        document.getElementById('filterTabs').addEventListener('click', (e) => {
-            const tab = e.target.closest('.filter-tab');
-            if (!tab) return;
-            document.querySelectorAll('.filter-tab').forEach(item => item.classList.remove('active'));
-            tab.classList.add('active');
-            currentFilter = tab.dataset.filter;
-            filterClients();
-        });
-
-        // Placeholder functions
-        function abonarCliente(id) {
-            alert(`Función de abono para cliente ${id} - Implementar modal de pago`);
-        }
-
-        function verDetalle(id) {
-            alert(`Ver detalle del cliente ${id} - Implementar drawer/modal`);
-        }
-
-        // Initialize
+        if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+        cargarMarca();
+        cargarClima();
         loadClients();
     </script>
 </body>
