@@ -2,16 +2,14 @@
 from __future__ import annotations
 
 import threading
-import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.services.pos_base import filas_de, listar_sucursales, ultima_carga
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
-_CARTERA_TTL = 45.0
 _cartera_lock = threading.Lock()
-_cartera_cache: dict[tuple, tuple[float, dict]] = {}
+_cartera_cache: dict[tuple, tuple[tuple, dict]] = {}
 
 
 def olvidar_cartera() -> None:
@@ -533,17 +531,17 @@ def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
 
 
 def _cartera_admin(sucursal_id: int | None = None) -> dict:
-    from app.services.pos_base import _ambito_cache
+    from app.services.pos_base import _ambito_cache, sellos_de
 
     clave = (_ambito_cache(), sucursal_id)
-    ahora = time.monotonic()
+    sellos = sellos_de(("clientes", "cuenta_corriente", "configuracion"), sucursal_id)
     with _cartera_lock:
         guardada = _cartera_cache.get(clave)
-        if guardada and ahora - guardada[0] < _CARTERA_TTL:
+        if guardada and guardada[0] == sellos:
             return guardada[1]
     resultado = _calcular_cartera(sucursal_id)
     with _cartera_lock:
-        _cartera_cache[clave] = (time.monotonic(), resultado)
+        _cartera_cache[clave] = (sellos, resultado)
     return resultado
 
 

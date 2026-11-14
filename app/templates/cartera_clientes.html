@@ -475,10 +475,6 @@
             return tipo.includes('express') || tipo.includes('expres');
         }
 
-        const TASA_BASE = 5;
-        const TASA_APAL = 5;
-        const PLAZO_BASE = 30;
-
         function calculateDaysSincePayment(fechaUltimoPago) {
             if (!fechaUltimoPago) return null;
             const lastPayment = new Date(fechaUltimoPago);
@@ -501,10 +497,6 @@
         function interesCuenta(client) {
             const monto = Number(client.mantenimiento) || 0;
             return { monto, real: client.mantenimiento_origen === 'libro' };
-        }
-
-        function sucursalDe(client) {
-            return client.sucursal_nombre || 'Sin sucursal';
         }
 
         function clientesDeSucursal() {

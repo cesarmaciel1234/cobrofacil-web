@@ -3006,23 +3006,6 @@ const $ = id => document.getElementById(id);
                 $('pedidosDia').textContent = `Reposición sugerida · Inversión estimada: ${plataJefe(ped.inversion_estimada || 0)}`;
 
                 let html = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #dc2626;">
-                        <div style="font-size:11px; font-weight:700; color:#dc2626; text-transform:uppercase;">ARTÍCULOS EN QUIEBRE</div>
-                        <div style="font-size:24px; font-weight:800; color:#0f172a; margin-top:2px;">${ped.articulos_en_quiebre || faltantes.length}</div>
-                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Alarma del inventario</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #2563eb;">
-                        <div style="font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase;">PROVEEDORES CON PEDIDO</div>
-                        <div style="font-size:24px; font-weight:800; color:#0f172a; margin-top:2px;">${ped.proveedores_con_pedido || (faltantes.length > 0 ? 1 : 0)}</div>
-                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Distribuidores a contactar</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #16a34a;">
-                        <div style="font-size:11px; font-weight:700; color:#16a34a; text-transform:uppercase;">INVERSIÓN ESTIMADA</div>
-                        <div style="font-size:24px; font-weight:800; color:#15803d; margin-top:2px;">${plataJefe(ped.inversion_estimada || 0)}</div>
-                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Presupuesto sugerido</div>
-                    </div>
-                </div>
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px;">
                     <!-- Tabla de Artículos a Pedir -->
                     <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
@@ -3191,7 +3174,11 @@ const $ = id => document.getElementById(id);
             btn.addEventListener('click', () => switchView(btn.dataset.view));
         });
         document.querySelectorAll('.pwa-nav-btn').forEach(btn => {
-            btn.addEventListener('click', () => switchView(btn.dataset.pwaView));
+            btn.addEventListener('click', () => {
+                if (btn.dataset.pwaView) {
+                    switchView(btn.dataset.pwaView);
+                }
+            });
         });
         document.querySelectorAll('.jefe-btn').forEach(btn => {
             btn.addEventListener('click', () => switchView(btn.dataset.jefe));
@@ -3258,13 +3245,18 @@ const $ = id => document.getElementById(id);
         }
 
         $('menuToggle')?.addEventListener('click', () => setSidebarOpen(!$('sidebar').classList.contains('open')));
+        $('pwaBtnMenu')?.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            setSidebarOpen(!$('sidebar').classList.contains('open'));
+        });
         if ($('sidebarCloseMobile')) $('sidebarCloseMobile').addEventListener('click', () => setSidebarOpen(false));
         $('sidebarBackdrop')?.addEventListener('click', () => setSidebarOpen(false));
         document.addEventListener('click', ev => {
             const sidebar = $('sidebar');
             const toggle = $('menuToggle');
-            if (sidebar && toggle && sidebar.classList.contains('open')) {
-                if (!sidebar.contains(ev.target) && !toggle.contains(ev.target)) {
+            const pwaMenu = $('pwaBtnMenu');
+            if (sidebar && sidebar.classList.contains('open')) {
+                if (!sidebar.contains(ev.target) && (!toggle || !toggle.contains(ev.target)) && (!pwaMenu || !pwaMenu.contains(ev.target))) {
                     setSidebarOpen(false);
                 }
             }

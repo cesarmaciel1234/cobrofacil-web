@@ -193,6 +193,28 @@ def _olvidar_tabla(tabla: str) -> None:
             pass
 
 
+def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None) -> tuple:
+    """Marca barata de las tablas. Si no cambió, la cartera armada sigue sirviendo."""
+    pedidas = [tabla for tabla in tablas if _TABLA.match(tabla or "")]
+    if not pedidas:
+        return ()
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    marcas = ", ".join("?" for _ in pedidas)
+    with get_db() as conn:
+        if sid is not None:
+            rows = conn.execute(
+                f"SELECT tabla, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla IN ({marcas}) AND sucursal_id = ? GROUP BY tabla",
+                (*pedidas, sid),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                f"SELECT tabla, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla IN ({marcas}) GROUP BY tabla",
+                pedidas,
+            ).fetchall()
+    por_tabla = {row["tabla"]: (row["marca"], int(row["n"] or 0)) for row in rows}
+    return tuple(por_tabla.get(tabla, (None, 0)) for tabla in pedidas)
+
+
 def _sello(conn, tabla: str, sucursal_id: int | None) -> tuple:
     if sucursal_id is not None:
         row = conn.execute(

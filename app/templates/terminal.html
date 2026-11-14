@@ -26,7 +26,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=3.7">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.5">
     <style>
         .balance-grid {
             display: grid;
@@ -98,42 +98,8 @@
         .footer-segment .val-warning { color: var(--warning); }
         .footer-segment .val-success { color: var(--success); }
         
-        .bottom-pwa-bar { display: none !important; }
         @media (max-width: 768px) {
             .terminal-footer { display: none !important; }
-            .bottom-pwa-bar {
-                display: none !important;
-                position: fixed;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                height: calc(60px + env(safe-area-inset-bottom, 0px));
-                padding-bottom: env(safe-area-inset-bottom, 0px);
-                background: rgba(15, 23, 42, 0.95);
-                backdrop-filter: blur(16px);
-                -webkit-backdrop-filter: blur(16px);
-                border-top: 1px solid rgba(255, 255, 255, 0.1);
-                z-index: 250;
-                justify-content: space-around;
-                align-items: center;
-            }
-            .pwa-nav-btn {
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                background: transparent;
-                border: none;
-                color: #94a3b8;
-                font-size: 10px;
-                font-weight: 700;
-                gap: 2px;
-                padding: 6px 8px;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-            .pwa-nav-btn.active { color: #38bdf8; }
-            .content { padding-bottom: 75px !important; }
         }
         
         /* 3D Premium Cards for Nuevo Registro */
@@ -390,6 +356,22 @@
                 </button>
             </div>
         </header>
+        <!-- Selector Multi-Sucursal Global -->
+        <div class="branch-selector-bar" id="branchSelectorBar">
+            <div class="branch-selector-left">
+                <span class="branch-label">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 7V3h12v4M9 11h2M13 11h2M9 15h2M13 15h2"/></svg>
+                    Sucursal:
+                </span>
+                <div id="sucursalPillsContainer" class="sucursal-pills-container">
+                    <button type="button" class="btn btn-sm btn-primary sucursal-pill active" data-sucursal="todas">Consolidado (Todas)</button>
+                </div>
+            </div>
+            <div class="branch-selector-right" id="sucursalStatusLabel">
+                <span class="branch-status-dot"></span>
+                <span>Espejo Nube · Neon PostgreSQL</span>
+            </div>
+        </div>
         <div class="content">
             <!-- VIEW: Home -->
             <div class="view" id="view-home">
@@ -1396,6 +1378,34 @@
         </div>
     </div>
 
+    <!-- DOCK PWA MÓVIL (Navegación Ejecutiva Inferior) -->
+    <nav class="bottom-pwa-bar" id="bottomPwaBar" aria-label="Navegación Principal Móvil">
+        <button type="button" class="pwa-nav-btn active" data-pwa-view="reporte" aria-label="Ventas">
+            <span class="pwa-icon">👑</span>
+            <span class="pwa-text">Ventas</span>
+        </button>
+        <button type="button" class="pwa-nav-btn" data-pwa-view="digitales" aria-label="Cobros">
+            <span class="pwa-icon">💳</span>
+            <span class="pwa-text">Cobros</span>
+        </button>
+        <button type="button" class="pwa-nav-btn" data-pwa-view="contabilidad" aria-label="Caja">
+            <span class="pwa-icon">💰</span>
+            <span class="pwa-text">Caja</span>
+        </button>
+        <a href="/cartera" class="pwa-nav-btn" aria-label="Cartera">
+            <span class="pwa-icon">👥</span>
+            <span class="pwa-text">Cartera</span>
+        </a>
+        <button type="button" class="pwa-nav-btn" data-pwa-view="pedidos" aria-label="Pedidos">
+            <span class="pwa-icon">📦</span>
+            <span class="pwa-text">Pedidos</span>
+        </button>
+        <button type="button" class="pwa-nav-btn" id="pwaBtnMenu" aria-label="Menú">
+            <span class="pwa-icon">☰</span>
+            <span class="pwa-text">Más</span>
+        </button>
+    </nav>
+
     <style>
         /* Panel flotante de métricas (Inicio / Dashboard) */
         .dashboard-bar {
@@ -1425,40 +1435,10 @@
             }
         }
         @media (max-width: 768px) {
-            .dashboard-bar {
-                padding: 10px 8px;
-                padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-                border-radius: 16px;
-                bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-                left: max(10px, env(safe-area-inset-left, 0px));
-                right: max(10px, env(safe-area-inset-right, 0px));
-                background: rgba(255, 255, 255, 0.85) !important;
-                backdrop-filter: blur(20px) !important;
-                -webkit-backdrop-filter: blur(20px) !important;
-                border: 1px solid rgba(255, 255, 255, 0.4) !important;
-                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1) !important;
-                gap: 4px !important;
+            .dashboard-bar,
+            .jefe-bar {
+                display: none !important;
             }
-            .dashboard-bar .value { font-size: 0.95rem !important; }
-            .dashboard-bar .label { font-size: 0.55rem !important; margin-bottom: 4px !important; }
-            .dashboard-bar .sub { font-size: 0.52rem !important; margin-top: 3px !important; }
-            .kpi-item {
-                padding: 4px 2px !important;
-            }
-            .jefe-bar:not(.field-hidden) {
-                display: flex !important;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                border-radius: 0;
-                background: rgba(15, 23, 42, 0.96) !important;
-                border: 0 !important;
-                box-shadow: none !important;
-                z-index: 250;
-                padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
-            }
-            .jefe-bar .label { color: #94a3b8 !important; font-size: 0.58rem !important; margin-bottom: 2px !important; }
-            .jefe-bar .value { color: #fff !important; font-size: 0.78rem !important; }
         }
         .corp-map { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 8px 16px 16px; }
         @media (min-width: 720px) { .corp-map { grid-template-columns: 1fr 1fr; } }
@@ -1811,6 +1791,6 @@
     <script src="/static/js/crm-loader.js?v=3.8"></script>
     <script src="/static/js/crm-delete.js?v=3.7"></script>
     <script src="/static/js/crm-backup.js?v=3.7"></script>
-    <script src="/static/js/app.js?v=4.3"></script>
+    <script src="/static/js/app.js?v=4.5"></script>
 </body>
 </html>
