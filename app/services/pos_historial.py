@@ -200,10 +200,9 @@ def resumen_cliente(pos_id, deuda: float | None = None) -> dict:
     )
     cobros = sum(fila["monto"] for fila in movs if fila["es_cobro"])
     partes = [f"{len(movs)} movimiento(s)"]
-    if ventas:
-        partes.append(f"Ventas: ${ventas:,.2f}")
-    if manuales:
-        partes.append(f"Cargos a mano: ${manuales:,.2f}")
+    cargos = ventas + manuales
+    if cargos:
+        partes.append(f"Ventas: ${cargos:,.2f}")
     if cobros:
         partes.append(f"Cobros: ${cobros:,.2f}")
     return {
@@ -216,6 +215,64 @@ def resumen_cliente(pos_id, deuda: float | None = None) -> dict:
         "ventas": round(ventas, 2),
         "manuales": round(manuales, 2),
         "cobros": round(cobros, 2),
+    }
+
+
+def _id_texto(valor) -> str:
+    texto = str(valor or "").strip()
+    return texto[:-2] if texto.endswith(".0") else texto
+
+
+def _tomar(fila: list, idx: dict, *nombres: str):
+    for nombre in nombres:
+        i = idx.get(nombre)
+        if i is not None and i < len(fila):
+            return fila[i]
+    return None
+
+
+def _items_del_ticket(venta_id: str) -> list[dict]:
+    for tabla in ("detalles_ventas", "detalle_ventas", "ventas_items"):
+        columnas, filas = filas_de(tabla)
+        if not columnas:
+            continue
+        idx = {str(col).lower(): i for i, col in enumerate(columnas)}
+        enlace = next((nombre for nombre in ("venta_id", "id_venta", "ticket_id", "venta") if nombre in idx), "")
+        items = []
+        for fila in filas:
+            if enlace and _id_texto(_tomar(fila, idx, enlace)) != venta_id:
+                continue
+            nombre = str(_tomar(fila, idx, "nombre_producto", "nombre", "producto", "descripcion", "corte") or "").strip()
+            if not nombre:
+                continue
+            items.append({
+                "nombre": nombre,
+                "cantidad": _num(_tomar(fila, idx, "cantidad", "kilos", "peso", "cant")),
+                "precio": _num(_tomar(fila, idx, "precio_unitario", "precio")),
+                "subtotal": _num(_tomar(fila, idx, "subtotal", "total", "monto")),
+            })
+        if items:
+            return items
+    return []
+
+
+def ticket_de(venta_id) -> dict:
+    buscado = _id_texto(venta_id).lstrip("#")
+    if not buscado:
+        return {"encontrado": False, "id": ""}
+    columnas, filas = filas_de("ventas")
+    idx = {str(col).lower(): i for i, col in enumerate(columnas)}
+    venta = next((fila for fila in filas if _id_texto(_tomar(fila, idx, "id")) == buscado), None)
+    if venta is None:
+        return {"encontrado": False, "id": buscado}
+    return {
+        "encontrado": True,
+        "id": buscado,
+        "fecha": str(_tomar(venta, idx, "fecha") or "").split(".")[0],
+        "total": _num(_tomar(venta, idx, "total")),
+        "pago": str(_tomar(venta, idx, "metodo_pago", "medio_pago") or "—"),
+        "estado": str(_tomar(venta, idx, "estado") or ""),
+        "items": _items_del_ticket(buscado),
     }
 
 

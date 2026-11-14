@@ -78,20 +78,8 @@
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        .weather {
-            min-width: 52px;
-            height: 40px;
-            padding: 0 10px;
-            border-radius: 12px;
-            background: #2b2b2b;
-            color: #fff;
-            font-weight: 800;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-        }
         .page {
-            padding: 18px 16px calc(132px + env(safe-area-inset-bottom, 0px));
+            padding: 18px 16px calc(84px + env(safe-area-inset-bottom, 0px));
         }
         h1 {
             margin: 0 0 14px;
@@ -217,52 +205,106 @@
             text-align: center;
             color: var(--muted);
         }
-        .bar {
-            position: fixed;
-            left: 50%;
-            transform: translateX(-50%);
-            width: min(456px, calc(100% - 24px));
-            bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-            z-index: 30;
+        .resumen {
             display: grid;
             grid-template-columns: repeat(4, 1fr);
             gap: 2px;
-            padding: 14px 6px 12px;
-            border-radius: 22px;
-            background: var(--bar);
-            backdrop-filter: blur(18px);
-            border: 1px solid rgba(255,255,255,0.7);
-            box-shadow: 0 12px 40px rgba(15, 23, 42, 0.12);
+            margin: 0 0 14px;
+            padding: 12px 4px;
+            border-radius: 18px;
+            background: #0f172a;
         }
-        .bar button {
+        .resumen button {
             border: 0;
             background: transparent;
-            padding: 2px 2px;
+            padding: 4px 2px;
             cursor: pointer;
             min-width: 0;
+            border-radius: 12px;
         }
-        .bar button.on { background: rgba(15, 23, 42, 0.05); border-radius: 14px; }
-        .bar small {
+        .resumen button.on { background: rgba(255, 255, 255, 0.08); }
+        .resumen small {
             display: block;
-            color: #64748b;
+            color: #94a3b8;
             font-size: 9px;
             font-weight: 800;
             letter-spacing: 0.04em;
         }
-        .bar b {
+        .resumen b {
             display: block;
             margin-top: 3px;
-            font-size: 0.95rem;
+            font-size: 0.92rem;
             letter-spacing: -0.03em;
-            color: #0f172a;
+            color: #f8fafc;
         }
-        .bar .sub {
+        .resumen .sub {
             display: block;
             margin-top: 2px;
-            color: #94a3b8;
+            color: #64748b;
             font-size: 9px;
             font-weight: 650;
         }
+        .panel {
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 40;
+            width: min(92vw, 380px);
+            background: #0f172a;
+            color: #e2e8f0;
+            transform: translateX(-105%);
+            transition: transform 0.2s ease;
+            padding: calc(18px + env(safe-area-inset-top, 0px)) 16px calc(84px + env(safe-area-inset-bottom, 0px));
+            overflow: auto;
+        }
+        .panel.open { transform: translateX(0); }
+        .panel h2 { margin: 0 0 6px; font-size: 1.05rem; color: #f8fafc; }
+        .panel .nota { margin: 0 0 16px; color: #94a3b8; font-size: 13px; line-height: 1.4; }
+        .panel label { display: block; margin-bottom: 14px; font-size: 12px; font-weight: 800; color: #94a3b8; letter-spacing: 0.04em; }
+        .panel select {
+            display: block;
+            width: 100%;
+            height: 44px;
+            margin-top: 6px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            background: #1e293b;
+            color: #fff;
+            padding: 0 12px;
+        }
+        .panel .chips { flex-wrap: wrap; overflow: visible; padding-bottom: 0; }
+        .panel .chip { background: transparent; color: #e2e8f0; border-color: rgba(255, 255, 255, 0.16); }
+        .panel .chip.active { background: #38bdf8; color: #0f172a; border-color: #38bdf8; }
+        .panel-fondo { position: fixed; inset: 0; z-index: 35; background: rgba(15, 23, 42, 0.45); }
+        .modulos {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 50;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            height: calc(60px + env(safe-area-inset-bottom, 0px));
+            padding-bottom: env(safe-area-inset-bottom, 0px);
+            background: rgba(15, 23, 42, 0.94);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .modulos a {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 2px;
+            min-width: 52px;
+            min-height: 48px;
+            color: #94a3b8;
+            font-size: 10px;
+            font-weight: 700;
+            text-decoration: none;
+        }
+        .modulos a.active { color: #38bdf8; }
         #barDeuda { color: var(--risk); }
         #barRiesgo { color: var(--danger); }
         #barCobros { color: var(--ok); }
@@ -270,14 +312,16 @@
             position: fixed;
             inset: 0;
             background: rgba(15, 23, 42, 0.35);
-            z-index: 40;
+            z-index: 60;
         }
         .sheet {
             position: fixed;
             left: 0;
             right: 0;
             bottom: 0;
-            z-index: 41;
+            z-index: 61;
+            max-height: min(88vh, 640px);
+            overflow: auto;
             background: #fff;
             border-radius: 24px 24px 0 0;
             padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
@@ -293,6 +337,14 @@
         }
         .fact span { display: block; color: #94a3b8; font-size: 11px; font-weight: 700; }
         .fact strong { display: block; margin-top: 2px; }
+        button.fact {
+            width: 100%;
+            text-align: left;
+            border: 0;
+            cursor: pointer;
+            font: inherit;
+            color: inherit;
+        }
         .sheet.historial {
             top: 10px;
             left: 50%;
@@ -355,32 +407,104 @@
             font-weight: 700;
             cursor: pointer;
         }
+        #lista[hidden], .ficha[hidden] { display: none !important; }
+        #btnOpciones .ico-atras { display: none; }
+        #btnOpciones.es-atras .ico-menu { display: none; }
+        #btnOpciones.es-atras .ico-atras { display: block; }
+        #btnPerfil { display: none; }
+        .topbar.en-ficha #btnActualizar { display: none; }
+        .topbar.en-ficha #btnPerfil { display: inline-flex; }
+        .ficha-nombre { margin: 0; font-size: 1.35rem; letter-spacing: -0.03em; }
+        .ficha-sub { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+        .ficha-numeros {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin: 14px 0;
+        }
+        .ficha-numeros div, .ficha-total {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 10px 12px;
+        }
+        .ficha-numeros span, .ficha-total span {
+            display: block;
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+        .ficha-numeros strong { display: block; margin-top: 3px; font-size: 14px; }
+        .ficha-total { margin-bottom: 14px; }
+        .ficha-total strong { display: block; margin-top: 2px; font-size: 1.35rem; letter-spacing: -0.03em; }
+        .ficha-nota { margin: 0 0 12px; color: #64748b; font-size: 12px; font-weight: 700; }
+        .movs { display: flex; flex-direction: column; gap: 8px; }
+        .mov {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            min-height: 64px;
+            padding: 12px 14px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: #fff;
+            text-align: left;
+            cursor: pointer;
+        }
+        .mov strong, .mov-num b { display: block; font-size: 14px; }
+        .mov span, .mov-num span { display: block; margin-top: 3px; color: #64748b; font-size: 12px; }
+        .mov-num { text-align: right; flex: none; }
+        .mov.cobro .mov-num b { color: #047857; }
+        .mov.venta .mov-num b { color: #dc2626; }
+        .perfil-aviso { margin: 0 0 12px; color: #64748b; font-size: 13px; }
+        .perfil-campo { display: block; margin-bottom: 10px; }
+        .perfil-campo span {
+            display: block;
+            margin-bottom: 4px;
+            color: #94a3b8;
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: 0.04em;
+        }
+        .perfil-campo input {
+            width: 100%;
+            height: 44px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 0 12px;
+        }
     </style>
 </head>
 <body>
 <div class="shell">
     <header class="topbar">
-        <button class="icon-btn" type="button" onclick="location.href='/'" aria-label="Volver">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
+        <button class="icon-btn" id="btnOpciones" type="button" aria-label="Opciones del módulo">
+            <svg class="ico-menu" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+            <svg class="ico-atras" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>
         </button>
         <div class="brand">
             <span id="diaIcon" aria-hidden="true">☀️</span>
             <strong id="empresaNombre">CARTERA</strong>
         </div>
-        <span class="weather" id="clima">--°</span>
-        <button class="icon-btn blue" type="button" onclick="loadClients()" aria-label="Actualizar">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
+        <button class="icon-btn blue" id="btnActualizar" type="button" aria-label="Actualizar">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-2.6-6.3"/><path d="M21 3v6h-6"/></svg>
+        </button>
+        <button class="icon-btn blue" id="btnPerfil" type="button" aria-label="Perfil del cliente">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
         </button>
     </header>
 
-    <main class="page">
-        <h1>Cartera</h1>
-        <div class="tools">
-            <input id="searchInput" type="search" placeholder="Buscar nombre o DNI" oninput="filterClients()">
+    <aside class="panel" id="panelHerramientas" aria-label="Herramientas del módulo">
+        <h2>Herramientas · Cartera</h2>
+        <p class="nota">Filtros del libro: sucursal, antigüedad y tipo de cuenta.</p>
+        <label>SUCURSAL
             <select id="sucursalFiltro" onchange="elegirSucursal()">
                 <option value="">Todas las sucursales</option>
             </select>
-        </div>
+        </label>
         <div class="chips" id="filterTabs">
             <button class="chip active" data-filter="all" type="button">Todos <span id="countAll">0</span></button>
             <button class="chip" data-filter="saldo" type="button">Con deuda <span id="countSaldo">0</span></button>
@@ -391,11 +515,13 @@
             <button class="chip" data-filter="60+" type="button">60+ <span id="count60">0</span></button>
             <button class="chip" data-filter="90+" type="button">90+ <span id="count90">0</span></button>
         </div>
-        <div class="cards" id="cards"></div>
-        <div class="empty" id="emptyState">Cargando el libro…</div>
-    </main>
+    </aside>
+    <div class="panel-fondo" id="panelFondo" hidden></div>
 
-    <nav class="bar" aria-label="Resumen de cartera">
+    <main class="page">
+        <div id="lista">
+        <input class="buscar" id="searchInput" type="search" placeholder="Buscar nombre o DNI" oninput="filterClients()" style="width:100%;height:44px;border:1px solid var(--line);border-radius:12px;background:#fff;padding:0 14px;margin-bottom:12px;">
+        <nav class="resumen" aria-label="Resumen de cartera">
         <button type="button" data-filter="saldo" id="goDeuda">
             <small>EN LA CALLE</small>
             <b id="barDeuda">$0</b>
@@ -416,14 +542,34 @@
             <b id="barClientes">0</b>
             <span class="sub" id="barClientesSub">con deuda</span>
         </button>
+        </nav>
+        <div class="cards" id="cards"></div>
+        <div class="empty" id="emptyState">Cargando el libro…</div>
+        </div>
+        <section class="ficha" id="ficha" hidden></section>
+    </main>
+
+    <nav class="modulos" aria-label="Módulos">
+        <a href="/?view=reporte"><span aria-hidden="true">👑</span>Ventas</a>
+        <a href="/?view=digitales"><span aria-hidden="true">💳</span>Cobros</a>
+        <a href="/?view=contabilidad"><span aria-hidden="true">💰</span>Caja</a>
+        <a href="/cartera" class="active" aria-current="page"><span aria-hidden="true">👥</span>Cartera</a>
+        <a href="/?view=pedidos"><span aria-hidden="true">📦</span>Pedidos</a>
     </nav>
 
     <div id="sheetHost" hidden></div>
 </div>
 
+    <script src="/static/js/barra/ventas.js?v=1"></script>
+    <script src="/static/js/barra/cobros.js?v=1"></script>
+    <script src="/static/js/barra/caja.js?v=1"></script>
+    <script src="/static/js/barra/cartera.js?v=1"></script>
+    <script src="/static/js/barra/pedidos.js?v=1"></script>
+    <script src="/static/js/barra/armar.js?v=1"></script>
     <script>
         const API_BASE = '/api';
         const CACHE_CARTERA = 'crm-cartera-app';
+        const PERFILES_LOCAL = 'crm-perfiles-local';
         let allClients = [];
         let currentFilter = 'all';
         let cobrosMes = 0;
@@ -517,7 +663,7 @@
         }
 
         function desdeLibro(cliente) {
-            return {
+            return aplicarPerfilLocal({
                 id: cliente.id,
                 pos_id: cliente.id,
                 nombre: cliente.nombre,
@@ -532,8 +678,39 @@
                 tarifa: cliente.tarifa,
                 en_riesgo: cliente.en_riesgo,
                 estado: cliente.estado,
-                sucursal_nombre: cliente.sucursal_nombre || ''
+                sucursal_nombre: cliente.sucursal_nombre || '',
+                direccion: ''
+            });
+        }
+
+        function leerPerfiles() {
+            try { return JSON.parse(localStorage.getItem(PERFILES_LOCAL)) || {}; }
+            catch (e) { return {}; }
+        }
+
+        function aplicarPerfilLocal(client) {
+            const local = leerPerfiles()[String(client.id)];
+            if (!local) return client;
+            if (local.nombre) client.nombre = local.nombre;
+            if ('dni' in local) client.cuit = local.dni || '';
+            if ('telefono' in local) client.telefono = local.telefono || '';
+            if ('direccion' in local) client.direccion = local.direccion || '';
+            return client;
+        }
+
+        function guardarPerfilLocal(perfil) {
+            const todos = leerPerfiles();
+            todos[String(perfil.id)] = {
+                id: perfil.id,
+                pos_id: perfil.pos_id,
+                nombre: perfil.nombre,
+                dni: perfil.dni,
+                telefono: perfil.telefono,
+                direccion: perfil.direccion,
+                origen: 'local',
+                actualizado: new Date().toISOString()
             };
+            localStorage.setItem(PERFILES_LOCAL, JSON.stringify(todos));
         }
 
         function setFilter(filter) {
@@ -541,7 +718,7 @@
             document.querySelectorAll('.chip').forEach(item => {
                 item.classList.toggle('active', item.dataset.filter === filter);
             });
-            document.querySelectorAll('.bar button').forEach(item => {
+            document.querySelectorAll('.resumen button').forEach(item => {
                 item.classList.toggle('on', item.dataset.filter === filter);
             });
             filterClients();
@@ -661,68 +838,229 @@
             return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        function filaHistorial(fila) {
-            const clase = fila.es_cobro ? 'cobro' : (fila.es_venta ? 'venta' : '');
-            const dias = fila.dias == null ? '—' : `${fila.dias} d`;
-            const mant = fila.es_interes ? 'Asentado' : (fila.mantenimiento == null ? '—' : formatPos(fila.mantenimiento));
-            return `<tr class="${fila.es_cobro ? 'cobro-row' : ''}">
-                <td>${esc(fila.fecha)}</td>
-                <td class="${clase}">${esc(fila.etiqueta)}</td>
-                <td class="num ${clase}">${formatPos(fila.monto)}</td>
-                <td class="num">${formatPos(fila.saldo)}</td>
-                <td>${esc(fila.ticket)}</td>
-                <td>${esc(fila.detalle)}</td>
-                <td class="${fila.dias > 30 ? 'dias-mora' : ''}">${dias}</td>
-                <td class="num ${fila.mantenimiento > 0 ? 'mant' : ''}">${mant}</td>
-            </tr>`;
+        let libroAbierto = [];
+        let marcaEmpresa = 'CARTERA';
+
+        function ponerMarca(texto, conIcono) {
+            document.getElementById('empresaNombre').textContent = texto;
+            document.getElementById('diaIcon').hidden = !conIcono;
         }
 
-        async function abrirFicha(id) {
+        function clienteDelHash() {
+            const marca = location.hash.match(/^#c=([^&]+)/);
+            return marca ? decodeURIComponent(marca[1]) : '';
+        }
+
+        function cfrPorDia(tarifa) {
+            const n = parseFloat(String(tarifa || '').replace('%', '').replace(',', '.'));
+            if (!Number.isFinite(n)) return esc(tarifa || '—');
+            const hoy = new Date();
+            const dias = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).getDate();
+            const diario = n / dias;
+            return diario.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '%';
+        }
+
+        function fechaCorta(valor) {
+            const texto = String(valor || '');
+            const partes = texto.match(/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}))?/);
+            if (!partes) return texto || '—';
+            return partes[3] + '/' + partes[2] + (partes[4] ? ' ' + partes[4] + ':' + partes[5] : '');
+        }
+
+        function mostrarLista() {
+            document.getElementById('lista').hidden = false;
+            const ficha = document.getElementById('ficha');
+            ficha.hidden = true;
+            ficha.innerHTML = '';
+            libroAbierto = [];
+            cerrarMovimiento();
+            ponerMarca(marcaEmpresa, true);
+            marcarAtras(false);
+        }
+
+        function marcarAtras(activo) {
+            const boton = document.getElementById('btnOpciones');
+            boton.classList.toggle('es-atras', activo);
+            boton.setAttribute('aria-label', activo ? 'Volver' : 'Opciones del módulo');
+            document.querySelector('.topbar').classList.toggle('en-ficha', activo);
+            if (activo) abrirPanel(false);
+        }
+
+        function tarjetaMovimiento(fila, indice) {
+            const clase = fila.es_cobro ? 'cobro' : (fila.es_venta ? 'venta' : '');
+            const extra = fila.detalle && fila.detalle !== '—' ? fila.detalle : (fila.ticket && fila.ticket !== '—' ? fila.ticket : '');
+            return `<button type="button" class="mov ${clase}" data-mov="${indice}">
+                <div>
+                    <strong>${esc(fila.etiqueta)}</strong>
+                    <span>${esc(fechaCorta(fila.fecha))}${extra ? ' · ' + esc(extra) : ''}</span>
+                </div>
+                <div class="mov-num">
+                    <b>${formatPos(fila.monto)}</b>
+                    <span>saldo ${formatPos(fila.saldo)}</span>
+                </div>
+            </button>`;
+        }
+
+        function pintarFichaBase(client, cuerpo) {
+            const ficha = document.getElementById('ficha');
+            const saldo = deudaVisible(client);
+            const interes = interesCuenta(client);
+            const total = saldo + interes.monto;
+            const interesTxt = interes.real ? formatCompact(interes.monto) : ('est. ' + formatCompact(interes.monto));
+            document.getElementById('lista').hidden = true;
+            ficha.hidden = false;
+            ponerMarca(client.nombre, false);
+            marcarAtras(true);
+            ficha.innerHTML = `
+                <div class="ficha-numeros">
+                    <div><span>CAPITAL</span><strong>${formatCompact(saldo)}</strong></div>
+                    <div><span>INTERÉS</span><strong>${interesTxt}</strong></div>
+                    <div><span>CFR DÍA</span><strong>${cfrPorDia(client.tarifa)}</strong></div>
+                </div>
+                <div class="ficha-total"><span>TOTAL A PAGAR</span><strong>${formatCompact(total)}</strong></div>
+                <div id="fichaCuerpo">${cuerpo}</div>`;
+            window.scrollTo(0, 0);
+        }
+
+        async function pintarFicha(id) {
             const client = allClients.find(item => String(item.id) === String(id));
             if (!client) return;
-            const host = document.getElementById('sheetHost');
-            host.hidden = false;
-            host.innerHTML = `
-                <div class="sheet-back" data-close="1"></div>
-                <section class="sheet historial" role="dialog" aria-modal="true">
-                    <div class="hist-head"><h3>Historial del cliente</h3><button class="hist-close" type="button" data-close="1" aria-label="Cerrar">×</button></div>
-                    <div class="hist-who">${esc(client.nombre)} <span>${esc(client.tipo_cliente || 'regular')}</span></div>
-                    <div class="hist-scroll"><p style="padding:16px;color:#64748b">Cargando el libro…</p></div>
-                </section>`;
+            pintarFichaBase(client, '<p class="ficha-nota">Cargando el libro…</p>');
             if (client.pos_id == null) {
-                host.querySelector('.hist-scroll').innerHTML = '<p style="padding:16px;color:#64748b">Esta cuenta todavía no tiene el libro de Cobro Fácil.</p>';
+                document.getElementById('fichaCuerpo').innerHTML = '<p class="ficha-nota">Esta cuenta todavía no tiene el libro de Cobro Fácil.</p>';
                 return;
             }
             try {
                 const dato = await fetch(`${API_BASE}/pos/historial?pos_id=${encodeURIComponent(client.pos_id)}&deuda=${encodeURIComponent(deudaVisible(client))}`).then(r => r.json());
-                const movs = dato.movimientos || [];
-                if (!movs.length) {
-                    host.querySelector('.hist-scroll').innerHTML = '<p style="padding:16px;color:#64748b">El libro de esta cuenta todavía no llegó a la nube.</p>';
+                if (clienteDelHash() !== String(id)) return;
+                libroAbierto = dato.movimientos || [];
+                const nota = dato.resumen ? `<p class="ficha-nota">${esc(dato.resumen)}</p>` : '';
+                if (!libroAbierto.length) {
+                    document.getElementById('fichaCuerpo').innerHTML = nota + '<p class="ficha-nota">El libro de esta cuenta todavía no llegó a la nube.</p>';
                     return;
                 }
-                host.querySelector('.historial').insertAdjacentHTML('beforeend', `
-                    <div class="hist-foot">
-                        <p>${esc(dato.resumen || '')}</p>
-                        <span class="badge-mant">Mantenimiento: +${formatPos(dato.mantenimiento)}</span>
-                        <span class="badge-total">TOTAL ESTIMADO: ${formatPos(dato.total_estimado)}</span>
-                    </div>`);
-                host.querySelector('.hist-scroll').innerHTML = `
-                    <table class="hist-table">
-                        <thead><tr>
-                            <th>Fecha</th><th>Tipo</th><th>Monto</th><th>Saldo</th>
-                            <th>Ticket / cobro</th><th>Descripción</th><th>Días</th><th>Mantenimiento</th>
-                        </tr></thead>
-                        <tbody>${movs.map(filaHistorial).join('')}</tbody>
-                    </table>`;
+                document.getElementById('fichaCuerpo').innerHTML = nota + `<div class="movs">${libroAbierto.map(tarjetaMovimiento).join('')}</div>`;
             } catch (_) {
-                host.querySelector('.hist-scroll').innerHTML = '<p style="padding:16px;color:#64748b">No se pudo leer el historial.</p>';
+                const cuerpo = document.getElementById('fichaCuerpo');
+                if (cuerpo) cuerpo.innerHTML = '<p class="ficha-nota">No se pudo leer el historial.</p>';
             }
         }
 
-        function cerrarFicha() {
+        function abrirMovimiento(indice) {
+            const fila = libroAbierto[indice];
+            if (!fila) return;
+            const dias = fila.dias == null ? '—' : `${fila.dias} días`;
+            const mant = fila.es_interes ? 'Asentado' : (fila.mantenimiento == null ? '—' : formatPos(fila.mantenimiento));
+            const numero = String(fila.ticket || '').match(/#(\d+)/);
+            const ticket = numero
+                ? `<button type="button" class="fact" data-ticket="${esc(numero[1])}"><span>Ticket</span><strong>#${esc(numero[1])}</strong></button>`
+                : `<div class="fact"><span>Ticket</span><strong>${esc(fila.ticket)}</strong></div>`;
+            const host = document.getElementById('sheetHost');
+            host.hidden = false;
+            host.innerHTML = `
+                <div class="sheet-back" data-close="1"></div>
+                <section class="sheet" role="dialog" aria-modal="true" aria-label="Movimiento">
+                    <h3>${esc(fila.etiqueta)}</h3>
+                    <p>${esc(fila.fecha)}</p>
+                    <div class="facts">
+                        <div class="fact"><span>Monto</span><strong>${formatPos(fila.monto)}</strong></div>
+                        <div class="fact"><span>Saldo</span><strong>${formatPos(fila.saldo)}</strong></div>
+                        ${ticket}
+                        <div class="fact"><span>Días</span><strong>${esc(dias)}</strong></div>
+                        <div class="fact"><span>Mantenimiento</span><strong>${mant}</strong></div>
+                        <div class="fact"><span>Detalle</span><strong>${esc(fila.detalle)}</strong></div>
+                    </div>
+                    <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+                </section>`;
+        }
+
+        async function verTicket(id) {
+            const sheet = document.querySelector('#sheetHost .sheet');
+            if (!sheet) return;
+            sheet.innerHTML = `<h3>Ticket #${esc(id)}</h3><p>Buscando en el libro…</p>`;
+            try {
+                const dato = await fetch(`${API_BASE}/pos/ticket?id=${encodeURIComponent(id)}`).then(r => r.json());
+                if (!dato.encontrado) {
+                    sheet.innerHTML = `<h3>Ticket #${esc(id)}</h3><p>Ese ticket todavía no está en la nube.</p><button class="sheet-close" type="button" data-close="1">Cerrar</button>`;
+                    return;
+                }
+                const lineas = (dato.items || []).map(item => `
+                    <div class="fact"><span>${esc(item.nombre)}</span><strong>${esc(item.cantidad)} x ${formatPos(item.precio)} · ${formatPos(item.subtotal)}</strong></div>
+                `).join('');
+                sheet.innerHTML = `
+                    <h3>Ticket #${esc(dato.id)}</h3>
+                    <p>${esc(dato.fecha)} · ${esc(dato.pago)}${dato.estado ? ' · ' + esc(dato.estado) : ''}</p>
+                    <div class="facts">${lineas || '<p>El ticket está, sin el detalle de los cortes.</p>'}</div>
+                    <p class="perfil-aviso">Total ${formatPos(dato.total)}</p>
+                    <button class="sheet-close" type="button" data-close="1">Cerrar</button>`;
+            } catch (_) {
+                sheet.innerHTML = `<h3>Ticket #${esc(id)}</h3><p>No se pudo leer el ticket.</p><button class="sheet-close" type="button" data-close="1">Cerrar</button>`;
+            }
+        }
+
+        function cerrarMovimiento() {
             const host = document.getElementById('sheetHost');
             host.hidden = true;
             host.innerHTML = '';
+        }
+
+        function abrirPerfil() {
+            const id = clienteDelHash();
+            const client = allClients.find(item => String(item.id) === String(id));
+            const host = document.getElementById('sheetHost');
+            host.hidden = false;
+            if (!client) {
+                host.innerHTML = `
+                    <div class="sheet-back" data-close="1"></div>
+                    <section class="sheet" role="dialog" aria-modal="true" aria-label="Perfil">
+                        <h3>Perfil</h3>
+                        <p>Abrí un cliente para editar su ficha.</p>
+                        <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+                    </section>`;
+                return;
+            }
+            const perfil = {
+                id: client.id,
+                pos_id: client.pos_id,
+                nombre: client.nombre || '',
+                dni: client.cuit || '',
+                telefono: client.telefono || '',
+                direccion: client.direccion || ''
+            };
+            host.innerHTML = `
+                <div class="sheet-back" data-close="1"></div>
+                <section class="sheet" role="dialog" aria-modal="true" aria-label="Perfil">
+                    <h3>Perfil</h3>
+                    <p class="perfil-aviso">Queda en este teléfono. La base se actualiza más adelante.</p>
+                    <label class="perfil-campo"><span>NOMBRE</span><input id="perfilNombre" value="${esc(perfil.nombre)}" autocomplete="name"></label>
+                    <label class="perfil-campo"><span>DNI</span><input id="perfilDni" value="${esc(perfil.dni)}" inputmode="numeric" autocomplete="off"></label>
+                    <label class="perfil-campo"><span>TELÉFONO</span><input id="perfilTelefono" value="${esc(perfil.telefono)}" inputmode="tel" autocomplete="tel"></label>
+                    <label class="perfil-campo"><span>DIRECCIÓN</span><input id="perfilDireccion" value="${esc(perfil.direccion)}" autocomplete="street-address"></label>
+                    <button class="sheet-close" type="button" data-guardar="1">Guardar en el teléfono</button>
+                </section>`;
+            host.dataset.perfilId = String(client.id);
+        }
+
+        function guardarPerfilAbierto() {
+            const id = document.getElementById('sheetHost').dataset.perfilId;
+            const client = allClients.find(item => String(item.id) === String(id));
+            if (!client) return;
+            const perfil = {
+                id: client.id,
+                pos_id: client.pos_id,
+                nombre: document.getElementById('perfilNombre').value.trim(),
+                dni: document.getElementById('perfilDni').value.trim(),
+                telefono: document.getElementById('perfilTelefono').value.trim(),
+                direccion: document.getElementById('perfilDireccion').value.trim()
+            };
+            guardarPerfilLocal(perfil);
+            if (perfil.nombre) client.nombre = perfil.nombre;
+            client.cuit = perfil.dni;
+            client.telefono = perfil.telefono;
+            client.direccion = perfil.direccion;
+            if (clienteDelHash() === String(client.id)) ponerMarca(client.nombre, false);
+            filterClients();
+            cerrarMovimiento();
         }
 
         function aplicarLibro(dato) {
@@ -733,6 +1071,8 @@
             llenarSucursales(dato.sucursales || []);
             updateMetrics();
             filterClients();
+            const abierto = clienteDelHash();
+            if (abierto) pintarFicha(abierto);
         }
 
         async function loadClients() {
@@ -757,53 +1097,72 @@
             }
         }
 
+        function abrirPanel(abierto) {
+            const panel = document.getElementById('panelHerramientas');
+            const fondo = document.getElementById('panelFondo');
+            const on = abierto == null ? !panel.classList.contains('open') : !!abierto;
+            panel.classList.toggle('open', on);
+            fondo.hidden = !on;
+        }
+
+        document.getElementById('btnOpciones').addEventListener('click', () => {
+            if (document.getElementById('btnOpciones').classList.contains('es-atras')) {
+                location.hash = '';
+                return;
+            }
+            abrirPanel();
+        });
+        document.getElementById('btnActualizar').addEventListener('click', () => loadClients());
+        document.getElementById('btnPerfil').addEventListener('click', () => abrirPerfil());
+        document.getElementById('panelFondo').addEventListener('click', () => abrirPanel(false));
         document.getElementById('filterTabs').addEventListener('click', (event) => {
             const tab = event.target.closest('.chip');
             if (!tab) return;
             setFilter(tab.dataset.filter);
+            abrirPanel(false);
         });
-        document.querySelector('.bar').addEventListener('click', (event) => {
+        document.querySelector('.resumen').addEventListener('click', (event) => {
             const button = event.target.closest('button');
             if (!button || !button.dataset.filter) return;
             setFilter(button.dataset.filter);
         });
         document.getElementById('cards').addEventListener('click', (event) => {
             const card = event.target.closest('.debt-card');
-            if (card) abrirFicha(card.dataset.id);
+            if (!card) return;
+            const marca = '#c=' + encodeURIComponent(card.dataset.id);
+            if (location.hash === marca) pintarFicha(card.dataset.id);
+            else location.hash = marca;
+        });
+        document.getElementById('ficha').addEventListener('click', (event) => {
+            const mov = event.target.closest('[data-mov]');
+            if (mov) abrirMovimiento(Number(mov.dataset.mov));
         });
         document.getElementById('sheetHost').addEventListener('click', (event) => {
-            if (event.target.closest('[data-close]')) cerrarFicha();
+            const ticket = event.target.closest('[data-ticket]');
+            if (ticket) {
+                verTicket(ticket.dataset.ticket);
+                return;
+            }
+            if (event.target.closest('[data-guardar]')) guardarPerfilAbierto();
+            else if (event.target.closest('[data-close]')) cerrarMovimiento();
+        });
+        window.addEventListener('hashchange', () => {
+            const abierto = clienteDelHash();
+            if (abierto) pintarFicha(abierto);
+            else mostrarLista();
         });
 
         async function cargarMarca() {
             try {
                 const data = await fetch('/auth/session').then(r => r.ok ? r.json() : null);
                 const nombre = (data && data.empresa_nombre) || '';
-                if (nombre) document.getElementById('empresaNombre').textContent = nombre.toUpperCase();
+                if (nombre) {
+                    marcaEmpresa = nombre.toUpperCase();
+                    if (!clienteDelHash()) ponerMarca(marcaEmpresa, true);
+                }
             } catch (_) {}
             const hora = new Date().getHours();
             document.getElementById('diaIcon').textContent = hora >= 19 || hora < 7 ? '🌙' : '☀️';
-        }
-
-        function cargarClima() {
-            const pintar = (lat, lon) => {
-                fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
-                    .then(r => r.json())
-                    .then(data => {
-                        const temp = data.current_weather && data.current_weather.temperature;
-                        if (Number.isFinite(temp)) document.getElementById('clima').textContent = Math.round(temp) + '°';
-                    })
-                    .catch(() => {});
-            };
-            if ('geolocation' in navigator) {
-                navigator.geolocation.getCurrentPosition(
-                    pos => pintar(pos.coords.latitude, pos.coords.longitude),
-                    () => pintar(-32.45, -60.88),
-                    { timeout: 4000 }
-                );
-            } else {
-                pintar(-32.45, -60.88);
-            }
         }
 
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
@@ -812,7 +1171,6 @@
             if (previo) aplicarLibro(JSON.parse(previo));
         } catch (e) {}
         cargarMarca();
-        cargarClima();
         loadClients();
     </script>
 </body>

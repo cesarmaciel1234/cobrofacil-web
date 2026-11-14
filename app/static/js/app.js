@@ -2424,13 +2424,14 @@ const $ = id => document.getElementById(id);
                 cont.innerHTML = html;
 
                 cont.querySelectorAll('.sucursal-pill').forEach(btn => {
-                    btn.onclick = () => {
+                    btn.onclick = (ev) => {
+                        ev.stopPropagation();
                         const val = btn.dataset.sucursal;
                         activeSucursalId = val === 'todas' ? null : parseInt(val, 10);
                         cargarSucursalesSelector();
                         const activeView = document.querySelector('.view.active');
-                        const vName = activeView ? activeView.id.replace('view-', '') : 'dashboard';
-                        if (['reporte', 'dashboard', 'contabilidad', 'admin', 'proveedor', 'promedio', 'ticket'].includes(vName)) {
+                        const vName = activeView ? activeView.id.replace('view-', '') : 'reporte';
+                        if (['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket', 'dashboard'].includes(vName)) {
                             cargarJefe(vName === 'dashboard' ? 'reporte' : vName);
                         }
                     };
@@ -2568,12 +2569,12 @@ const $ = id => document.getElementById(id);
                 if (!dato.libro) {
                     $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
-                    let html = '';
+                    let html = '<p class="modulo-esencial">El resumen del día está arriba. El arqueo y el detalle se abren en Opciones.</p>';
 
                     const medios = c.medios_pago || [];
                     const totalMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0) || 1;
                     html += `
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
+                    <div data-herramienta="arqueo" data-titulo="Arqueo por medio de pago" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
                         <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                             <span>💳 Arqueo por Medio de Pago</span>
                             <span style="font-size:12px; font-weight:600; color:#64748b;">Total: ${plataJefe(totalMedios)}</span>
@@ -2608,7 +2609,7 @@ const $ = id => document.getElementById(id);
                     html += `</tbody></table></div></div>`;
 
                     html += `
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
+                    <div data-herramienta="movimientos" data-titulo="Cobros y gastos del día" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
                         <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
                             <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">📥 Cobros de Fiado del Día (${(c.detalle_cobros || []).length})</div>
                             <div style="max-height:260px; overflow-y:auto;">`;
@@ -2657,28 +2658,21 @@ const $ = id => document.getElementById(id);
                     let html = '';
 
                     if (v) {
-                        const periodos = [
-                            { id: 'Hoy', label: 'Hoy' },
-                            { id: 'Semana', label: 'Semana' },
-                            { id: 'Semana p.', label: 'Semana p.' },
-                            { id: 'Mes', label: 'Mes' },
-                            { id: 'Año', label: 'Año' },
-                            { id: 'Período', label: 'Período' }
-                        ];
+                        const largos = ['Semana p.', 'Mes', 'Año', 'Período'];
+                        const esLargo = largos.includes(perActual);
 
                         html += `
                         <div class="vitrina-wrap">
                             <div class="vitrina-head">
-                                <div>
-                                    <h1 class="vitrina-saludo">${v.saludo || 'Buenas tardes, Jefe'}</h1>
-                                    <div class="vitrina-sub">Vitrina de tienda</div>
-                                </div>
                                 <div class="vitrina-periodos">
-                                    ${periodos.map(p => `
-                                        <button type="button" class="periodo-pill ${p.id === perActual ? 'active' : ''}" onclick="window.cambiarPeriodoVitrina('${p.id}')">
-                                            ${p.label}
-                                        </button>
-                                    `).join('')}
+                                    <button type="button" class="periodo-pill ${perActual === 'Hoy' ? 'active' : ''}" onclick="window.cambiarPeriodoVitrina('Hoy')">Hoy</button>
+                                    <button type="button" class="periodo-pill ${perActual === 'Semana' ? 'active' : ''}" onclick="window.cambiarPeriodoVitrina('Semana')">Semana</button>
+                                    <select class="periodo-pill ${esLargo ? 'active' : ''}" aria-label="Período" onchange="window.cambiarPeriodoVitrina(this.value)">
+                                        <option value="Período" ${perActual === 'Período' || !esLargo ? 'selected' : ''}>Período</option>
+                                        <option value="Semana p." ${perActual === 'Semana p.' ? 'selected' : ''}>Semana p.</option>
+                                        <option value="Mes" ${perActual === 'Mes' ? 'selected' : ''}>Mes</option>
+                                        <option value="Año" ${perActual === 'Año' ? 'selected' : ''}>Año</option>
+                                    </select>
                                 </div>
                             </div>
 
@@ -2808,7 +2802,7 @@ const $ = id => document.getElementById(id);
                     const totalVentas = (v && v.tickets && v.tickets.total > 0) ? v.tickets.total : (resumen.ventas || 1);
                     const alertas = (dato.pulso && dato.pulso.alertas) || [];
                     const chips = alertas.length
-                        ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">${alertas.map(a => {
+                        ? `<div data-herramienta="alertas" data-titulo="Alertas del día" style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">${alertas.map(a => {
                             const bg = a.nivel === 'riesgo' ? '#fef2f2' : (a.nivel === 'ok' ? '#f0fdf4' : '#fffbeb');
                             const fg = a.nivel === 'riesgo' ? '#991b1b' : (a.nivel === 'ok' ? '#166534' : '#92400e');
                             return `<span style="background:${bg}; color:${fg}; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700;">${textoJefe(a.texto)}</span>`;
@@ -2819,7 +2813,7 @@ const $ = id => document.getElementById(id);
 
                     if (des.length > 0) {
                         html += `
-                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
+                        <div data-herramienta="sucursales" data-titulo="Rendimiento por sucursal" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
                             <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                                 <span>🏢 Rendimiento Multi-Sucursal</span>
                                 <span style="font-size:12px; font-weight:600; color:#64748b;">${des.length} locales sincronizados</span>
@@ -2854,7 +2848,7 @@ const $ = id => document.getElementById(id);
 
                     if (rank.length > 0) {
                         html += `
-                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                        <div data-herramienta="ranking" data-titulo="Ranking de cortes" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
                             <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                                 <span>🥩 Ranking de Cortes y Productos Más Vendidos</span>
                                 <span style="font-size:12px; font-weight:600; color:#64748b;">Top ${rank.length} productos</span>
@@ -2897,44 +2891,9 @@ const $ = id => document.getElementById(id);
                 const dig = dato.digitales || {};
                 $('digitalesDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Mercado Pago · QR · Tarjetas';
 
-                let html = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:16px;">
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">BRUTO MP</div>
-                        <div style="font-size:18px; font-weight:800; color:#0f172a; margin-top:2px;">${plataJefe(dig.bruto_mp)}</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#16a34a; text-transform:uppercase;">NETO MP</div>
-                        <div style="font-size:18px; font-weight:800; color:#15803d; margin-top:2px;">${plataJefe(dig.neto_mp)}</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#2563eb; text-transform:uppercase;">TICKETS DIGITALES</div>
-                        <div style="font-size:18px; font-weight:800; color:#1d4ed8; margin-top:2px;">${plataJefe(dig.tickets_digitales)}</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#15803d; text-transform:uppercase;">FIRMADOS EN TICKET</div>
-                        <div style="font-size:18px; font-weight:800; color:#166534; margin-top:2px;">${plataJefe(dig.firmados_ticket)}</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#d97706; text-transform:uppercase;">SIN FIRMAR / F9</div>
-                        <div style="font-size:18px; font-weight:800; color:#b45309; margin-top:2px;">${plataJefe(dig.sin_firmar)}</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#dc2626; text-transform:uppercase;">MP SIN TICKET</div>
-                        <div style="font-size:18px; font-weight:800; color:#b91c1c; margin-top:2px;">${plataJefe(dig.sin_ticket)}</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#4f46e5; text-transform:uppercase;">CLIENTE</div>
-                        <div style="font-size:18px; font-weight:800; color:#4338ca; margin-top:2px;">${plataJefe(dig.cliente_cobros)}</div>
-                    </div>
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
-                        <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">CANCELADOS</div>
-                        <div style="font-size:18px; font-weight:800; color:#475569; margin-top:2px;">${plataJefe(dig.cancelados)}</div>
-                    </div>
-                </div>`;
                 const txs = dig.transacciones || [];
-                html += `
-                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
+                let html = `<p class="modulo-esencial">Bruto, neto y tickets están en el resumen. El libro de cada cobro se abre en Opciones.</p>
+                <div data-herramienta="auditoria" data-titulo="Libro de auditoría" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
                     <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                         <span>📋 Libro de Auditoría Transaccional Digital (${txs.length})</span>
                         <span style="font-size:12px; color:#64748b;">${dig.fuente === 'libro' ? 'Libro de Mercado Pago' : 'Reconstruido desde tickets'}</span>
@@ -3003,7 +2962,6 @@ const $ = id => document.getElementById(id);
             if (panel === 'pedidos' && $('pedidosCuerpo')) {
                 const ped = dato.pedidos || {};
                 const faltantes = ped.faltantes || [];
-                $('pedidosDia').textContent = `Reposición sugerida · Inversión estimada: ${plataJefe(ped.inversion_estimada || 0)}`;
 
                 let html = `
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px;">
@@ -3012,7 +2970,7 @@ const $ = id => document.getElementById(id);
                         <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">
                             🥩 Faltantes y Stock a Pedir (${faltantes.length})
                         </div>
-                        <div style="max-height:380px; overflow-y:auto;">
+                        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
                             <table class="data-table" style="width:100%; border-collapse:collapse;">
                                 <thead>
                                     <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
@@ -3041,7 +2999,7 @@ const $ = id => document.getElementById(id);
                 html += `</tbody></table></div></div>
 
                     <!-- Mensaje de WhatsApp Listo -->
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; display:flex; flex-direction:column;">
+                    <div data-herramienta="whatsapp" data-titulo="Mensaje al frigorífico" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; display:flex; flex-direction:column;">
                         <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:8px;">
                             📲 Mensaje de WhatsApp Listo para el Frigorífico
                         </div>
@@ -3081,7 +3039,22 @@ const $ = id => document.getElementById(id);
                     ? filas.map(t => `<tr><td>${textoJefe((t.fecha || '').slice(11, 16))}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(t.pago)}</td><td>${plataJefe(t.total)}</td></tr>`).join('')
                     : `<tr><td colspan="4">${aviso || 'Sin tickets en ese día.'}</td></tr>`;
             }
+            if (window.ModuloPanel) ModuloPanel.recoger(panel);
             pintarBarraJefe(panel, dato);
+        }
+
+        const vistasRaiz = new Set(['reporte', 'digitales', 'contabilidad', 'pedidos']);
+        let moduloActual = 'reporte';
+
+        function marcarEntrada(name) {
+            const boton = $('menuToggle');
+            if (!boton) return;
+            const raiz = vistasRaiz.has(name);
+            if (raiz) moduloActual = name;
+            boton.classList.toggle('es-atras', !raiz);
+            const etiqueta = raiz ? 'Opciones del módulo' : 'Volver';
+            boton.setAttribute('aria-label', etiqueta);
+            boton.title = etiqueta;
         }
 
         function switchView(name) {
@@ -3167,6 +3140,8 @@ const $ = id => document.getElementById(id);
             if (name === 'finanzas-aging') renderFinanzasAging();
             if (name === 'finanzas-margenes') renderFinanzasMargenes();
             if (name === 'dashboard') void actualizarInformeEstado();
+            if (window.ModuloPanel) ModuloPanel.usar(name);
+            marcarEntrada(name);
             setSidebarOpen(false);
         }
 
@@ -3244,7 +3219,14 @@ const $ = id => document.getElementById(id);
             });
         }
 
-        $('menuToggle')?.addEventListener('click', () => setSidebarOpen(!$('sidebar').classList.contains('open')));
+        $('menuToggle')?.addEventListener('click', () => {
+            const boton = $('menuToggle');
+            if (boton && boton.classList.contains('es-atras')) {
+                switchView(moduloActual);
+                return;
+            }
+            setSidebarOpen(!$('sidebar').classList.contains('open'));
+        });
         $('pwaBtnMenu')?.addEventListener('click', (ev) => {
             ev.stopPropagation();
             setSidebarOpen(!$('sidebar').classList.contains('open'));

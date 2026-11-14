@@ -919,10 +919,18 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
 
 @media (max-width: 768px) {
     .sidebar {
-        transform: translateX(-100%);
+        transform: translateX(-105%);
         transition: transform 0.28s var(--ease);
         box-shadow: var(--shadow-lg);
         z-index: 500;
+        width: min(88vw, 300px);
+    }
+    .nav-item svg {
+        width: 20px !important;
+        height: 20px !important;
+        max-width: 20px !important;
+        max-height: 20px !important;
+        flex: 0 0 20px !important;
     }
     .sidebar.open { transform: translateX(0); z-index: 500; }
     .sidebar-backdrop { z-index: 499; }
@@ -1488,11 +1496,6 @@ body.sidebar-open .dashboard-bar,
     padding: 0 4px 16px;
 }
 .vitrina-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    flex-wrap: wrap;
-    gap: 16px;
     margin-bottom: 12px;
 }
 .vitrina-saludo {
@@ -1509,16 +1512,10 @@ body.sidebar-open .dashboard-bar,
     margin: 0;
 }
 .vitrina-periodos {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    white-space: nowrap;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-    padding-bottom: 4px;
+    width: 100%;
 }
 .vitrina-periodos::-webkit-scrollbar {
     display: none;
@@ -1528,11 +1525,13 @@ body.sidebar-open .dashboard-bar,
     color: #475569;
     border: 1px solid #E2E8F0;
     border-radius: 9999px;
-    padding: 6px 14px;
+    padding: 8px 6px;
     font-size: 12px;
     font-weight: 700;
     cursor: pointer;
-    flex-shrink: 0;
+    width: 100%;
+    min-height: 36px;
+    text-align: center;
     touch-action: manipulation;
     transition: all 0.15s ease;
     user-select: none;
@@ -1552,6 +1551,11 @@ body.sidebar-open .dashboard-bar,
     border-color: #0F172A;
     box-shadow: 0 2px 8px rgba(15, 23, 42, 0.25);
 }
+select.periodo-pill {
+    appearance: none;
+    -webkit-appearance: none;
+}
+select.periodo-pill.active option { color: #0F172A; }
 .vitrina-banner {
     color: #9A3412;
     background: #FFF7ED;
@@ -1596,8 +1600,12 @@ body.sidebar-open .dashboard-bar,
     .vitrina-card-lbl {
         font-size: 11px !important;
     }
+    .vitrina-card { min-width: 0; overflow: hidden; }
     .vitrina-card-val {
-        font-size: 17px !important;
+        font-size: 16px !important;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        max-width: 100%;
     }
     .vitrina-card-val.val-muted {
         font-size: 14px !important;
@@ -1841,9 +1849,112 @@ body.sidebar-open .dashboard-bar,
         filter: drop-shadow(0 2px 6px rgba(56, 189, 248, 0.4));
     }
     .content {
-        padding-bottom: calc(85px + env(safe-area-inset-bottom, 0px)) !important;
+        padding-bottom: calc(148px + env(safe-area-inset-bottom, 0px)) !important;
+    }
+    html, body { overflow-x: clip; }
+    .main, .view, .card, .card-body, .content { max-width: 100%; min-width: 0; }
+    #digitalesCuerpo, #pedidosCuerpo, #contaCuerpo, #reporteCuerpo, #ticketCuerpo, #adminCuerpo {
+        overflow: visible;
+        max-width: 100%;
+    }
+    #digitalesCuerpo > div,
+    #pedidosCuerpo > div,
+    #contaCuerpo > div,
+    #reporteCuerpo > div {
+        grid-template-columns: 1fr !important;
+        min-width: 0 !important;
+    }
+    #digitalesCuerpo .data-table,
+    #pedidosCuerpo .data-table,
+    #contaCuerpo .data-table,
+    #reporteCuerpo .data-table,
+    #ticketCuerpo .data-table {
+        width: max-content;
+        min-width: 100%;
+    }
+    #digitalesCuerpo .data-table th,
+    #digitalesCuerpo .data-table td,
+    #pedidosCuerpo .data-table th,
+    #pedidosCuerpo .data-table td,
+    #contaCuerpo .data-table th,
+    #contaCuerpo .data-table td,
+    #reporteCuerpo .data-table th,
+    #reporteCuerpo .data-table td {
+        white-space: nowrap;
     }
 }
+
+/* El menú lateral es el panel de herramientas. Se abre con Opciones, en cualquier ancho. */
+.sidebar {
+    transform: translateX(-105%);
+    width: min(92vw, 380px);
+}
+.sidebar.open { transform: translateX(0); }
+.main { margin-left: 0 !important; }
+.menu-toggle { display: inline-flex !important; }
+.menu-toggle .ico-atras { display: none; }
+.menu-toggle.es-atras .ico-menu,
+.menu-toggle.es-atras .brand-mark { display: none !important; }
+.menu-toggle.es-atras .ico-atras { display: block; }
+.bottom-pwa-bar {
+    display: flex !important;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: rgba(15, 23, 42, 0.94);
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    z-index: 1001;
+    justify-content: space-around;
+    align-items: center;
+}
+.herramientas-detalle {
+    margin: 8px 8px 12px;
+    max-height: 46vh;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+}
+.herramientas-vacio {
+    margin: 4px 12px 12px;
+    color: #64748b;
+    font-size: 13px;
+    line-height: 1.4;
+}
+.herramienta-btn { font-size: 14px; min-height: 44px; }
+.modulo-esencial { margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.4; }
+.pwa-nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 10px;
+    font-weight: 700;
+    text-decoration: none;
+    min-width: 52px;
+    min-height: 48px;
+    cursor: pointer;
+}
+.pwa-nav-btn.active { color: #38bdf8; }
+.nav-sucursal { padding: 0 10px 8px; }
+.nav-sucursal .sucursal-pills-container {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    align-items: stretch;
+}
+.nav-sucursal .sucursal-pill {
+    width: 100%;
+    min-height: 44px;
+    text-align: left;
+    justify-content: flex-start;
+}
+.content { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
 
 
 

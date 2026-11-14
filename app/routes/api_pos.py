@@ -336,6 +336,14 @@ def api_pos_historial():
     return jsonify(resumen_cliente(pos_id, request.args.get("deuda", type=float)))
 
 
+@api_bp.route("/pos/ticket", methods=["GET"])
+def api_pos_ticket():
+    """Un ticket de venta del libro, con sus cortes si llegaron a la nube."""
+    from app.services.pos_historial import ticket_de
+
+    return jsonify(ticket_de(request.args.get("id")))
+
+
 @api_bp.route("/pos/sync/logs", methods=["GET"])
 def api_pos_sync_logs():
     """

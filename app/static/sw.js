@@ -1,5 +1,5 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.5';
+const CACHE_VERSION = 'crm-frigorifico-v4.9';
 const SHELL_ASSETS = [
   '/',
   '/login',
@@ -14,6 +14,7 @@ const SHELL_ASSETS = [
   '/static/js/crm-loader.js',
   '/static/js/crm-delete.js',
   '/static/js/app.js',
+  '/static/js/modulo-panel.js',
   '/static/vendor/dexie.min.js',
   '/static/js/pos-offline.js',
   '/static/icons/icon-180.png',
@@ -26,6 +27,7 @@ const NETWORK_FIRST_PATHS = [
   '/login',
   '/pos',
   '/static/js/app.js',
+  '/static/js/modulo-panel.js',
   '/static/js/crm-sync-api.js',
   '/static/js/crm-loader.js',
   '/static/js/crm-delete.js',
