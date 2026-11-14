@@ -585,16 +585,22 @@
             if (!clients.length) {
                 box.innerHTML = '';
                 emptyState.hidden = false;
+                emptyState.textContent = 'No hay clientes en este filtro.';
                 return;
             }
             emptyState.hidden = true;
             box.innerHTML = clients.map(client => {
                 const saldo = deudaVisible(client);
-                const status = getClientStatus(client);
-                const tipo = esExpress(client) ? 'EXPRESS' : String(client.tipo_cliente || 'CLIENTE').replaceAll('_', ' ').toUpperCase();
                 const interes = interesCuenta(client);
-                const late = `<span class="late ${interes.monto > 0 ? '' : 'ok'}">${formatCents(interes.monto)}<br>interés</span>`;
-                const plazo = client.plazo_dias == null || client.plazo_dias === '' ? '—' : `${esc(client.plazo_dias)} días`;
+                const total = saldo + interes.monto;
+                const tipo = esExpress(client) ? 'EXPRESS' : String(client.tipo_cliente || 'CLIENTE').replaceAll('_', ' ').toUpperCase();
+                const interesTxt = interes.real ? formatCompact(interes.monto) : ('est. ' + formatCompact(interes.monto));
+                const late = client.dias == null
+                    ? '<span class="late">Sin días<br>en el libro</span>'
+                    : (Number(client.dias) > 0
+                        ? `<span class="late">${esc(client.dias)} días<br>retraso</span>`
+                        : '<span class="late ok">Al día</span>');
+                const pie = [client.cuit ? 'DNI ' + client.cuit : '', client.telefono || ''].filter(Boolean).join(' · ') || 'Ver historial';
                 return `
                     <article class="debt-card" data-id="${esc(client.id)}">
                         <div class="card-top">
@@ -610,16 +616,16 @@
                             ${late}
                         </div>
                         <div class="metrics">
-                            <div><span>DEUDA</span><strong>${formatCompact(saldo)}</strong></div>
-                            <div><span>LÍMITE</span><strong>${formatCompact(client.techo_deuda || 0)}</strong></div>
-                            <div><span>PLAZO</span><strong>${plazo}</strong></div>
+                            <div><span>CAPITAL</span><strong>${formatCompact(saldo)}</strong></div>
+                            <div><span>INTERÉS</span><strong>${interesTxt}</strong></div>
+                            <div><span>CFR</span><strong>${esc(client.tarifa || '—')}</strong></div>
                         </div>
                         <div class="card-foot">
                             <div>
-                                <span class="amount-label">A COBRAR</span>
-                                <span class="amount ${saldo > 0 ? 'hot' : 'cool'}">${formatCompact(saldo)}</span>
+                                <span class="amount-label">TOTAL A PAGAR</span>
+                                <span class="amount ${saldo > 0 ? 'hot' : 'cool'}">${formatCompact(total)}</span>
                             </div>
-                            <div class="foot-note">${esc(sucursalDe(client))}<br>${esc(status.label)}</div>
+                            <div class="foot-note">${esc(pie)}</div>
                         </div>
                     </article>`;
             }).join('');
@@ -631,28 +637,28 @@
             const riesgo = base.filter(enRiesgo);
             const deuda = conDeuda.reduce((sum, c) => sum + deudaVisible(c), 0);
             const deudaRiesgo = riesgo.reduce((sum, c) => sum + Math.max(deudaVisible(c), 0), 0);
-            document.getElementById('barDeuda').textContent = formatCompact(deuda);
-            document.getElementById('barDeudaSub').textContent = `${conDeuda.length} cuentas`;
-            document.getElementById('barRiesgo').textContent = formatCompact(deudaRiesgo);
-            document.getElementById('barRiesgoSub').textContent = `${riesgo.length} cuentas`;
-            document.getElementById('barCobros').textContent = formatCompact(cobrosMes);
-            document.getElementById('barClientes').textContent = String(base.length);
-            document.getElementById('barClientesSub').textContent = conDeuda.length ? `${conDeuda.length} con deuda` : 'en la calle';
+            document.getElementById('barDeuda').textContent = formatCompact(libro.cartera_en_calle != null ? libro.cartera_en_calle : deuda);
+            document.getElementById('barDeudaSub').textContent = `${libro.cuentas_activas != null ? libro.cuentas_activas : conDeuda.length} activas`;
+            document.getElementById('barRiesgo').textContent = formatCompact(libro.cartera_en_riesgo != null ? libro.cartera_en_riesgo : deudaRiesgo);
+            document.getElementById('barRiesgoSub').textContent = `${libro.cuentas_en_riesgo != null ? libro.cuentas_en_riesgo : riesgo.length} cuentas`;
+            document.getElementById('barCobros').textContent = formatCompact(libro.cobros_del_mes != null ? libro.cobros_del_mes : cobrosMes);
+            document.getElementById('barClientes').textContent = String(libro.cuentas_activas != null ? libro.cuentas_activas : conDeuda.length);
+            document.getElementById('barClientesSub').textContent = 'con deuda';
             document.getElementById('countAll').textContent = base.length;
             document.getElementById('countSaldo').textContent = conDeuda.length;
             document.getElementById('countAlDia').textContent = base.filter(c => deudaVisible(c) <= 0).length;
             document.getElementById('countExpress').textContent = base.filter(esExpress).length;
             document.getElementById('countCriticos').textContent = riesgo.length;
             document.getElementById('count30').textContent = base.filter(c => {
-                const days = calculateDaysSincePayment(c.fecha_ultimo_pago);
+                const days = diasDe(c);
                 return days !== null && days >= 30;
             }).length;
             document.getElementById('count60').textContent = base.filter(c => {
-                const days = calculateDaysSincePayment(c.fecha_ultimo_pago);
+                const days = diasDe(c);
                 return days !== null && days >= 60;
             }).length;
             document.getElementById('count90').textContent = base.filter(c => {
-                const days = calculateDaysSincePayment(c.fecha_ultimo_pago);
+                const days = diasDe(c);
                 return days !== null && days >= 90;
             }).length;
         }
@@ -727,19 +733,36 @@
             host.innerHTML = '';
         }
 
-        async function loadClients() {
-            const response = await fetch(`${API_BASE}/clientes`);
-            const data = await response.json();
-            allClients = data.clientes || data || [];
-            llenarSucursales();
+        function aplicarLibro(dato) {
+            const cartera = (dato && dato.cartera) || {};
+            libro = cartera;
+            cobrosMes = Number(cartera.cobros_del_mes) || 0;
+            allClients = (cartera.clientes || cartera.top_deudores || []).map(desdeLibro);
+            llenarSucursales(dato.sucursales || []);
             updateMetrics();
             filterClients();
-            fetch(`${API_BASE}/pos/historial`).then(r => r.ok ? r.json() : null).then(extra => {
-                interesPorCliente = {};
-                for (const item of (extra && extra.clientes) || []) interesPorCliente[String(item.pos_id)] = item;
-                updateMetrics();
-                filterClients();
-            }).catch(() => {});
+        }
+
+        async function loadClients() {
+            const vacio = document.getElementById('emptyState');
+            if (!allClients.length && vacio) {
+                vacio.hidden = false;
+                vacio.textContent = 'Cargando el libro…';
+            }
+            try {
+                let url = `${API_BASE}/pos/jefe?panel=admin`;
+                if (sucursalId) url += '&sucursal_id=' + encodeURIComponent(sucursalId);
+                const response = await fetch(url);
+                if (!response.ok) throw new Error('libro');
+                const dato = await response.json();
+                try { sessionStorage.setItem(CACHE_CARTERA, JSON.stringify(dato)); } catch (e) {}
+                aplicarLibro(dato);
+            } catch (e) {
+                if (!allClients.length && vacio) {
+                    vacio.hidden = false;
+                    vacio.textContent = 'El libro no llegó. Tocá actualizar.';
+                }
+            }
         }
 
         document.getElementById('filterTabs').addEventListener('click', (event) => {
@@ -792,6 +815,10 @@
         }
 
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
+        try {
+            const previo = sessionStorage.getItem(CACHE_CARTERA);
+            if (previo) aplicarLibro(JSON.parse(previo));
+        } catch (e) {}
         cargarMarca();
         cargarClima();
         loadClients();
