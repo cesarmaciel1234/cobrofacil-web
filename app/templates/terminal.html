@@ -98,11 +98,11 @@
         .footer-segment .val-warning { color: var(--warning); }
         .footer-segment .val-success { color: var(--success); }
         
-        .bottom-pwa-bar { display: none; }
+        .bottom-pwa-bar { display: none !important; }
         @media (max-width: 768px) {
             .terminal-footer { display: none !important; }
             .bottom-pwa-bar {
-                display: flex !important;
+                display: none !important;
                 position: fixed;
                 bottom: 0;
                 left: 0;
@@ -287,10 +287,10 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5H9.5a2.5 2.5 0 000 5h5a2.5 2.5 0 010 5H8"/></svg>
                 💰 Caja & Tesorería
             </button>
-            <button type="button" class="nav-item" data-view="admin">
+            <a class="nav-item" href="/cartera" style="text-decoration:none;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-                👥 Cartera & Fiado
-            </button>
+                👥 Cartera
+            </a>
             <button type="button" class="nav-item" data-view="pedidos">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h13l3 5v5h-2M3 7v10h2M16 17a2 2 0 104 0M7 17a2 2 0 104 0"/></svg>
                 📦 Pedidos al Frigorífico
@@ -301,10 +301,6 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16v10a2 2 0 01-2 2H6a2 2 0 01-2-2V8zM8 8V6a4 4 0 018 0v2"/></svg>
                 🎟️ Tickets Recientes
             </button>
-            <a class="nav-item" href="/cartera" style="text-decoration:none;">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-                📲 Cartera Móvil PWA
-            </a>
             <button type="button" class="nav-item" data-view="dashboard">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="5" rx="1"/><rect x="14" y="12" width="7" height="9" rx="1"/><rect x="3" y="16" width="7" height="5" rx="1"/></svg>
                 🏛️ Balance Corporativo
@@ -394,26 +390,9 @@
                 </button>
             </div>
         </header>
-        <!-- Selector Multi-Sucursal Global -->
-        <div class="branch-selector-bar" id="branchSelectorBar" style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:10px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
-                <span style="font-size:12px; font-weight:800; color:#334155; text-transform:uppercase; letter-spacing:0.04em; display:flex; align-items:center; gap:6px;">
-                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 7v14M21 7v14M6 7V3h12v4M9 11h2M13 11h2M9 15h2M13 15h2"/></svg>
-                    Sucursal:
-                </span>
-                <div id="sucursalPillsContainer" style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
-                    <button type="button" class="btn btn-sm btn-primary sucursal-pill active" data-sucursal="todas" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">Consolidado (Todas)</button>
-                </div>
-            </div>
-            <div style="font-size:12px; color:#64748b; font-weight:600; display:flex; align-items:center; gap:6px;" id="sucursalStatusLabel">
-                <span style="width:8px; height:8px; border-radius:50%; background:#10b981; display:inline-block;"></span>
-                <span>Espejo Nube · Neon PostgreSQL</span>
-            </div>
-        </div>
-
         <div class="content">
             <!-- VIEW: Home -->
-            <div class="view active" id="view-home">
+            <div class="view" id="view-home">
                 <div style="margin-bottom: 20px;">
                     <h2 style="margin:0; font-size: 1.5rem; color: #111827;">Obligaciones y Pagos</h2>
                 </div>
@@ -446,7 +425,7 @@
                         <button type="button" class="corp-area" data-corp="proveedor"><strong>Abastecimiento</strong><span>Proveedores y compras</span></button>
                         <button type="button" class="corp-area" data-corp="contabilidad"><strong>Tesorería</strong><span>Contabilidad, caja y gastos</span></button>
                         <button type="button" class="corp-area" data-corp="auditoria"><strong>Control</strong><span>Auditoría y márgenes</span></button>
-                        <a class="corp-area" href="/cartera"><strong>Cartera</strong><span>Deuda de cada cliente</span></a>
+                        <button type="button" class="corp-area" data-corp="admin"><strong>Cartera & Fiado</strong><span>Libro de la sucursal</span></button>
                     </div>
                 </div>
                 <div class="kpi-grid" id="kpiGrid">
@@ -511,8 +490,18 @@
             </div>
             <div class="view" id="view-admin">
                 <div class="card">
-                    <div class="card-head"><h2>Cartera de Clientes & Crédito (Fiado)</h2><span id="adminDia">Espejo en tiempo real de cuentas y saldos</span></div>
-                    <div class="card-body" id="adminCuerpo" style="padding:20px; line-height:1.5;">Cargando cartera…</div>
+                    <div class="card-head"><h2>Cartera & Fiado</h2><span id="adminDia">Libro de la sucursal</span></div>
+                    <div class="card-body" id="adminCuerpo" style="display:block; background:transparent; border:0; padding:16px;">Cargando cartera…</div>
+                </div>
+            </div>
+            <div class="view" id="view-historial-fiado">
+                <div class="card">
+                    <div class="card-head">
+                        <button type="button" class="btn btn-ghost" id="btnVolverCartera" style="padding:6px 10px;">← Cartera</button>
+                        <h2 id="histFiadoNombre">Historial</h2>
+                        <span id="histFiadoSub">Libro de la cuenta</span>
+                    </div>
+                    <div class="card-body" id="histFiadoCuerpo" style="display:block; background:#fff; border:0; padding:12px 16px 24px; color:#0f172a;">Cargando el libro…</div>
                 </div>
             </div>
             <!-- VIEW: Cobros Digitales MP -->
@@ -529,11 +518,9 @@
                     <div class="card-body" id="pedidosCuerpo" style="padding:20px; line-height:1.5;">Cargando faltantes de stock…</div>
                 </div>
             </div>
-            <div class="view" id="view-reporte">
-                <div class="card">
-                    <div class="card-head"><h2>Reporte</h2><span id="reporteDia">Cerebro Jefe</span></div>
-                    <div class="card-body" id="reporteCuerpo" style="padding:20px; line-height:1.5;">Cargando el libro de Cobro Fácil…</div>
-                </div>
+            <div class="view active" id="view-reporte">
+                <span id="reporteDia" style="display:none;">Cerebro Jefe</span>
+                <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">Cargando vitrina de tienda…</div>
             </div>
             <div class="view" id="view-proveedor">
                 <div class="card">
@@ -580,11 +567,11 @@
                         <h3>Directorio Activo</h3>
                         <p>Gestión de clientes y deudas corrientes</p>
                     </div>
-                    <a class="menu-card" href="/cartera" style="text-decoration:none;">
+                    <div class="menu-card" onclick="abrirCarteraFiado()">
                         <div class="menu-card-icon">📒</div>
-                        <h3>Cartera</h3>
-                        <p>Deuda en la calle, riesgo y cobros del mes</p>
-                    </a>
+                        <h3>Cartera & Fiado</h3>
+                        <p>Libro de la sucursal y el historial de cada cuenta</p>
+                    </div>
                     <div class="menu-card" onclick="abrirSubVistaClientes('cliInrecuperables')">
                         <div class="menu-card-icon">🚨</div>
                         <h3>Inrecuperables</h3>
@@ -1343,37 +1330,11 @@
 
 
 
-    <!-- Barra de Navegación Rápida Jefe (Desktop) -->
-    <nav class="dashboard-bar jefe-bar field-hidden" id="jefeBar" aria-label="Esenciales del jefe">
-        <button type="button" class="jefe-btn" data-jefe="reporte"><span class="label">👑 Ventas</span><span class="sub">Ventas & Cortes</span></button>
-        <button type="button" class="jefe-btn" data-jefe="digitales"><span class="label">📱 Digital</span><span class="sub">Mercado Pago</span></button>
-        <button type="button" class="jefe-btn" data-jefe="contabilidad"><span class="label">💰 Caja</span><span class="sub">Caja & Arqueo</span></button>
-        <button type="button" class="jefe-btn" data-jefe="admin"><span class="label">👥 Cartera</span><span class="sub">Cartera & Fiado</span></button>
-        <button type="button" class="jefe-btn" data-jefe="pedidos"><span class="label">📦 Pedidos</span><span class="sub">Frigorífico</span></button>
-    </nav>
-
-    <!-- Barra de Navegación Inferior Móvil PWA (Estilo App Nativa iPhone / Android) -->
-    <nav class="bottom-pwa-bar" id="bottomPwaBar" aria-label="Navegación Móvil PWA">
-        <button type="button" class="pwa-nav-btn active" data-pwa-view="reporte">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19V5M4 19h16M8 16v-5M12 16V8M16 16v-3"/></svg>
-            <span>Ventas</span>
-        </button>
-        <button type="button" class="pwa-nav-btn" data-pwa-view="digitales">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h2M10 15h4"/></svg>
-            <span>Digital</span>
-        </button>
-        <button type="button" class="pwa-nav-btn" data-pwa-view="contabilidad">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v12M15 9.5H9.5a2.5 2.5 0 000 5h5a2.5 2.5 0 010 5H8"/></svg>
-            <span>Caja</span>
-        </button>
-        <button type="button" class="pwa-nav-btn" data-pwa-view="admin">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>
-            <span>Cartera</span>
-        </button>
-        <button type="button" class="pwa-nav-btn" data-pwa-view="pedidos">
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7h13l3 5v5h-2M3 7v10h2M16 17a2 2 0 104 0M7 17a2 2 0 104 0"/></svg>
-            <span>Pedidos</span>
-        </button>
+    <nav class="dashboard-bar jefe-bar field-hidden" id="jefeBar" aria-label="Resumen de la ventana">
+        <div class="kpi-item"><span class="label" id="jefeKpi1L">En la calle</span><span class="value" id="jefeKpi1V">—</span></div>
+        <div class="kpi-item"><span class="label" id="jefeKpi2L">Activas</span><span class="value" id="jefeKpi2V">—</span></div>
+        <div class="kpi-item"><span class="label" id="jefeKpi3L">En riesgo</span><span class="value" id="jefeKpi3V">—</span></div>
+        <div class="kpi-item"><span class="label" id="jefeKpi4L">Cobros mes</span><span class="value" id="jefeKpi4V">—</span></div>
     </nav>
 
     <div class="dashboard-bar field-hidden" id="dashboardBar">
@@ -1484,6 +1445,20 @@
             .kpi-item {
                 padding: 4px 2px !important;
             }
+            .jefe-bar:not(.field-hidden) {
+                display: flex !important;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                border-radius: 0;
+                background: rgba(15, 23, 42, 0.96) !important;
+                border: 0 !important;
+                box-shadow: none !important;
+                z-index: 250;
+                padding: 8px 4px calc(8px + env(safe-area-inset-bottom, 0px));
+            }
+            .jefe-bar .label { color: #94a3b8 !important; font-size: 0.58rem !important; margin-bottom: 2px !important; }
+            .jefe-bar .value { color: #fff !important; font-size: 0.78rem !important; }
         }
         .corp-map { display: grid; grid-template-columns: 1fr; gap: 8px; padding: 8px 16px 16px; }
         @media (min-width: 720px) { .corp-map { grid-template-columns: 1fr 1fr; } }
@@ -1833,9 +1808,9 @@
     <script src="/static/js/crm-db.js?v=3.7"></script>
     <script src="/static/js/sync-engine.js?v=3.7"></script>
     <script src="/static/js/crm-sync-api.js?v=3.7"></script>
-    <script src="/static/js/crm-loader.js?v=3.7"></script>
+    <script src="/static/js/crm-loader.js?v=3.8"></script>
     <script src="/static/js/crm-delete.js?v=3.7"></script>
     <script src="/static/js/crm-backup.js?v=3.7"></script>
-    <script src="/static/js/app.js?v=3.7"></script>
+    <script src="/static/js/app.js?v=4.3"></script>
 </body>
 </html>

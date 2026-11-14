@@ -10,7 +10,7 @@ except ImportError:
     psycopg2 = None
 
 def is_postgres():
-    return Config.DATABASE_URL and psycopg2
+    return bool(Config.DATABASE_URL and psycopg2) and not Config.TESTING
 
 
 def _split_sql_script(sql: str) -> list[str]:
@@ -124,6 +124,9 @@ class PostgresConnWrapper:
 import os
 from flask import has_request_context, session, request
 
+# Neon cobra caro cada conexión: las migraciones se corren una vez por empresa y proceso.
+_schemas_listos = set()
+
 def get_tenant_db_path(empresa_id=None):
     if Config.TESTING:
         return Config.DB_PATH
@@ -160,7 +163,7 @@ def _init_tenant_db(conn):
 
 @contextmanager
 def get_db(empresa_id=None):
-    if Config.DATABASE_URL and psycopg2:
+    if is_postgres():
         conn = psycopg2.connect(Config.DATABASE_URL)
         conn.cursor_factory = psycopg2.extras.DictCursor
         try:
@@ -182,13 +185,20 @@ def get_db(empresa_id=None):
                     empresa_id = 1
 
             cur = conn.cursor()
-            if empresa_id == 0 or empresa_id == 1:
+            empresa_num = int(empresa_id or 0)
+            if empresa_num in _schemas_listos:
+                esquema = "public" if empresa_num in (0, 1) else f"empresa_{empresa_num}"
+                cur.execute(f"SET search_path TO {esquema}")
+            elif empresa_id == 0 or empresa_id == 1:
                 cur.execute("SET search_path TO public")
                 if empresa_id == 1 and table_exists(wrapper, "clientes"):
                     try:
                         ensure_tenant_migrations(wrapper)
+                        _schemas_listos.add(empresa_num)
                     except Exception as e:
                         print(f"Error en migraciones del tenant {empresa_id}: {e}")
+                else:
+                    _schemas_listos.add(empresa_num)
             elif empresa_id > 1:
                 schema_name = f"empresa_{empresa_id}"
                 cur.execute("SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = 'clientes'", (schema_name,))
@@ -204,10 +214,12 @@ def get_db(empresa_id=None):
                     wrapper.executescript(sql)
                     _run_migrations(wrapper)
                     conn.commit()
+                    _schemas_listos.add(empresa_num)
                 else:
                     cur.execute(f"SET search_path TO {schema_name}")
                     try:
                         ensure_tenant_migrations(wrapper)
+                        _schemas_listos.add(empresa_num)
                     except Exception as e:
                         print(f"Error en migraciones del tenant {empresa_id}: {e}")
 
@@ -410,9 +422,25 @@ def _table_exists(conn, name: str) -> bool:
     return table_exists(conn, name)
 
 
+_migraciones_hechas = set()
+
+
+def _esquema_activo(conn) -> str:
+    if type(conn).__name__ != "PostgresConnWrapper":
+        return "sqlite:" + str(Config.DB_PATH)
+    row = conn.execute("SELECT current_schema() AS esquema").fetchone()
+    if not row:
+        return "public"
+    return row["esquema"] or "public"
+
+
 def ensure_tenant_migrations(conn) -> None:
-    """Aplica migraciones incrementales al esquema del tenant activo."""
+    """Aplica migraciones incrementales al esquema del tenant activo, una vez por proceso."""
+    esquema = _esquema_activo(conn)
+    if esquema in _migraciones_hechas:
+        return
     _run_migrations(conn)
+    _migraciones_hechas.add(esquema)
 
 
 def _pg_column_names(conn, table: str) -> set[str]:

@@ -393,14 +393,21 @@ def api_pos_resolver_empresa():
 
 @api_bp.route("/pos/jefe", methods=["GET"])
 def api_pos_jefe():
-    """Reporte, jefe, contabilidad, admin, proveedor, promedio o ticket. Con filtro multi-sucursal."""
+    """Reporte, jefe, contabilidad, admin, proveedor, promedio o ticket. Con filtro multi-sucursal y período."""
     from app.services.pos_jefe import panel
 
     nombre = (request.args.get("panel") or "reporte").strip().lower()
     sucursal_id = request.args.get("sucursal_id", type=int)
-    if nombre not in ("reporte", "jefe", "contabilidad", "admin", "cartera", "clientes", "digitales", "cobros_digitales", "pedidos", "abastecimiento", "proveedor", "promedio", "ticket"):
+    periodo = (request.args.get("periodo") or "Hoy").strip()
+    desde = request.args.get("desde")
+    hasta = request.args.get("hasta")
+    if nombre not in (
+        "reporte", "jefe", "vitrina", "contabilidad", "admin", "cartera", "clientes",
+        "digitales", "cobros_digitales", "pedidos", "abastecimiento",
+        "proveedor", "promedio", "ticket"
+    ):
         return jsonify({"error": "Panel desconocido"}), 400
-    return jsonify(panel(nombre, sucursal_id=sucursal_id))
+    return jsonify(panel(nombre, sucursal_id=sucursal_id, periodo=periodo, desde=desde, hasta=hasta))
 
 
 @api_bp.route("/pos/sucursales", methods=["GET"])

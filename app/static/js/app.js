@@ -286,6 +286,7 @@ const $ = id => document.getElementById(id);
 
         let histPagosFiltro = '';
         let activeRowIndex = -1;
+        let carteraEnPantalla = [];
 
         const titles = {
             home: ['Inicio', 'Resumen rápido', 'Inicio'],
@@ -310,7 +311,8 @@ const $ = id => document.getElementById(id);
             promedio: ['Promedio', 'Ticket medio del día', 'Promedio'],
             ticket: ['Ticket', 'Historial de tickets del día', 'Ticket'],
             contabilidad: ['Contabilidad', 'Caja, cobros y gastos del espejo', 'Contabilidad'],
-            admin: ['Admin Cartera', 'Cartera de clientes, mora y límites de fiado', 'Admin'],
+            admin: ['Cartera & Fiado', 'Libro de la sucursal', 'Fiado'],
+            'historial-fiado': ['Historial del cliente', 'Movimientos del libro de Cobro Fácil', 'Historial'],
             digitales: ['Cobros Digitales MP', 'Auditoría de Mercado Pago, QR y Point', 'Digital'],
             pedidos: ['Pedidos al Frigorífico', 'Faltantes de stock y mensaje WhatsApp', 'Pedidos']
         };
@@ -834,6 +836,123 @@ const $ = id => document.getElementById(id);
                 </div>
                 ${actionBtnHtml}
             </div>`;
+        }
+
+        function tarjetaClienteFiado(d) {
+            const deuda = Number(d.deuda) || 0;
+            const interes = Number(d.mantenimiento) || 0;
+            const total = deuda + interes;
+            const atraso = d.dias != null && Number(d.dias) > 0;
+            const badge = atraso
+                ? `<span class="badge-home vencido" style="line-height:1.2;text-align:center;display:inline-block">${esc(d.dias)} días<br>retraso</span>`
+                : (d.dias == null
+                    ? '<span class="badge-home neutro">Sin días<br>en el libro</span>'
+                    : '<span class="badge-home verde">Al día</span>');
+            const interesTxt = d.mantenimiento_origen === 'libro'
+                ? '$' + fmtCompact(interes)
+                : 'est. $' + fmtCompact(interes);
+            const pie = [d.dni ? 'DNI ' + d.dni : '', d.telefono || ''].filter(Boolean).join(' · ');
+            return `
+            <div class="debt-card" data-pos-id="${esc(d.id)}" role="button" tabindex="0">
+                <div class="card-header">
+                    <div class="card-title-group">
+                        <div class="icon-box">👤</div>
+                        <div>
+                            <h3 class="card-title">${esc(d.nombre || 'Cliente')}</h3>
+                            <span class="pill pill-type">${esc(d.tipo || 'Cliente')}</span>
+                        </div>
+                    </div>
+                    ${badge}
+                </div>
+                <div class="card-body">
+                    <div class="data-col">
+                        <span class="data-label">Capital</span>
+                        <span class="data-value">$${fmtCompact(deuda)}</span>
+                    </div>
+                    <div class="data-col">
+                        <span class="data-label">Interés</span>
+                        <span class="data-value">${interesTxt}</span>
+                    </div>
+                    <div class="data-col">
+                        <span class="data-label">CFR</span>
+                        <span class="data-value">${esc(d.tarifa || '—')}</span>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <div class="amount-section">
+                        <span class="amount-label">TOTAL A PAGAR</span>
+                        <span class="amount-total${atraso ? ' highlight' : ''}">$${fmtCompact(total)}</span>
+                    </div>
+                    <div class="due-details">${esc(pie || 'Ver historial')}</div>
+                </div>
+            </div>`;
+        }
+
+        function filaLibroCliente(fila) {
+            const clase = fila.es_cobro ? 'color:#047857;font-weight:700' : '';
+            const dias = fila.dias == null ? '—' : `${fila.dias} d`;
+            const mant = fila.es_interes ? 'Asentado' : (fila.mantenimiento == null ? '—' : plataJefe(fila.mantenimiento));
+            return `<tr style="border-bottom:1px solid #f1f5f9; font-size:13px;">
+                <td style="padding:8px 10px; white-space:nowrap;">${esc(fila.fecha)}</td>
+                <td style="padding:8px 10px; ${clase}">${esc(fila.etiqueta)}</td>
+                <td style="padding:8px 10px; text-align:right; ${clase}">${plataJefe(fila.monto)}</td>
+                <td style="padding:8px 10px; text-align:right;">${plataJefe(fila.saldo)}</td>
+                <td style="padding:8px 10px;">${esc(fila.ticket)}</td>
+                <td style="padding:8px 10px; color:#475569;">${esc(fila.detalle)}</td>
+                <td style="padding:8px 10px; text-align:center; ${fila.dias > 30 ? 'color:#b91c1c;font-weight:800' : ''}">${dias}</td>
+                <td style="padding:8px 10px; text-align:right;">${mant}</td>
+            </tr>`;
+        }
+
+        async function abrirHistorialFiado(posId) {
+            const cliente = carteraEnPantalla.find(c => String(c.id) === String(posId)) || {};
+            switchView('historial-fiado');
+            if ($('histFiadoNombre')) $('histFiadoNombre').textContent = cliente.nombre || 'Cliente';
+            if ($('histFiadoSub')) $('histFiadoSub').textContent = [cliente.dni, cliente.telefono, cliente.tipo].filter(Boolean).join(' · ') || 'Libro de la cuenta';
+            const cuerpo = $('histFiadoCuerpo');
+            if (!cuerpo) return;
+            cuerpo.innerHTML = '<p style="color:#64748b;">Cargando el libro…</p>';
+            try {
+                const deuda = Number(cliente.deuda) || 0;
+                const res = await fetch('/api/pos/historial?pos_id=' + encodeURIComponent(posId) + '&deuda=' + encodeURIComponent(deuda));
+                const dato = await res.json();
+                const movs = dato.movimientos || [];
+                const tel = String(cliente.telefono || '').replace(/\D/g, '');
+                const wsp = tel.length >= 8
+                    ? `<a href="https://wa.me/549${tel}?text=${encodeURIComponent('Hola ' + (cliente.nombre || '') + ', te escribimos de la administración. Tu saldo es ' + plataJefe(dato.deuda) + '.')}" target="_blank" style="background:#22c55e; color:#fff; padding:8px 12px; border-radius:10px; font-size:13px; font-weight:800; text-decoration:none;">Cobrar por WhatsApp</a>`
+                    : '';
+                const cabeza = `
+                    <div style="display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px;">
+                        <span style="font-weight:800; color:#0f172a;">${esc(dato.resumen || '')}</span>
+                        <span style="background:#fff7ed; color:#9a3412; padding:4px 10px; border-radius:999px; font-weight:800;">Mantenimiento ${plataJefe(dato.mantenimiento)}</span>
+                        <span style="background:#fef2f2; color:#9f1239; padding:4px 10px; border-radius:999px; font-weight:800;">Total ${plataJefe(dato.total_estimado)}</span>
+                        ${wsp}
+                    </div>`;
+                if (!movs.length) {
+                    cuerpo.innerHTML = cabeza + '<p style="color:#64748b;">El libro de esta cuenta todavía no llegó a la nube.</p>';
+                    return;
+                }
+                cuerpo.innerHTML = cabeza + `
+                    <div style="overflow-x:auto;">
+                        <table class="data-table" style="width:100%; border-collapse:collapse; background:#fff;">
+                            <thead>
+                                <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase;">
+                                    <th style="padding:8px 10px; text-align:left;">Fecha</th>
+                                    <th style="padding:8px 10px; text-align:left;">Tipo</th>
+                                    <th style="padding:8px 10px; text-align:right;">Monto</th>
+                                    <th style="padding:8px 10px; text-align:right;">Saldo</th>
+                                    <th style="padding:8px 10px; text-align:left;">Ticket</th>
+                                    <th style="padding:8px 10px; text-align:left;">Detalle</th>
+                                    <th style="padding:8px 10px; text-align:center;">Días</th>
+                                    <th style="padding:8px 10px; text-align:right;">Mantenimiento</th>
+                                </tr>
+                            </thead>
+                            <tbody>${movs.map(filaLibroCliente).join('')}</tbody>
+                        </table>
+                    </div>`;
+            } catch (_) {
+                cuerpo.innerHTML = '<p style="color:#b91c1c;">No se pudo leer el historial.</p>';
+            }
         }
 
         function renderHomeTable() {
@@ -2089,6 +2208,8 @@ const $ = id => document.getElementById(id);
             if (data) await tenantCachePut('appData', data);
         }
 
+        window.abrirCarteraFiado = () => { location.href = '/cartera'; };
+
         window.abrirSubVistaClientes = (id) => {
             const resolved = id === 'cliNuevo' ? 'cliAdd' : id;
             if ($('clientesMenu')) $('clientesMenu').classList.add('field-hidden');
@@ -2172,6 +2293,118 @@ const $ = id => document.getElementById(id);
             }[c]));
         }
 
+        function pintarBarraJefe(panel, dato) {
+            const resumen = (dato && dato.resumen) || {};
+            const cartera = (dato && dato.cartera) || {};
+            const dig = (dato && dato.digitales) || {};
+            const caja = (dato && dato.contabilidad) || {};
+            const ped = (dato && dato.pedidos) || {};
+            let items = [
+                ['Ventana', '—'],
+                ['', '—'],
+                ['', '—'],
+                ['', '—'],
+            ];
+            if (panel === 'admin' || panel === 'cartera' || panel === 'clientes') {
+                items = [
+                    ['En la calle', plataJefe(cartera.cartera_en_calle || cartera.deuda_total)],
+                    ['Activas', String(cartera.cuentas_activas || cartera.con_deuda || 0)],
+                    ['En riesgo', plataJefe(cartera.cartera_en_riesgo || 0)],
+                    ['Cobros del mes', plataJefe(cartera.cobros_del_mes || 0)],
+                ];
+            } else if (panel === 'reporte' || panel === 'jefe') {
+                items = [
+                    (() => {
+                        const v = dato.vitrina;
+                        const vtot = (v && v.tickets && v.tickets.total > 0) ? v.tickets.total : resumen.ventas;
+                        const vcnt = (v && v.tickets && v.tickets.cant > 0) ? v.tickets.cant : (resumen.tickets || 0);
+                        const vprom = vcnt > 0 ? (vtot / vcnt) : (resumen.promedio || 0);
+                        const vdig = (v && v.tickets_digitales && v.tickets_digitales.valor > 0) ? v.tickets_digitales.valor : 0;
+                        const vdigPct = vtot > 0 ? Math.round(vdig / vtot * 100) : (resumen.mix_digital_pct || 0);
+                        return [
+                            ['Ventas', plataJefe(vtot)],
+                            ['Tickets', String(vcnt)],
+                            ['Promedio', plataJefe(vprom)],
+                            ['Digital', vdigPct + '%'],
+                        ];
+                    })()[0],
+                    (() => {
+                        const v = dato.vitrina;
+                        const vtot = (v && v.tickets && v.tickets.total > 0) ? v.tickets.total : resumen.ventas;
+                        const vcnt = (v && v.tickets && v.tickets.cant > 0) ? v.tickets.cant : (resumen.tickets || 0);
+                        const vprom = vcnt > 0 ? (vtot / vcnt) : (resumen.promedio || 0);
+                        return ['Tickets', String(vcnt)];
+                    })(),
+                    (() => {
+                        const v = dato.vitrina;
+                        const vtot = (v && v.tickets && v.tickets.total > 0) ? v.tickets.total : resumen.ventas;
+                        const vcnt = (v && v.tickets && v.tickets.cant > 0) ? v.tickets.cant : (resumen.tickets || 0);
+                        const vprom = vcnt > 0 ? (vtot / vcnt) : (resumen.promedio || 0);
+                        return ['Promedio', plataJefe(vprom)];
+                    })(),
+                    (() => {
+                        const v = dato.vitrina;
+                        const vtot = (v && v.tickets && v.tickets.total > 0) ? v.tickets.total : resumen.ventas;
+                        const vdig = (v && v.tickets_digitales && v.tickets_digitales.valor > 0) ? v.tickets_digitales.valor : 0;
+                        const vdigPct = vtot > 0 ? Math.round(vdig / vtot * 100) : (resumen.mix_digital_pct || 0);
+                        return ['Digital', vdigPct + '%'];
+                    })(),
+                ];
+            } else if (panel === 'digitales') {
+                items = [
+                    ['Bruto', plataJefe(dig.bruto_mp)],
+                    ['Neto', plataJefe(dig.neto_mp)],
+                    ['Tickets', plataJefe(dig.tickets_digitales)],
+                    ['Sin ticket', plataJefe(dig.sin_ticket)],
+                ];
+            } else if (panel === 'contabilidad' || panel === 'tesoreria') {
+                items = [
+                    ['Ventas', plataJefe(caja.ventas)],
+                    ['Cobros', plataJefe(caja.cobros)],
+                    ['Gastos', plataJefe(caja.gastos)],
+                    ['Resultado', plataJefe(caja.resultado)],
+                ];
+            } else if (panel === 'pedidos') {
+                items = [
+                    ['En quiebre', String(ped.articulos_en_quiebre || 0)],
+                    ['Proveedores', String(ped.proveedores_con_pedido || 0)],
+                    ['Inversión', plataJefe(ped.inversion_estimada)],
+                    ['A pedir', String((ped.faltantes || []).length)],
+                ];
+            } else if (panel === 'proveedor') {
+                const lista = (dato && dato.proveedores) || [];
+                const deuda = lista.reduce((suma, p) => suma + Number(p.deuda || 0), 0);
+                items = [
+                    ['Proveedores', String(lista.length)],
+                    ['Deuda', plataJefe(deuda)],
+                    ['', '—'],
+                    ['', '—'],
+                ];
+            } else if (panel === 'promedio') {
+                items = [
+                    ['Promedio', plataJefe(resumen.promedio)],
+                    ['Tickets', String(resumen.tickets || 0)],
+                    ['Ventas', plataJefe(resumen.ventas)],
+                    ['Día', resumen.dia || '—'],
+                ];
+            } else if (panel === 'ticket') {
+                const filas = (dato && dato.tickets) || [];
+                items = [
+                    ['Tickets', String(filas.length)],
+                    ['Ventas', plataJefe(resumen.ventas)],
+                    ['Promedio', plataJefe(resumen.promedio)],
+                    ['Día', resumen.dia || '—'],
+                ];
+            }
+            items.forEach((par, i) => {
+                const n = i + 1;
+                const etiqueta = $('jefeKpi' + n + 'L');
+                const valor = $('jefeKpi' + n + 'V');
+                if (etiqueta) etiqueta.textContent = par[0];
+                if (valor) valor.textContent = par[1];
+            });
+        }
+
         let activeSucursalId = null;
 
         async function cargarSucursalesSelector() {
@@ -2207,18 +2440,121 @@ const $ = id => document.getElementById(id);
             }
         }
 
+        let jefeCargaToken = 0;
+        let pinturaCartera = 0;
+
+        function claveJefe(panel) {
+            let empresa = '';
+            let usuario = '';
+            try {
+                empresa = (JSON.parse(localStorage.getItem('empresa_datos') || '{}').nombre) || '';
+            } catch (e) {}
+            try {
+                usuario = (sessionUser && (sessionUser.username || sessionUser.usuario || sessionUser.nombre)) || '';
+            } catch (e) {}
+            const suc = activeSucursalId == null ? 'todas' : String(activeSucursalId);
+            const per = (panel === 'reporte' && window.vitrinaPeriodo) ? (':' + window.vitrinaPeriodo) : '';
+            return 'crm-jefe:' + usuario + ':' + empresa + ':' + panel + per + ':' + suc;
+        }
+
+        function pintarTarjetasCliente(deudores, cartera) {
+            const cuerpo = $('adminCuerpo');
+            if (!cuerpo) return;
+            const marca = ++pinturaCartera;
+
+            let headerDiv = null;
+            if (cartera) {
+                headerDiv = document.createElement('div');
+                headerDiv.className = 'cartera-kpis-top';
+                headerDiv.style.cssText = 'display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:18px;';
+                headerDiv.innerHTML = `
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #059669;">
+                        <div style="font-size:11px; font-weight:700; color:#059669; text-transform:uppercase;">CARTERA EN LA CALLE</div>
+                        <div style="font-size:22px; font-weight:800; color:#0f172a; margin-top:2px;">${plataJefe(cartera.total_deuda || cartera.cartera_en_la_calle || 0)}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${cartera.con_deuda || cartera.cuentas_activas || 0} cuentas activas · colocación total</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #2563eb;">
+                        <div style="font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase;">CUENTAS ACTIVAS</div>
+                        <div style="font-size:22px; font-weight:800; color:#0f172a; margin-top:2px;">${cartera.con_deuda || cartera.cuentas_activas || 0}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">de ${cartera.total_cuentas || deudores.length} clientes registrados</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #dc2626;">
+                        <div style="font-size:11px; font-weight:700; color:#dc2626; text-transform:uppercase;">CARTERA EN RIESGO</div>
+                        <div style="font-size:22px; font-weight:800; color:#b91c1c; margin-top:2px;">${plataJefe(cartera.deuda_en_riesgo || cartera.cartera_en_riesgo || 0)}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">${cartera.cuentas_en_riesgo || 0} en riesgo/mora · mayor: ${cartera.mayor_deudor || '—'}</div>
+                    </div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #0d9488;">
+                        <div style="font-size:11px; font-weight:700; color:#0d9488; text-transform:uppercase;">COBROS DEL MES</div>
+                        <div style="font-size:22px; font-weight:800; color:#0f766e; margin-top:2px;">${plataJefe(cartera.cobros_mes || cartera.cobros_del_mes || 0)}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Abonado este mes</div>
+                    </div>
+                `;
+            }
+
+            const grid = document.createElement('div');
+            grid.className = 'cards-grid';
+            if (headerDiv) {
+                cuerpo.replaceChildren(headerDiv, grid);
+            } else {
+                cuerpo.replaceChildren(grid);
+            }
+            let i = 0;
+            const paso = 8;
+            function lote() {
+                if (marca !== pinturaCartera) return;
+                const fin = Math.min(i + paso, deudores.length);
+                for (; i < fin; i++) {
+                    const wrap = document.createElement('div');
+                    wrap.innerHTML = tarjetaClienteFiado(deudores[i]);
+                    const card = wrap.firstElementChild;
+                    if (!card) continue;
+                    card.addEventListener('click', () => abrirHistorialFiado(card.dataset.posId));
+                    grid.appendChild(card);
+                }
+                if (i < deudores.length) requestAnimationFrame(lote);
+            }
+            lote();
+        }
+
+        window.cambiarPeriodoVitrina = function(periodo) {
+            window.vitrinaPeriodo = periodo;
+            cargarJefe('reporte');
+        };
+
         async function cargarJefe(panel) {
-            let dato = { libro: false };
+            const token = ++jefeCargaToken;
+            const clave = claveJefe(panel);
+            try {
+                const crudo = sessionStorage.getItem(clave);
+                if (crudo) aplicarDatosJefe(panel, JSON.parse(crudo), true);
+            } catch (e) {}
+            let dato = null;
             try {
                 let url = '/api/pos/jefe?panel=' + encodeURIComponent(panel);
+                if (panel === 'reporte' && window.vitrinaPeriodo) {
+                    url += '&periodo=' + encodeURIComponent(window.vitrinaPeriodo);
+                }
                 if (activeSucursalId !== null && activeSucursalId !== undefined) {
                     url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
                 }
                 const res = await fetch(url);
+                if (!res.ok) throw new Error('panel');
                 dato = await res.json();
             } catch (e) {
-                dato = { libro: false };
+                dato = null;
             }
+            if (token !== jefeCargaToken) return;
+            if (!dato) {
+                if (!sessionStorage.getItem(clave)) aplicarDatosJefe(panel, { libro: false }, false);
+                return;
+            }
+            try {
+                sessionStorage.setItem(clave, JSON.stringify(dato));
+            } catch (e) {}
+            aplicarDatosJefe(panel, dato, false);
+        }
+
+        function aplicarDatosJefe(panel, dato, enCurso) {
             const resumen = dato.resumen || {};
             const aviso = dato.libro
                 ? ''
@@ -2232,31 +2568,7 @@ const $ = id => document.getElementById(id);
                 if (!dato.libro) {
                     $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
-                    const resultadoColor = (c.resultado >= 0) ? '#16a34a' : '#dc2626';
-
-                    let html = `
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px;">
-                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Ventas del Día</div>
-                            <div style="font-size:1.6rem; font-weight:800; color:#0f172a; margin-top:4px;">${plataJefe(c.ventas)}</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:2px;">${c.tickets || 0} tickets emitidos</div>
-                        </div>
-                        <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#166534; text-transform:uppercase; letter-spacing:0.04em;">Cobros Fiado (Cta Cte)</div>
-                            <div style="font-size:1.6rem; font-weight:800; color:#15803d; margin-top:4px;">${plataJefe(c.cobros)}</div>
-                            <div style="font-size:12px; color:#166534; margin-top:2px;">Entradas directas a caja</div>
-                        </div>
-                        <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#991b1b; text-transform:uppercase; letter-spacing:0.04em;">Gastos de Caja</div>
-                            <div style="font-size:1.6rem; font-weight:800; color:#b91c1c; margin-top:4px;">${plataJefe(c.gastos)}</div>
-                            <div style="font-size:12px; color:#991b1b; margin-top:2px;">${(c.detalle_gastos || []).length} egresos registrados</div>
-                        </div>
-                        <div style="background:#f8fafc; border:2px solid ${resultadoColor}; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#475569; text-transform:uppercase; letter-spacing:0.04em;">Resultado Operativo</div>
-                            <div style="font-size:1.6rem; font-weight:900; color:${resultadoColor}; margin-top:4px;">${plataJefe(c.resultado)}</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Ventas + Cobros - Gastos</div>
-                        </div>
-                    </div>`;
+                    let html = '';
 
                     const medios = c.medios_pago || [];
                     const totalMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0) || 1;
@@ -2331,39 +2643,179 @@ const $ = id => document.getElementById(id);
                 }
             }
 
-            // 2. JEFE / REPORTE
+            // 2. JEFE / REPORTE & VITRINA
             if (panel === 'reporte' && $('reporteCuerpo')) {
-                $('reporteDia').textContent = resumen.dia ? (resumen.es_hoy ? 'Hoy · ' + resumen.dia : 'Libro · ' + resumen.dia) : 'Cerebro Jefe';
-                if (!dato.libro) {
+                const v = dato.vitrina || null;
+                const perActual = (v && v.periodo) || window.vitrinaPeriodo || 'Hoy';
+                window.vitrinaPeriodo = perActual;
+
+                $('reporteDia').textContent = (v && v.es_hoy ? 'Hoy · ' : 'Período · ') + perActual + (dato.actualizado_en ? ' · espejo ' + String(dato.actualizado_en).replace('T', ' ').slice(0, 16) : '');
+
+                if (!dato.libro && !v) {
                     $('reporteCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
+                    let html = '';
+
+                    if (v) {
+                        const periodos = [
+                            { id: 'Hoy', label: 'Hoy' },
+                            { id: 'Semana', label: 'Semana' },
+                            { id: 'Semana p.', label: 'Semana p.' },
+                            { id: 'Mes', label: 'Mes' },
+                            { id: 'Año', label: 'Año' },
+                            { id: 'Período', label: 'Período' }
+                        ];
+
+                        html += `
+                        <div class="vitrina-wrap">
+                            <div class="vitrina-head">
+                                <div>
+                                    <h1 class="vitrina-saludo">${v.saludo || 'Buenas tardes, Jefe'}</h1>
+                                    <div class="vitrina-sub">Vitrina de tienda</div>
+                                </div>
+                                <div class="vitrina-periodos">
+                                    ${periodos.map(p => `
+                                        <button type="button" class="periodo-pill ${p.id === perActual ? 'active' : ''}" onclick="window.cambiarPeriodoVitrina('${p.id}')">
+                                            ${p.label}
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+
+                            <div class="vitrina-banner">
+                                <span>⚠️</span>
+                                <span>En línea — datos de la tienda al ${v.actualizado_en_texto || '13/11 17:08'} (copia en la nube)</span>
+                            </div>
+
+                            <div class="vitrina-grid">
+                                <!-- Card 1: Ganancia parcial -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.ganancia_parcial.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val ${v.ganancia_parcial.valor === null ? 'val-muted' : ''}">
+                                        ${v.ganancia_parcial.texto}
+                                    </div>
+                                    <div class="vitrina-card-sub">${v.ganancia_parcial.subtitulo}</div>
+                                </div>
+
+                                <!-- Card 2: Inventario al costo -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.inventario_costo.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.inventario_costo.texto}</div>
+                                    <div class="vitrina-card-sub">Valuación a costo real</div>
+                                </div>
+
+                                <!-- Card 3: Pagos clientes -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.pagos_clientes.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.pagos_clientes.texto}</div>
+                                    <div class="vitrina-card-sub">Cobranzas de cuenta corriente</div>
+                                </div>
+
+                                <!-- Card 4: Deuda clientes -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.deuda_clientes.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.deuda_clientes.texto}</div>
+                                    <div class="vitrina-card-sub">Saldo en la calle</div>
+                                </div>
+
+                                <!-- Card 5: Tickets digitales -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.tickets_digitales.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.tickets_digitales.texto}</div>
+                                    <div class="vitrina-card-sub">${v.tickets_digitales.subtitulo}</div>
+                                </div>
+
+                                <!-- Card 6: Cliente -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.cliente.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.cliente.texto}</div>
+                                    <div class="vitrina-card-sub">${v.cliente.subtitulo}</div>
+                                </div>
+
+                                <!-- Card 7: Sin firmar / F9 -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.sin_firmar.titulo}</span>
+                                        <span class="vitrina-card-badge badge-amber">${v.sin_firmar.badge}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.sin_firmar.texto}</div>
+                                    <div class="vitrina-card-sub">Tickets sin firma MP</div>
+                                </div>
+
+                                <!-- Card 8: MP sin ticket -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.mp_sin_ticket.titulo}</span>
+                                        <span class="vitrina-card-badge badge-red">${v.mp_sin_ticket.badge}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.mp_sin_ticket.texto}</div>
+                                    <div class="vitrina-card-sub">${v.mp_sin_ticket.subtitulo}</div>
+                                </div>
+
+                                <!-- Card 9: Redondeo del día -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.redondeo.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.redondeo.texto}</div>
+                                    <div class="vitrina-card-sub">${v.redondeo.subtitulo}</div>
+                                </div>
+
+                                <!-- Card 10: Descuento del día -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.descuento.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.descuento.texto}</div>
+                                    <div class="vitrina-card-sub">${v.descuento.subtitulo}</div>
+                                </div>
+
+                                <!-- Card 11: Tickets del día -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.tickets.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.tickets.texto}</div>
+                                    <div class="vitrina-card-sub">Operaciones registradas</div>
+                                </div>
+
+                                <!-- Card 12: Cancelaciones del día -->
+                                <div class="vitrina-card">
+                                    <div class="vitrina-card-top">
+                                        <span class="vitrina-card-lbl">${v.cancelaciones.titulo}</span>
+                                    </div>
+                                    <div class="vitrina-card-val">${v.cancelaciones.texto}</div>
+                                    <div class="vitrina-card-sub">Ventas canceladas</div>
+                                </div>
+                            </div>
+                        </div>`;
+                    }
+
                     const des = dato.desglose_sucursales || [];
                     const rank = dato.ranking_cortes || [];
-                    const totalVentas = resumen.ventas || 1;
+                    const totalVentas = (v && v.tickets && v.tickets.total > 0) ? v.tickets.total : (resumen.ventas || 1);
+                    const alertas = (dato.pulso && dato.pulso.alertas) || [];
+                    const chips = alertas.length
+                        ? `<div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px;">${alertas.map(a => {
+                            const bg = a.nivel === 'riesgo' ? '#fef2f2' : (a.nivel === 'ok' ? '#f0fdf4' : '#fffbeb');
+                            const fg = a.nivel === 'riesgo' ? '#991b1b' : (a.nivel === 'ok' ? '#166534' : '#92400e');
+                            return `<span style="background:${bg}; color:${fg}; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:700;">${textoJefe(a.texto)}</span>`;
+                        }).join('')}</div>`
+                        : '';
 
-                    let html = `
-                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:20px;">
-                        <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#1e40af; text-transform:uppercase; letter-spacing:0.04em;">Ventas Totales</div>
-                            <div style="font-size:1.8rem; font-weight:800; color:#1d4ed8; margin-top:4px;">${plataJefe(resumen.ventas)}</div>
-                            <div style="font-size:12px; color:#1e40af; margin-top:2px;">Facturación consolidada del día</div>
-                        </div>
-                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Tickets Emitidos</div>
-                            <div style="font-size:1.8rem; font-weight:800; color:#0f172a; margin-top:4px;">${resumen.tickets}</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Clientes atendidos en mostrador</div>
-                        </div>
-                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Ticket Promedio</div>
-                            <div style="font-size:1.8rem; font-weight:800; color:#0f172a; margin-top:4px;">${plataJefe(resumen.promedio)}</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:2px;">Gasto promedio por ticket</div>
-                        </div>
-                        <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:14px; padding:16px;">
-                            <div style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; letter-spacing:0.04em;">Medio de Pago Líder</div>
-                            <div style="font-size:1.4rem; font-weight:800; color:#0f172a; margin-top:6px;">${textoJefe(resumen.pago) || 'Efectivo'}</div>
-                            <div style="font-size:12px; color:#64748b; margin-top:4px;">Mayor volumen transaccional</div>
-                        </div>
-                    </div>`;
+                    html += chips;
 
                     if (des.length > 0) {
                         html += `
@@ -2446,55 +2898,46 @@ const $ = id => document.getElementById(id);
                 $('digitalesDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Mercado Pago · QR · Tarjetas';
 
                 let html = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:12px; margin-bottom:18px;">
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">BRUTO MP</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#0f172a; margin-top:2px;">${plataJefe(dig.bruto_mp)}</div>
-                        <div style="font-size:11px; color:#64748b;">Total cobrado digital</div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px; margin-bottom:16px;">
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">BRUTO MP</div>
+                        <div style="font-size:18px; font-weight:800; color:#0f172a; margin-top:2px;">${plataJefe(dig.bruto_mp)}</div>
                     </div>
-                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#166534; text-transform:uppercase;">NETO MP</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#15803d; margin-top:2px;">${plataJefe(dig.neto_mp)}</div>
-                        <div style="font-size:11px; color:#166534;">Líquido a cobrar</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#16a34a; text-transform:uppercase;">NETO MP</div>
+                        <div style="font-size:18px; font-weight:800; color:#15803d; margin-top:2px;">${plataJefe(dig.neto_mp)}</div>
                     </div>
-                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#1e40af; text-transform:uppercase;">TICKETS DIGITALES</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#1d4ed8; margin-top:2px;">${plataJefe(dig.tickets_digitales)}</div>
-                        <div style="font-size:11px; color:#1e40af;">Emitidos en TPV</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#2563eb; text-transform:uppercase;">TICKETS DIGITALES</div>
+                        <div style="font-size:18px; font-weight:800; color:#1d4ed8; margin-top:2px;">${plataJefe(dig.tickets_digitales)}</div>
                     </div>
-                    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#15803d; text-transform:uppercase;">FIRMADOS EN TICKET</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#16a34a; margin-top:2px;">${plataJefe(dig.firmados_ticket)}</div>
-                        <div style="font-size:11px; color:#15803d;">Cobros cerrados</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#15803d; text-transform:uppercase;">FIRMADOS EN TICKET</div>
+                        <div style="font-size:18px; font-weight:800; color:#166534; margin-top:2px;">${plataJefe(dig.firmados_ticket)}</div>
                     </div>
-                    <div style="background:#fef3c7; border:1px solid #fde68a; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#92400e; text-transform:uppercase;">SIN FIRMAR / F9</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#b45309; margin-top:2px;">${plataJefe(dig.sin_firmar)}</div>
-                        <div style="font-size:11px; color:#92400e;">Pendiente de firma</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#d97706; text-transform:uppercase;">SIN FIRMAR / F9</div>
+                        <div style="font-size:18px; font-weight:800; color:#b45309; margin-top:2px;">${plataJefe(dig.sin_firmar)}</div>
                     </div>
-                    <div style="background:#fef2f2; border:2px solid #ef4444; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#991b1b; text-transform:uppercase;">MP SIN TICKET</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#dc2626; margin-top:2px;">${plataJefe(dig.sin_ticket)}</div>
-                        <div style="font-size:11px; color:#991b1b; font-weight:700;">🚨 Alerta de auditoría</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#dc2626; text-transform:uppercase;">MP SIN TICKET</div>
+                        <div style="font-size:18px; font-weight:800; color:#b91c1c; margin-top:2px;">${plataJefe(dig.sin_ticket)}</div>
                     </div>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#475569; text-transform:uppercase;">CLIENTE (COBROS)</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#0f172a; margin-top:2px;">${plataJefe(dig.cliente_cobros)}</div>
-                        <div style="font-size:11px; color:#475569;">Cobranzas fiado</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#4f46e5; text-transform:uppercase;">CLIENTE</div>
+                        <div style="font-size:18px; font-weight:800; color:#4338ca; margin-top:2px;">${plataJefe(dig.cliente_cobros)}</div>
                     </div>
-                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:14px;">
-                        <div style="font-size:10px; font-weight:800; color:#64748b; text-transform:uppercase;">CANCELADOS</div>
-                        <div style="font-size:1.4rem; font-weight:900; color:#64748b; margin-top:2px;">${plataJefe(dig.cancelados)}</div>
-                        <div style="font-size:11px; color:#64748b;">Operaciones nulas</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:12px 14px;">
+                        <div style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">CANCELADOS</div>
+                        <div style="font-size:18px; font-weight:800; color:#475569; margin-top:2px;">${plataJefe(dig.cancelados)}</div>
                     </div>
                 </div>`;
-
                 const txs = dig.transacciones || [];
                 html += `
                 <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
                     <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                         <span>📋 Libro de Auditoría Transaccional Digital (${txs.length})</span>
-                        <span style="font-size:12px; color:#64748b;">Reconciliación bancaria en vivo</span>
+                        <span style="font-size:12px; color:#64748b;">${dig.fuente === 'libro' ? 'Libro de Mercado Pago' : 'Reconstruido desde tickets'}</span>
                     </div>
                     <div style="overflow-x:auto;">
                         <table class="data-table" style="width:100%; border-collapse:collapse;">
@@ -2514,11 +2957,14 @@ const $ = id => document.getElementById(id);
                     html += `<tr><td colspan="7" style="padding:16px; text-align:center; color:#64748b;">Sin movimientos digitales registrados hoy.</td></tr>`;
                 } else {
                     txs.forEach(t => {
-                        let stBadge = `<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">FIRMADO</span>`;
-                        if (t.estado.includes('SIN TICKET')) {
-                            stBadge = `<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800;">🚨 SIN TICKET</span>`;
-                        } else if (t.estado.includes('SIN FIRMAR')) {
+                        const estado = String(t.estado || '');
+                        let stBadge = `<span style="background:#dcfce7; color:#15803d; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">${textoJefe(estado || 'FIRMADO')}</span>`;
+                        if (estado.includes('SIN TICKET')) {
+                            stBadge = `<span style="background:#fee2e2; color:#b91c1c; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800;">SIN TICKET</span>`;
+                        } else if (estado.includes('SIN FIRMAR')) {
                             stBadge = `<span style="background:#fef3c7; color:#92400e; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">SIN FIRMAR</span>`;
+                        } else if (estado === 'EN TICKET') {
+                            stBadge = `<span style="background:#dbeafe; color:#1d4ed8; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">EN TICKET</span>`;
                         }
                         html += `
                         <tr style="border-bottom:1px solid #f1f5f9; font-size:13px;">
@@ -2540,91 +2986,17 @@ const $ = id => document.getElementById(id);
             // 4. ADMIN / CARTERA & FIADO (CON MORA, INTERÉS Y BOTÓN WHATSAPP)
             if (panel === 'admin' && $('adminCuerpo')) {
                 const cartera = dato.cartera || {};
-                const deudores = cartera.top_deudores || [];
+                const deudores = cartera.clientes || cartera.top_deudores || [];
                 $('adminDia').textContent = `Espejo en tiempo real · ${cartera.total_cuentas || 0} cuentas registradas`;
 
-                let html = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:18px;">
-                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">CARTERA EN LA CALLE</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#15803d; margin-top:4px;">${plataJefe(cartera.cartera_en_calle || cartera.deuda_total)}</div>
-                        <div style="font-size:12px; color:#166534;">${cartera.cuentas_activas || cartera.con_deuda} cuentas activas · colocación total</div>
-                    </div>
-                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">CUENTAS ACTIVAS</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#1d4ed8; margin-top:4px;">${cartera.cuentas_activas || cartera.con_deuda}</div>
-                        <div style="font-size:12px; color:#1e40af;">de ${cartera.total_cuentas || 0} clientes registrados</div>
-                    </div>
-                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:800; color:#991b1b; text-transform:uppercase;">CARTERA EN RIESGO</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#b91c1c; margin-top:4px;">${plataJefe(cartera.cartera_en_riesgo || 0)}</div>
-                        <div style="font-size:12px; color:#991b1b;">${cartera.cuentas_en_riesgo || 0} en riesgo/mora · interés simple</div>
-                    </div>
-                    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">COBROS DEL MES</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#16a34a; margin-top:4px;">${plataJefe(cartera.cobros_del_mes || 0)}</div>
-                        <div style="font-size:12px; color:#166534;">Abonado este mes a caja</div>
-                    </div>
-                </div>
+                if (enCurso) $('adminDia').textContent += ' · actualizando';
 
-                <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
-                        <div style="font-size:14px; font-weight:800; color:#1e293b;">
-                            👥 Cartera de Clientes y Crédito Barrial
-                        </div>
-                        <a href="/cartera" class="btn btn-sm btn-primary" style="text-decoration:none; border-radius:8px; padding:6px 12px; font-size:12px; font-weight:700;">
-                            📲 Ver Cartera PWA Completa
-                        </a>
-                    </div>
-
-                    <div style="overflow-x:auto;">
-                        <table class="data-table" style="width:100%; border-collapse:collapse;">
-                            <thead>
-                                <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
-                                    <th style="padding:10px 12px; text-align:left;">ID</th>
-                                    <th style="padding:10px 12px; text-align:left;">DNI / CUIT</th>
-                                    <th style="padding:10px 12px; text-align:left;">Nombre</th>
-                                    <th style="padding:10px 12px; text-align:left;">Tipo</th>
-                                    <th style="padding:10px 12px; text-align:center;">Estado</th>
-                                    <th style="padding:10px 12px; text-align:right;">Deuda</th>
-                                    <th style="padding:10px 12px; text-align:right;">Mantenimiento</th>
-                                    <th style="padding:10px 12px; text-align:center;">Días</th>
-                                    <th style="padding:10px 12px; text-align:center;">Tarifa</th>
-                                    <th style="padding:10px 12px; text-align:center;">Acciones</th>
-                                </tr>
-                            </thead>
-                            <tbody>`;
-                if (deudores.length === 0) {
-                    html += `<tr><td colspan="10" style="padding:16px; text-align:center; color:#64748b;">No hay clientes con deuda registrada.</td></tr>`;
+                carteraEnPantalla = deudores;
+                if (!deudores.length) {
+                    $('adminCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">No hay clientes en el libro de esta sucursal.</p>`;
                 } else {
-                    deudores.forEach(d => {
-                        const stBadge = d.en_riesgo
-                            ? `<span style="background:#fee2e2; color:#991b1b; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800;">Atención</span>`
-                            : `<span style="background:#f1f5f9; color:#475569; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600;">Normal</span>`;
-
-                        const telLimpio = (d.telefono || '').replace(/\D/g, '');
-                        const wspBtn = telLimpio.length >= 8
-                            ? `<a href="https://wa.me/549${telLimpio}?text=Hola%20${encodeURIComponent(d.nombre)},%20te%20escribimos%20de%20la%20administracion.%20Tu%20saldo%20actual%20es%20de%20${encodeURIComponent(plataJefe(d.deuda))}%20(%2B%20${encodeURIComponent(plataJefe(d.mantenimiento))}%20de%20mantenimiento).%20Favor%20confirmar%20cuando%20puedas%20pasar%20a%20abonar.%20Gracias!" target="_blank" style="background:#22c55e; color:#fff; padding:4px 10px; border-radius:8px; font-size:11px; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:4px;">📲 Cobrar</a>`
-                            : `<span style="color:#94a3b8; font-size:11px;">Sin tel</span>`;
-
-                        html += `
-                        <tr style="border-bottom:1px solid #f1f5f9; font-size:13px;">
-                            <td style="padding:10px 12px; color:#64748b; font-family:monospace;">${textoJefe(d.id)}</td>
-                            <td style="padding:10px 12px; color:#64748b;">${textoJefe(d.dni) || 'Sin DNI'}</td>
-                            <td style="padding:10px 12px; font-weight:700; color:#1e293b;">${textoJefe(d.nombre)}</td>
-                            <td style="padding:10px 12px; color:#475569;">${textoJefe(d.tipo)}</td>
-                            <td style="padding:10px 12px; text-align:center;">${stBadge}</td>
-                            <td style="padding:10px 12px; text-align:right; font-weight:900; color:#047857;">${plataJefe(d.deuda)}</td>
-                            <td style="padding:10px 12px; text-align:right; font-weight:700; color:#b45309;">+${plataJefe(d.mantenimiento)}</td>
-                            <td style="padding:10px 12px; text-align:center; color:#64748b;">${d.dias} días</td>
-                            <td style="padding:10px 12px; text-align:center; font-weight:700; color:#475569;">${d.tarifa}</td>
-                            <td style="padding:10px 12px; text-align:center;">${wspBtn}</td>
-                        </tr>`;
-                    });
+                    pintarTarjetasCliente(deudores, cartera);
                 }
-                html += `</tbody></table></div></div>`;
-
-                $('adminCuerpo').innerHTML = html;
             }
 
             // 5. PEDIDOS AL FRIGORÍFICO (ABASTECIMIENTO & WHATSAPP)
@@ -2634,24 +3006,23 @@ const $ = id => document.getElementById(id);
                 $('pedidosDia').textContent = `Reposición sugerida · Inversión estimada: ${plataJefe(ped.inversion_estimada || 0)}`;
 
                 let html = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:14px; margin-bottom:18px;">
-                    <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:800; color:#991b1b; text-transform:uppercase;">ARTÍCULOS EN QUIEBRE</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#dc2626; margin-top:4px;">${ped.articulos_en_quiebre || 0}</div>
-                        <div style="font-size:12px; color:#991b1b;">Alarma de inventario bajo stock</div>
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:16px;">
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #dc2626;">
+                        <div style="font-size:11px; font-weight:700; color:#dc2626; text-transform:uppercase;">ARTÍCULOS EN QUIEBRE</div>
+                        <div style="font-size:24px; font-weight:800; color:#0f172a; margin-top:2px;">${ped.articulos_en_quiebre || faltantes.length}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Alarma del inventario</div>
                     </div>
-                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:800; color:#1e40af; text-transform:uppercase;">PROVEEDORES CON PEDIDO</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#1d4ed8; margin-top:4px;">${ped.proveedores_con_pedido || 0}</div>
-                        <div style="font-size:12px; color:#1e40af;">Distribuidores a contactar</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #2563eb;">
+                        <div style="font-size:11px; font-weight:700; color:#2563eb; text-transform:uppercase;">PROVEEDORES CON PEDIDO</div>
+                        <div style="font-size:24px; font-weight:800; color:#0f172a; margin-top:2px;">${ped.proveedores_con_pedido || (faltantes.length > 0 ? 1 : 0)}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Distribuidores a contactar</div>
                     </div>
-                    <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:14px; padding:16px;">
-                        <div style="font-size:11px; font-weight:800; color:#166534; text-transform:uppercase;">INVERSIÓN ESTIMADA</div>
-                        <div style="font-size:1.8rem; font-weight:900; color:#15803d; margin-top:4px;">${plataJefe(ped.inversion_estimada || 0)}</div>
-                        <div style="font-size:12px; color:#166534;">Presupuesto sugerido de reposición</div>
+                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:12px; padding:14px 18px; border-left:4px solid #16a34a;">
+                        <div style="font-size:11px; font-weight:700; color:#16a34a; text-transform:uppercase;">INVERSIÓN ESTIMADA</div>
+                        <div style="font-size:24px; font-weight:800; color:#15803d; margin-top:2px;">${plataJefe(ped.inversion_estimada || 0)}</div>
+                        <div style="font-size:11px; color:#94a3b8; margin-top:2px;">Presupuesto sugerido</div>
                     </div>
                 </div>
-
                 <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px;">
                     <!-- Tabla de Artículos a Pedir -->
                     <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
@@ -2727,9 +3098,14 @@ const $ = id => document.getElementById(id);
                     ? filas.map(t => `<tr><td>${textoJefe((t.fecha || '').slice(11, 16))}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(t.pago)}</td><td>${plataJefe(t.total)}</td></tr>`).join('')
                     : `<tr><td colspan="4">${aviso || 'Sin tickets en ese día.'}</td></tr>`;
             }
+            pintarBarraJefe(panel, dato);
         }
 
         function switchView(name) {
+            if (name === 'admin') {
+                location.href = '/cartera';
+                return;
+            }
             if (name === 'usuarios' && sessionUser.role !== 'admin') {
                 toast('Solo administradores pueden gestionar usuarios', true);
                 return;
@@ -2759,9 +3135,6 @@ const $ = id => document.getElementById(id);
             }
             if ($('jefeBar')) {
                 $('jefeBar').classList.toggle('field-hidden', !jefeVistas.includes(name));
-                document.querySelectorAll('.jefe-btn').forEach(btn => {
-                    btn.classList.toggle('active', btn.dataset.jefe === name);
-                });
             }
             if (['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) cargarJefe(name);
             if ($('cobranzasBar')) {
@@ -4282,7 +4655,7 @@ const $ = id => document.getElementById(id);
                 console.error('boot:', e);
                 setLoading(false);
                 data = ensureDataShape(data);
-                switchView('home');
+                switchView('reporte');
                 toast('Error al cargar. Recargá la página.', true);
             }
         }
@@ -4315,6 +4688,8 @@ const $ = id => document.getElementById(id);
         }
         updateWeather();
         setInterval(updateWeather, 1800000); // 30 mins
+
+        if ($('btnVolverCartera')) $('btnVolverCartera').addEventListener('click', () => switchView('admin'));
 
         boot();
         setInterval(() => void loadAll({ enSegundoPlano: true, bloquearUI: false }), 60000);

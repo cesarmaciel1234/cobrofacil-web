@@ -182,3 +182,52 @@ def test_api_panel_pedidos(client):
     assert ped["articulos_en_quiebre"] == 3
     assert ped["inversion_estimada"] > 0
     assert "Mondongo" in ped["mensaje_whatsapp"]
+    assert "Maciel" not in ped["mensaje_whatsapp"]
+    assert "Casa Central" in ped["mensaje_whatsapp"]
+
+
+def test_panel_no_inventa_mora_ni_cuenta_y_el_ranking_es_del_dia(client):
+    _cargar_datos_muestra()
+    guardar_parte(
+        tabla="ventas_items",
+        sucursal_id=1,
+        sucursal_nombre="Casa Central",
+        columnas=["id", "venta_id", "nombre", "cantidad", "subtotal"],
+        filas=[[9, 999, "COSTILLAR VIEJO", 4.0, 80000.0]],
+        parte=2,
+        partes=2,
+    )
+    guardar_parte(
+        tabla="ventas",
+        sucursal_id=1,
+        sucursal_nombre="Casa Central",
+        columnas=["id", "fecha", "total", "metodo_pago", "estado"],
+        filas=[[301, "2026-11-12 18:00:00", 100000.0, "Efectivo", "PAGADO"]],
+        parte=2,
+        partes=2,
+    )
+
+    jefe = client.get("/api/pos/jefe?panel=jefe").get_json()
+    cortes = [c["producto"] for c in jefe["ranking_cortes"]]
+    assert "COSTILLAR VIEJO" not in cortes
+    assert "ASADO" in cortes
+    assert jefe["resumen"]["variacion_pct"] == 35.0
+    assert jefe["resumen"]["dia_anterior"] == "2026-11-12"
+    assert jefe["actualizado_en"]
+    textos = " ".join(a["texto"] for a in jefe["pulso"]["alertas"])
+    assert "cuentas" in textos
+
+    digitales = client.get("/api/pos/jefe?panel=digitales").get_json()["digitales"]
+    assert digitales["fuente"] == "ticket"
+    assert digitales["neto_estimado"] is True
+    assert digitales["neto_mp"] == digitales["bruto_mp"]
+    cuentas = {t["cuenta"] for t in digitales["transacciones"]}
+    assert "Cristina Báez Rodríguez" not in cuentas
+    assert all(t["estado"] != "FIRMADO" for t in digitales["transacciones"])
+
+    cartera = client.get("/api/pos/jefe?panel=admin").get_json()["cartera"]
+    silvia = cartera["top_deudores"][0]
+    assert silvia["dias"] is None
+    assert silvia["en_riesgo"] is True
+    assert silvia["tarifa"] == "10%"
+    assert silvia["mantenimiento_origen"] == "cupo"

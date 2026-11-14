@@ -322,7 +322,7 @@
         if (new URLSearchParams(window.location.search).get('view')) {
             bus().emit('applyPwaDeepLink');
         } else {
-            bus().emit('switchView', 'home');
+            bus().emit('switchView', 'reporte');
         }
 
         void finishBootInBackground(hadCacheOnStart);

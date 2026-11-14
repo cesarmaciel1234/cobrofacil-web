@@ -374,10 +374,10 @@
     </header>
 
     <main class="page">
-        <h1>Cartera de clientes</h1>
+        <h1>Cartera</h1>
         <div class="tools">
             <input id="searchInput" type="search" placeholder="Buscar nombre o DNI" oninput="filterClients()">
-            <select id="sucursalFiltro" onchange="updateMetrics(); filterClients();">
+            <select id="sucursalFiltro" onchange="elegirSucursal()">
                 <option value="">Todas las sucursales</option>
             </select>
         </div>
@@ -392,17 +392,17 @@
             <button class="chip" data-filter="90+" type="button">90+ <span id="count90">0</span></button>
         </div>
         <div class="cards" id="cards"></div>
-        <div class="empty" id="emptyState" hidden>No hay clientes en este filtro.</div>
+        <div class="empty" id="emptyState">Cargando el libro…</div>
     </main>
 
     <nav class="bar" aria-label="Resumen de cartera">
         <button type="button" data-filter="saldo" id="goDeuda">
-            <small>DEUDA</small>
+            <small>EN LA CALLE</small>
             <b id="barDeuda">$0</b>
-            <span class="sub" id="barDeudaSub">0 cuentas</span>
+            <span class="sub" id="barDeudaSub">0 activas</span>
         </button>
         <button type="button" data-filter="criticos" id="goRiesgo">
-            <small>DEUDA RIESGO</small>
+            <small>EN RIESGO</small>
             <b id="barRiesgo">$0</b>
             <span class="sub" id="barRiesgoSub">0 cuentas</span>
         </button>
@@ -412,9 +412,9 @@
             <span class="sub">del mes</span>
         </button>
         <button type="button" data-filter="all" id="goClientes">
-            <small>CLIENTES</small>
+            <small>ACTIVAS</small>
             <b id="barClientes">0</b>
-            <span class="sub" id="barClientesSub">en la calle</span>
+            <span class="sub" id="barClientesSub">con deuda</span>
         </button>
     </nav>
 
@@ -423,10 +423,12 @@
 
     <script>
         const API_BASE = '/api';
+        const CACHE_CARTERA = 'crm-cartera-app';
         let allClients = [];
         let currentFilter = 'all';
         let cobrosMes = 0;
-        let interesPorCliente = {};
+        let libro = {};
+        let sucursalId = '';
 
         function formatCents(amount) {
             return new Intl.NumberFormat('es-AR', {
@@ -458,12 +460,14 @@
         }
 
         function deudaVisible(client) {
-            if (client.pos_uid || client.pos_id != null) {
-                const deuda = Number(client.deuda_pos);
-                return Number.isFinite(deuda) ? deuda : 0;
-            }
+            if (client.deuda_pos != null && client.deuda_pos !== '') return Number(client.deuda_pos) || 0;
             const saldo = Number(client.saldo_actual);
             return Number.isFinite(saldo) ? saldo : 0;
+        }
+
+        function diasDe(client) {
+            if (client.dias != null && client.dias !== '') return Number(client.dias);
+            return calculateDaysSincePayment(client.fecha_ultimo_pago);
         }
 
         function esExpress(client) {
@@ -485,36 +489,18 @@
         }
 
         function getClientStatus(cliente) {
-            const saldo = deudaVisible(cliente);
-            const techo = Number(cliente.techo_deuda) || 0;
-            const scoring = cliente.scoring || 'A';
-            if (saldo <= 0) return { label: 'Al día', class: 'ok' };
-            if (String(cliente.estado_cuenta || '').toLowerCase() === 'suspendido') return { label: 'Suspendido', class: 'hot' };
-            if (techo > 0 && saldo >= techo * 0.9) return { label: 'Atención', class: 'hot' };
-            if (scoring === 'C' || scoring === 'D') return { label: 'Crítico', class: 'hot' };
-            if (techo > 0 && saldo >= techo * 0.6) return { label: 'Atención', class: 'hot' };
-            const days = calculateDaysSincePayment(cliente.fecha_ultimo_pago);
-            const plazo = Number(cliente.plazo_dias);
-            if (Number.isFinite(plazo) && plazo > 0 && days !== null && days > plazo) return { label: 'Vencido', class: 'hot' };
-            return { label: 'Regular', class: '' };
+            if (cliente.en_riesgo) return { label: 'Atención', class: 'hot' };
+            if (deudaVisible(cliente) <= 0) return { label: 'Al día', class: 'ok' };
+            return { label: cliente.estado || 'Regular', class: '' };
         }
 
         function enRiesgo(client) {
-            return getClientStatus(client).class === 'hot';
+            return !!client.en_riesgo;
         }
 
         function interesCuenta(client) {
-            const real = interesPorCliente[String(client.pos_id)];
-            if (real && Number.isFinite(Number(real.mantenimiento))) {
-                return { monto: Number(real.mantenimiento), pct: 0, real: true };
-            }
-            const saldo = deudaVisible(client);
-            if (saldo <= 0.009) return { monto: 0, pct: 0, real: false };
-            const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
-            const plazoCliente = Number(client.plazo_dias);
-            const plazo = Number.isFinite(plazoCliente) && plazoCliente > 0 ? plazoCliente : PLAZO_BASE;
-            const pct = days !== null && days > plazo ? TASA_BASE + TASA_APAL : TASA_BASE;
-            return { monto: Math.round(saldo * pct) / 100, pct, real: false };
+            const monto = Number(client.mantenimiento) || 0;
+            return { monto, real: client.mantenimiento_origen === 'libro' };
         }
 
         function sucursalDe(client) {
@@ -522,18 +508,40 @@
         }
 
         function clientesDeSucursal() {
-            const elegida = document.getElementById('sucursalFiltro').value;
-            if (!elegida) return allClients;
-            return allClients.filter(client => sucursalDe(client) === elegida);
+            return allClients;
         }
 
-        function llenarSucursales() {
+        function elegirSucursal() {
+            sucursalId = document.getElementById('sucursalFiltro').value;
+            loadClients();
+        }
+
+        function llenarSucursales(lista) {
             const select = document.getElementById('sucursalFiltro');
-            const previa = select.value;
-            const nombres = [...new Set(allClients.map(sucursalDe))].sort((a, b) => a.localeCompare(b, 'es'));
-            select.innerHTML = '<option value="">Todas las sucursales</option>' +
-                nombres.map(nombre => `<option value="${esc(nombre)}">${esc(nombre)}</option>`).join('');
+            const previa = String(sucursalId || '');
+            const opciones = (lista || []).map(item => `<option value="${esc(item.id)}">${esc(item.nombre)}</option>`).join('');
+            select.innerHTML = '<option value="">Todas las sucursales</option>' + opciones;
             if ([...select.options].some(opcion => opcion.value === previa)) select.value = previa;
+        }
+
+        function desdeLibro(cliente) {
+            return {
+                id: cliente.id,
+                pos_id: cliente.id,
+                nombre: cliente.nombre,
+                cuit: cliente.dni,
+                telefono: cliente.telefono,
+                tipo_cliente: cliente.tipo,
+                deuda_pos: cliente.deuda,
+                techo_deuda: cliente.limite,
+                dias: cliente.dias,
+                mantenimiento: cliente.mantenimiento,
+                mantenimiento_origen: cliente.mantenimiento_origen,
+                tarifa: cliente.tarifa,
+                en_riesgo: cliente.en_riesgo,
+                estado: cliente.estado,
+                sucursal_nombre: cliente.sucursal_nombre || ''
+            };
         }
 
         function setFilter(filter) {
@@ -554,7 +562,7 @@
                     (client.nombre && client.nombre.toLowerCase().includes(searchQuery)) ||
                     (client.cuit && String(client.cuit).toLowerCase().includes(searchQuery));
                 const saldo = deudaVisible(client);
-                const days = calculateDaysSincePayment(client.fecha_ultimo_pago);
+                const days = diasDe(client);
                 let matchesCategory = true;
                 switch (currentFilter) {
                     case 'saldo': matchesCategory = saldo > 0; break;

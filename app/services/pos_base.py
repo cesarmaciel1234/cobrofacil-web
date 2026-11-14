@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import re
+import threading
+import time
 from datetime import datetime, timezone
 from typing import Any
 
@@ -10,6 +12,10 @@ from app.database import ensure_tenant_migrations, get_db
 
 _TABLA = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SECRETOS = ("password", "passwd", "token", "secret", "api_key", "access_token", "refresh_token")
+# El libro ya leído se reusa unos segundos. Cambiar de ventana no vuelve a bajar Neon.
+_CACHE_TTL = 45.0
+_cache_lock = threading.Lock()
+_cache: dict[tuple, tuple[float, tuple, list, list]] = {}
 
 
 def _utc_now() -> str:
@@ -94,6 +100,7 @@ def guardar_parte(
                 _utc_now(),
             ),
         )
+    _olvidar_tabla(tabla)
     return {"ok": True, "tabla": tabla, "parte": parte, "filas": len(limpias)}
 
 
@@ -157,21 +164,46 @@ def listar_sucursales() -> list[dict]:
     ]
 
 
-def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], list[list]]:
-    if not _TABLA.match(tabla or ""):
-        return [], []
-    with get_db() as conn:
-        ensure_tenant_migrations(conn)
-        if sucursal_id is not None:
-            partes = conn.execute(
-                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id = ? ORDER BY parte",
-                (tabla, int(sucursal_id)),
-            ).fetchall()
-        else:
-            partes = conn.execute(
-                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? ORDER BY sucursal_id, parte",
-                (tabla,),
-            ).fetchall()
+def _ambito_cache() -> str:
+    """La copia en memoria no se mezcla entre empresas ni entre bases de prueba."""
+    from app.config import Config
+
+    if Config.DATABASE_URL and not Config.TESTING:
+        try:
+            from flask import has_request_context, session
+
+            if has_request_context():
+                return "pg:" + str(int(session.get("empresa_id") or 1))
+        except Exception:
+            pass
+        return "pg:0"
+    return "sqlite:" + str(Config.DB_PATH)
+
+
+def _olvidar_tabla(tabla: str) -> None:
+    with _cache_lock:
+        for clave in list(_cache):
+            if clave[1] == tabla:
+                _cache.pop(clave, None)
+
+
+def _sello(conn, tabla: str, sucursal_id: int | None) -> tuple:
+    if sucursal_id is not None:
+        row = conn.execute(
+            "SELECT MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla = ? AND sucursal_id = ?",
+            (tabla, int(sucursal_id)),
+        ).fetchone()
+    else:
+        row = conn.execute(
+            "SELECT MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla = ?",
+            (tabla,),
+        ).fetchone()
+    if not row:
+        return (None, 0)
+    return (row["marca"], int(row["n"] or 0))
+
+
+def _armar_filas(partes) -> tuple[list[str], list[list]]:
     if not partes:
         return [], []
     columnas = list(json.loads(partes[0]["columnas"]))
@@ -179,7 +211,6 @@ def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], lis
     if not tiene_suc:
         columnas.append("sucursal_id")
         columnas.append("sucursal_nombre")
-
     filas: list[list] = []
     for parte in partes:
         sid = parte["sucursal_id"]
@@ -193,4 +224,37 @@ def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], lis
                 filas.append(f_copy)
         else:
             filas.extend(part_filas)
+    return columnas, filas
+
+
+def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], list[list]]:
+    if not _TABLA.match(tabla or ""):
+        return [], []
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    clave = (_ambito_cache(), tabla, sid)
+    ahora = time.monotonic()
+    with _cache_lock:
+        hit = _cache.get(clave)
+        if hit and ahora - hit[0] < _CACHE_TTL:
+            return hit[2], hit[3]
+    with get_db() as conn:
+        stamp = _sello(conn, tabla, sid)
+        with _cache_lock:
+            hit = _cache.get(clave)
+            if hit and hit[1] == stamp:
+                _cache[clave] = (time.monotonic(), stamp, hit[2], hit[3])
+                return hit[2], hit[3]
+        if sid is not None:
+            partes = conn.execute(
+                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id = ? ORDER BY parte",
+                (tabla, sid),
+            ).fetchall()
+        else:
+            partes = conn.execute(
+                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? ORDER BY sucursal_id, parte",
+                (tabla,),
+            ).fetchall()
+    columnas, filas = _armar_filas(partes)
+    with _cache_lock:
+        _cache[clave] = (time.monotonic(), stamp, columnas, filas)
     return columnas, filas
