@@ -11,7 +11,7 @@ barra
 │   └── tickets recientes
 ├── cobros     cobros del día
 │   └── libro de auditoría
-├── caja       resultado del día
+├── caja       medios de pago
 │   ├── arqueo
 │   ├── cobros y gastos
 │   └── balance corporativo

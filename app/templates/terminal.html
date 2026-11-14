@@ -26,7 +26,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.9">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.10">
     <style>
         .balance-grid {
             display: grid;
@@ -421,7 +421,7 @@
             <div class="view" id="view-contabilidad">
                 <div class="card">
                     <div class="card-head"><h2>Contabilidad & Caja</h2><span id="contaDia">Espejo de la caja</span></div>
-                    <div class="card-body" id="contaCuerpo" style="padding:20px; line-height:1.5;">Cargando el libro…</div>
+                    <div class="card-body" id="contaCuerpo">Cargando el libro…</div>
                 </div>
             </div>
             <div class="view" id="view-admin">
@@ -1736,25 +1736,7 @@
     <script>
         // Registro de Service Worker inline para asegurar actualización inmediata de caché
         if ('serviceWorker' in navigator) {
-            let refreshing = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (refreshing) return;
-                refreshing = true;
-                window.location.reload();
-            });
-            navigator.serviceWorker.register('/sw.js').then(reg => {
-                if (reg.waiting) {
-                    reg.waiting.postMessage('SKIP_WAITING');
-                }
-                reg.addEventListener('updatefound', () => {
-                    const newWorker = reg.installing;
-                    newWorker?.addEventListener('statechange', () => {
-                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                            newWorker.postMessage('SKIP_WAITING');
-                        }
-                    });
-                });
-            }).catch(err => console.warn('Inline SW registration failed:', err));
+            navigator.serviceWorker.register('/sw.js').catch(err => console.warn('Inline SW registration failed:', err));
         }
     </script>
 
@@ -1776,6 +1758,6 @@
     <script src="/static/js/barra/pedidos.js?v=1"></script>
     <script src="/static/js/barra/armar.js?v=1"></script>
     <script src="/static/js/modulo-panel.js?v=2"></script>
-    <script src="/static/js/app.js?v=4.11"></script>
+    <script src="/static/js/app.js?v=4.13"></script>
 </body>
 </html>

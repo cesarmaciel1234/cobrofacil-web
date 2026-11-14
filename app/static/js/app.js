@@ -291,6 +291,7 @@ const $ = id => document.getElementById(id);
         let mensajePedido = '';
         let filtroProveedorPedido = '';
         let carritoPedido = {};
+        let cajaEnPantalla = [];
 
         const titles = {
             home: ['Inicio', 'Resumen rápido', 'Inicio'],
@@ -2106,6 +2107,9 @@ const $ = id => document.getElementById(id);
                 localStorage.removeItem('sync_user');
                 localStorage.removeItem('sync_empresa');
                 if (window.CrmLoader && CrmLoader.limpiarCopiasDelTelefono) CrmLoader.limpiarCopiasDelTelefono();
+                if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+                    navigator.serviceWorker.controller.postMessage('OLVIDAR_APP');
+                }
                 await api('/auth/logout', { method: 'POST' });
             } catch (_) {}
             window.location.href = '/login';
@@ -2302,6 +2306,91 @@ const $ = id => document.getElementById(id);
             return String(valor ?? '').replace(/[&<>"']/g, (c) => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             }[c]));
+        }
+
+        function cuboDeMedio(nombre) {
+            const t = String(nombre || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+            if (t.includes('QR') || t.includes('MERCADO') || /(^|[^A-Z])MP([^A-Z]|$)/.test(t)) return 'qr';
+            if (t.includes('TRANSF')) return 'transferencia';
+            if (t.includes('TARJETA') || t.includes('DEBITO') || t.includes('CREDITO') || t.includes('VISA') || t.includes('MASTER') || t.includes('POINT')) return 'tarjeta';
+            if (t.includes('FIADO') || t.includes('CUENTA') || t.includes('CTA')) return 'fiado';
+            if (!t || t.includes('EFECTIVO') || t.includes('CASH') || t.includes('CONTADO')) return 'efectivo';
+            return '';
+        }
+
+        function armarCaja(c) {
+            const base = [
+                { id: 'efectivo', nombre: 'Efectivo' },
+                { id: 'transferencia', nombre: 'Transferencia' },
+                { id: 'tarjeta', nombre: 'Tarjeta' },
+                { id: 'qr', nombre: 'QR' },
+                { id: 'fiado', nombre: 'Fiado' },
+            ].map((m) => ({ ...m, monto: 0, tickets: 0, lineas: [] }));
+            const porId = Object.fromEntries(base.map((m) => [m.id, m]));
+            const otros = [];
+            (c.medios_pago || []).forEach((m) => {
+                const linea = {
+                    nombre: m.medio,
+                    monto: Number(m.monto) || 0,
+                    tickets: Number(m.tickets) || 0,
+                };
+                const id = cuboDeMedio(m.medio);
+                const destino = id && porId[id];
+                if (destino) {
+                    destino.monto += linea.monto;
+                    destino.tickets += linea.tickets;
+                    destino.lineas.push(linea);
+                } else {
+                    otros.push({
+                        id: 'otro:' + String(m.medio || ''),
+                        nombre: m.medio || 'Otro',
+                        monto: linea.monto,
+                        tickets: linea.tickets,
+                        lineas: [linea],
+                    });
+                }
+            });
+            const cobros = c.detalle_cobros || [];
+            const pago = {
+                id: 'pago-cliente',
+                nombre: 'Pago cliente',
+                monto: Number(c.cobros) || 0,
+                tickets: cobros.length,
+                lineas: cobros.map((cob) => ({
+                    nombre: cob.descripcion || 'Cobro',
+                    monto: Number(cob.monto) || 0,
+                    tickets: 0,
+                })),
+                esCobro: true,
+            };
+            return [...base, ...otros, pago].map((m) => {
+                m.monto = Math.round(m.monto * 100) / 100;
+                if (m.esCobro) m.detalle = m.tickets ? (m.tickets + (m.tickets === 1 ? ' cobro' : ' cobros')) : 'Sin cobros';
+                else m.detalle = m.tickets ? (m.tickets + (m.tickets === 1 ? ' ticket' : ' tickets')) : 'Sin movimientos';
+                return m;
+            });
+        }
+
+        function abrirCaja(id) {
+            const metodo = cajaEnPantalla.find((m) => m.id === id);
+            if (!metodo) return;
+            cerrarFaltante();
+            const fondo = document.createElement('div');
+            fondo.id = 'pedidoSheet';
+            fondo.className = 'pedido-sheet-back';
+            const lineas = metodo.lineas.length
+                ? metodo.lineas.map((l) => `<div class="pedido-dato"><span>${textoJefe(l.nombre)}${l.tickets ? ' · ' + l.tickets + (l.tickets === 1 ? ' ticket' : ' tickets') : ''}</span><b>${plataJefe(l.monto)}</b></div>`).join('')
+                : '<p class="caja-vacio">Sin movimientos ese día.</p>';
+            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="${textoJefe(metodo.nombre)}">
+                <strong class="pedido-sheet-titulo">${textoJefe(metodo.nombre)}</strong>
+                ${lineas}
+                <div class="pedido-dato"><span>Total</span><b>${plataJefe(metodo.monto)}</b></div>
+                <button type="button" class="btn" data-cerrar-caja>Cerrar</button>
+            </div>`;
+            fondo.addEventListener('click', (ev) => {
+                if (ev.target === fondo || ev.target.closest('[data-cerrar-caja]')) cerrarFaltante();
+            });
+            document.body.appendChild(fondo);
         }
 
         function cerrarFaltante() {
@@ -2877,12 +2966,13 @@ const $ = id => document.getElementById(id);
             // 1. CONTABILIDAD & CAJA
             if (panel === 'contabilidad' && $('contaCuerpo')) {
                 const c = dato.contabilidad || {};
-                const cartera = dato.cartera || {};
                 $('contaDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
                 if (!dato.libro) {
                     $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
-                    let html = '<p class="modulo-esencial">El resumen del día está arriba. El arqueo y el detalle se abren en Opciones.</p>';
+                    const metodos = armarCaja(c);
+                    cajaEnPantalla = metodos;
+                    let html = '<div class="caja-lista">' + metodos.map((m) => `<button type="button" class="caja-fila" data-caja="${textoJefe(m.id)}"><span class="caja-nombre">${textoJefe(m.nombre)}</span><span class="caja-lado"><b>${plataJefe(m.monto)}</b><small>${textoJefe(m.detalle)}</small></span></button>`).join('') + '</div>';
 
                     const medios = c.medios_pago || [];
                     const totalMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0) || 1;
@@ -2954,6 +3044,11 @@ const $ = id => document.getElementById(id);
                     html += `</div></div></div>`;
 
                     $('contaCuerpo').innerHTML = html;
+                    $('contaCuerpo').onclick = (ev) => {
+                        const fila = ev.target.closest('[data-caja]');
+                        if (!fila) return;
+                        abrirCaja(fila.getAttribute('data-caja'));
+                    };
                 }
             }
 
@@ -4831,36 +4926,7 @@ const $ = id => document.getElementById(id);
 
         function registerServiceWorker() {
             if (!('serviceWorker' in navigator)) return;
-            let swReloading = false;
-            navigator.serviceWorker.addEventListener('controllerchange', () => {
-                if (swReloading) return;
-                swReloading = true;
-                window.location.reload();
-            });
-            navigator.serviceWorker.register('/sw.js').then((reg) => {
-                if (reg.waiting) showPwaUpdateBanner(reg);
-                reg.addEventListener('updatefound', () => {
-                    const nw = reg.installing;
-                    nw?.addEventListener('statechange', () => {
-                        if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                            showPwaUpdateBanner(reg);
-                        }
-                    });
-                });
-            }).catch(e => console.warn('PWA SW err:', e));
-        }
-
-        function showPwaUpdateBanner(reg) {
-            if (document.getElementById('pwaUpdateBanner')) return;
-            const el = document.createElement('div');
-            el.id = 'pwaUpdateBanner';
-            el.className = 'pwa-update-toast';
-            el.innerHTML = '<span>Nueva versión disponible</span><button type="button">Actualizar</button>';
-            el.querySelector('button')?.addEventListener('click', () => {
-                reg.waiting?.postMessage('SKIP_WAITING');
-                window.location.reload();
-            });
-            document.body.appendChild(el);
+            navigator.serviceWorker.register('/sw.js').catch(e => console.warn('PWA SW err:', e));
         }
 
         function initIosInstallHint() {

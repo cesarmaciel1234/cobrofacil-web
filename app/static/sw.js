@@ -1,10 +1,7 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.11';
+const CACHE_VERSION = 'crm-frigorifico-v4.12';
 const SHELL_ASSETS = [
-  '/',
   '/login',
-  '/pos',
-  '/cartera',
   '/manifest.json',
   '/static/enterprise.css',
   '/static/js/crm-safe.js',
@@ -136,12 +133,30 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+function esLogin(response) {
+  try {
+    const path = new URL(response.url).pathname;
+    return path === '/login' || path.startsWith('/login/');
+  } catch (_) {
+    return false;
+  }
+}
+
+async function olvidarApp(cache) {
+  const claves = await cache.keys();
+  await Promise.all(claves.map((pedido) => {
+    const path = new URL(pedido.url).pathname;
+    if (path === '/' || path === '/cartera' || path === '/pos') return cache.delete(pedido);
+    return null;
+  }));
+}
+
 async function guardarRespuesta(cache, request, response) {
-  if (!response || !response.ok) return;
+  if (!response || !response.ok || esLogin(response)) return;
   await cache.put(cacheKey(request), response.clone());
   if (request.mode === 'navigate') {
     const path = new URL(request.url).pathname || '/';
-    await cache.put(path, response.clone());
+    if (path !== '/login') await cache.put(path, response.clone());
   }
 }
 
@@ -161,8 +176,14 @@ async function shellOffline(request) {
 
 async function networkFirst(request) {
   const cache = await caches.open(CACHE_VERSION);
+  const path = new URL(request.url).pathname || '/';
   try {
-    const response = await fetch(request);
+    const response = await fetch(new Request(request, { credentials: 'include' }));
+    if (request.mode === 'navigate' && esLogin(response) && path !== '/login') {
+      const guardada = await shellOffline(request);
+      if (guardada && !esLogin(guardada)) return guardada;
+    }
+    if (request.mode === 'navigate' && path === '/login') await olvidarApp(cache);
     await guardarRespuesta(cache, request, response);
     return response;
   } catch (_) {
@@ -187,4 +208,7 @@ async function staleWhileRevalidate(request) {
 
 self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data === 'OLVIDAR_APP') {
+    event.waitUntil(caches.open(CACHE_VERSION).then((cache) => olvidarApp(cache)));
+  }
 });
