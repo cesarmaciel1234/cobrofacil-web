@@ -1,20 +1,30 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.9';
+const CACHE_VERSION = 'crm-frigorifico-v4.11';
 const SHELL_ASSETS = [
   '/',
   '/login',
   '/pos',
+  '/cartera',
   '/manifest.json',
   '/static/enterprise.css',
   '/static/js/crm-safe.js',
   '/static/js/crm-bus.js',
+  '/static/js/crm-format.js',
+  '/static/js/crm-ui.js',
   '/static/js/crm-db.js',
   '/static/js/sync-engine.js',
   '/static/js/crm-sync-api.js',
   '/static/js/crm-loader.js',
   '/static/js/crm-delete.js',
+  '/static/js/crm-backup.js',
   '/static/js/app.js',
   '/static/js/modulo-panel.js',
+  '/static/js/barra/ventas.js',
+  '/static/js/barra/cobros.js',
+  '/static/js/barra/caja.js',
+  '/static/js/barra/cartera.js',
+  '/static/js/barra/pedidos.js',
+  '/static/js/barra/armar.js',
   '/static/vendor/dexie.min.js',
   '/static/js/pos-offline.js',
   '/static/icons/icon-180.png',
@@ -126,22 +136,38 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+async function guardarRespuesta(cache, request, response) {
+  if (!response || !response.ok) return;
+  await cache.put(cacheKey(request), response.clone());
+  if (request.mode === 'navigate') {
+    const path = new URL(request.url).pathname || '/';
+    await cache.put(path, response.clone());
+  }
+}
+
+async function shellOffline(request) {
+  const cache = await caches.open(CACHE_VERSION);
+  const exacta = await cache.match(cacheKey(request));
+  if (exacta) return exacta;
+  if (request.mode === 'navigate') {
+    const path = new URL(request.url).pathname || '/';
+    const porRuta = await cache.match(path);
+    if (porRuta) return porRuta;
+    const raiz = await cache.match('/');
+    if (raiz) return raiz;
+  }
+  return null;
+}
+
 async function networkFirst(request) {
-  const key = cacheKey(request);
   const cache = await caches.open(CACHE_VERSION);
   try {
     const response = await fetch(request);
-    if (response.ok) {
-      await cache.put(key, response.clone());
-    }
+    await guardarRespuesta(cache, request, response);
     return response;
   } catch (_) {
-    const cached = await cache.match(key);
-    if (cached) return cached;
-    if (request.mode === 'navigate') {
-      const shell = await cache.match('/');
-      if (shell) return shell;
-    }
+    const guardada = await shellOffline(request);
+    if (guardada) return guardada;
     throw _;
   }
 }

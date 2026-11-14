@@ -1087,7 +1087,7 @@
                 const response = await fetch(url);
                 if (!response.ok) throw new Error('libro');
                 const dato = await response.json();
-                try { sessionStorage.setItem(CACHE_CARTERA, JSON.stringify(dato)); } catch (e) {}
+                try { localStorage.setItem(CACHE_CARTERA, JSON.stringify(dato)); } catch (e) {}
                 aplicarLibro(dato);
             } catch (e) {
                 if (!allClients.length && vacio) {
@@ -1167,7 +1167,7 @@
 
         if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
         try {
-            const previo = sessionStorage.getItem(CACHE_CARTERA);
+            const previo = localStorage.getItem(CACHE_CARTERA) || sessionStorage.getItem(CACHE_CARTERA);
             if (previo) aplicarLibro(JSON.parse(previo));
         } catch (e) {}
         cargarMarca();

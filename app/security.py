@@ -173,15 +173,8 @@ def register_security(app):
             return None
             
         now = datetime.now(timezone.utc).timestamp()
-        last_act = session.get("last_activity")
-        TIMEOUT_SECONDS = 3600  # 60 minutos
-        
-        if last_act and (now - last_act > TIMEOUT_SECONDS):
-            session.clear()
-            if request.path.startswith("/api/"):
-                return jsonify({"error": "Sesión expirada por inactividad"}), 401
-            return redirect(url_for("views.login", error="Sesión expirada por inactividad"))
-            
+        # No hay vencimiento por inactividad. La sesión sigue hasta Salir
+        # o hasta entrar con otra cuenta. Cada visita renueva la cookie.
         session["last_activity"] = now
         return None
 

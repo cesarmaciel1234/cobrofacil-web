@@ -2105,6 +2105,7 @@ const $ = id => document.getElementById(id);
                 localStorage.removeItem('session_empresa_nombre');
                 localStorage.removeItem('sync_user');
                 localStorage.removeItem('sync_empresa');
+                if (window.CrmLoader && CrmLoader.limpiarCopiasDelTelefono) CrmLoader.limpiarCopiasDelTelefono();
                 await api('/auth/logout', { method: 'POST' });
             } catch (_) {}
             window.location.href = '/login';
@@ -2814,13 +2815,35 @@ const $ = id => document.getElementById(id);
             cargarJefe('reporte');
         };
 
+        function leerPanelJefe(clave) {
+            try {
+                return localStorage.getItem(clave) || sessionStorage.getItem(clave);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function guardarPanelJefe(clave, dato) {
+            const texto = JSON.stringify(dato);
+            try { localStorage.setItem(clave, texto); } catch (e) {}
+            try { sessionStorage.setItem(clave, texto); } catch (e) {}
+        }
+
         async function cargarJefe(panel) {
             const token = ++jefeCargaToken;
             const clave = claveJefe(panel);
+            let habiaLocal = false;
             try {
-                const crudo = sessionStorage.getItem(clave);
-                if (crudo) aplicarDatosJefe(panel, JSON.parse(crudo), true);
+                const crudo = leerPanelJefe(clave);
+                if (crudo) {
+                    habiaLocal = true;
+                    aplicarDatosJefe(panel, JSON.parse(crudo), true);
+                }
             } catch (e) {}
+            if (!navigator.onLine) {
+                if (!habiaLocal) aplicarDatosJefe(panel, { libro: false }, false);
+                return;
+            }
             let dato = null;
             try {
                 let url = '/api/pos/jefe?panel=' + encodeURIComponent(panel);
@@ -2838,12 +2861,10 @@ const $ = id => document.getElementById(id);
             }
             if (token !== jefeCargaToken) return;
             if (!dato) {
-                if (!sessionStorage.getItem(clave)) aplicarDatosJefe(panel, { libro: false }, false);
+                if (!habiaLocal) aplicarDatosJefe(panel, { libro: false }, false);
                 return;
             }
-            try {
-                sessionStorage.setItem(clave, JSON.stringify(dato));
-            } catch (e) {}
+            guardarPanelJefe(clave, dato);
             aplicarDatosJefe(panel, dato, false);
         }
 
@@ -4655,6 +4676,11 @@ const $ = id => document.getElementById(id);
         window.addEventListener('online', () => {
             updateConnectionStatus();
             void sincronizarSolicitudesPendientes();
+            const activa = document.querySelector('.view.active');
+            const name = activa ? activa.id.replace('view-', '') : '';
+            if (['reporte', 'digitales', 'contabilidad', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) {
+                cargarJefe(name);
+            }
         });
         window.addEventListener('offline', updateConnectionStatus);
         

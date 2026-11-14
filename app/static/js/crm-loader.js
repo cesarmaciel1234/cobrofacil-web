@@ -260,6 +260,16 @@
         };
     }
 
+    function limpiarCopiasDelTelefono() {
+        const borrar = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+            const clave = localStorage.key(i);
+            if (clave && (clave.indexOf('crm-jefe:') === 0 || clave === 'crm-cartera-app')) borrar.push(clave);
+        }
+        borrar.forEach((clave) => localStorage.removeItem(clave));
+        try { sessionStorage.removeItem('crm-cartera-app'); } catch (_) {}
+    }
+
     async function finishBootInBackground(hadCacheOnStart) {
         const { clearTenantCaches, tenantCacheGet } = global.CrmDb;
         const prevUser = localStorage.getItem('sync_user') || '';
@@ -274,6 +284,7 @@
 
         if (usuarioCambio || empresaCambio) {
             await clearTenantCaches();
+            limpiarCopiasDelTelefono();
         }
         if (curUser) localStorage.setItem('sync_user', curUser);
         if (curEmpresa) localStorage.setItem('sync_empresa', curEmpresa);
@@ -337,5 +348,6 @@
         runBoot,
         initSignalListener,
         teardownSignalListener,
+        limpiarCopiasDelTelefono,
     };
 })(window);

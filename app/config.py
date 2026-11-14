@@ -37,7 +37,7 @@ class Config:
         os.environ.get("SESSION_COOKIE_SECURE", "auto") == "auto"
         and os.environ.get("RENDER") == "true"
     )
-    PERMANENT_SESSION_LIFETIME = 86400 * 7  # 7 días
+    PERMANENT_SESSION_LIFETIME = 86400 * 400  # tope del navegador; cada visita lo renueva
     APP_VERSION = os.environ.get("APP_VERSION", "3.7")
 
     # Email informe empresarial (Resend HTTPS)
