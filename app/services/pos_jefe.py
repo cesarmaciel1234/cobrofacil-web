@@ -360,6 +360,10 @@ def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
             minimo = _numero(_valor(f, idx_p, "minimo", "stock_minimo", "punto_pedido"))
             maximo = _numero(_valor(f, idx_p, "maximo", "stock_maximo")) or (minimo * 2 if minimo > 0 else 10.0)
             costo = _numero(_valor(f, idx_p, "costo", "costo_unitario", "precio_costo"))
+            precio = _numero(_valor(f, idx_p, "precio", "precio_lista", "precio_venta"))
+            unidad = str(_valor(f, idx_p, "unidad") or "").strip()
+            marca_pesable = str(_valor(f, idx_p, "es_pesable") or "").strip().lower()
+            pesable = marca_pesable in ("1", "true", "t", "si", "sí") or unidad.lower() in ("kg", "kilo", "kilos")
             prov = str(_valor(f, idx_p, "proveedor", "proveedor_nombre") or "").strip() or "Sin proveedor"
 
             if stock <= minimo:
@@ -375,6 +379,9 @@ def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
                     "maximo": maximo,
                     "a_pedir": a_pedir,
                     "costo_unit": costo,
+                    "precio": precio,
+                    "unidad": "kg" if pesable else (unidad or "un"),
+                    "pesable": pesable,
                     "subtotal": subtotal,
                     "proveedor": prov,
                 })

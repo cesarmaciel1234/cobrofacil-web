@@ -287,6 +287,10 @@ const $ = id => document.getElementById(id);
         let histPagosFiltro = '';
         let activeRowIndex = -1;
         let carteraEnPantalla = [];
+        let faltantesEnPantalla = [];
+        let mensajePedido = '';
+        let filtroProveedorPedido = '';
+        let carritoPedido = {};
 
         const titles = {
             home: ['Inicio', 'Resumen rápido', 'Inicio'],
@@ -2287,10 +2291,298 @@ const $ = id => document.getElementById(id);
             return '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function cantidadJefe(n) {
+            const x = Number(n);
+            if (!Number.isFinite(x)) return '—';
+            return (Math.round(x * 10) / 10).toLocaleString('es-AR', { maximumFractionDigits: 1 });
+        }
+
         function textoJefe(valor) {
             return String(valor ?? '').replace(/[&<>"']/g, (c) => ({
                 '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
             }[c]));
+        }
+
+        function cerrarFaltante() {
+            document.getElementById('pedidoSheet')?.remove();
+        }
+
+        function clavePedido(item) {
+            return String(item.codigo || '') + '|' + String(item.producto || '');
+        }
+
+        function entradasCarrito() {
+            return Object.entries(carritoPedido);
+        }
+
+        function unidadPedido(item) {
+            if (!item) return 'un';
+            const cruda = String(item.unidad || '').trim();
+            const baja = cruda.toLowerCase();
+            if (item.pesable || baja === 'kg' || baja === 'kilo' || baja === 'kilos') return 'kg';
+            if (!baja || baja === 'un' || baja === 'u' || baja === 'und' || baja === 'unidad' || baja === 'unidades') return 'un';
+            return cruda;
+        }
+
+        function esKiloPedido(item) {
+            return unidadPedido(item) === 'kg';
+        }
+
+        function alinearCarrito(clave, entry) {
+            const item = faltantesEnPantalla.find((fila) => clavePedido(fila) === clave);
+            if (!item) return entry;
+            entry.unidad = unidadPedido(item);
+            entry.pesable = esKiloPedido(item);
+            if (!(entry.precio > 0)) entry.precio = Number(item.precio) || 0;
+            if (!(entry.costo > 0)) entry.costo = Number(item.costo_unit) || 0;
+            return entry;
+        }
+
+        function medidasDelCarrito(entradas) {
+            let kilos = 0;
+            let unidades = 0;
+            entradas.forEach(([clave, entry]) => {
+                alinearCarrito(clave, entry);
+                if (esKiloPedido(entry)) kilos += entry.cantidad;
+                else unidades += entry.cantidad;
+            });
+            const medidas = [];
+            if (unidades) medidas.push(cantidadJefe(unidades) + ' un');
+            if (kilos) medidas.push(cantidadJefe(kilos) + ' kg');
+            return medidas;
+        }
+
+        function pintarCarritoFlotante() {
+            let barra = document.getElementById('carritoFlotante');
+            const entradas = entradasCarrito();
+            const enPedidos = document.getElementById('view-pedidos')?.classList.contains('active');
+            if (!entradas.length || !enPedidos) {
+                barra?.remove();
+                return;
+            }
+            const total = entradas.reduce((suma, [, entry]) => suma + entry.cantidad * entry.costo, 0);
+            const medidas = medidasDelCarrito(entradas);
+            if (!barra) {
+                barra = document.createElement('button');
+                barra.id = 'carritoFlotante';
+                barra.type = 'button';
+                barra.className = 'carrito-flotante';
+                barra.addEventListener('click', abrirCarrito);
+                document.body.appendChild(barra);
+            }
+            barra.innerHTML = `<span class="carrito-n">${entradas.length}</span><span class="carrito-medio"><b>${medidas.join(' · ') || 'Pedido'}</b><small>Ver pedido</small></span><span class="carrito-plata"><small>Costo</small><b>${plataJefe(total)}</b></span>`;
+        }
+
+        function marcarMasCarrito() {
+            document.querySelectorAll('[data-sumar]').forEach((boton) => {
+                const item = faltantesEnPantalla[Number(boton.dataset.sumar)];
+                const entry = item && carritoPedido[clavePedido(item)];
+                if (!entry) {
+                    boton.textContent = '+';
+                    boton.classList.remove('en-carrito');
+                    return;
+                }
+                boton.innerHTML = `<b>${cantidadJefe(entry.cantidad)}</b><small>${textoJefe(unidadPedido(item))}</small>`;
+                boton.classList.add('en-carrito');
+            });
+        }
+
+        function sumarAlCarrito(indice) {
+            const item = faltantesEnPantalla[indice];
+            if (!item) return;
+            const clave = clavePedido(item);
+            if (!carritoPedido[clave]) {
+                carritoPedido[clave] = {
+                    producto: item.producto,
+                    proveedor: item.proveedor || 'Sin proveedor',
+                    costo: Number(item.costo_unit) || 0,
+                    precio: Number(item.precio) || 0,
+                    unidad: unidadPedido(item),
+                    pesable: esKiloPedido(item),
+                    cantidad: Number(item.a_pedir) || 1,
+                };
+            } else {
+                carritoPedido[clave].cantidad = Math.round((carritoPedido[clave].cantidad + 1) * 10) / 10;
+            }
+            marcarMasCarrito();
+            pintarCarritoFlotante();
+        }
+
+        function cambiarCarrito(clave, delta) {
+            const entry = carritoPedido[clave];
+            if (!entry) return;
+            entry.cantidad = Math.round((entry.cantidad + delta) * 10) / 10;
+            if (entry.cantidad <= 0) delete carritoPedido[clave];
+            marcarMasCarrito();
+            pintarCarritoFlotante();
+            if (entradasCarrito().length) abrirCarrito();
+            else cerrarFaltante();
+        }
+
+        function mensajeDelCarrito() {
+            const grupos = {};
+            entradasCarrito().forEach(([, entry]) => {
+                const nombre = entry.proveedor || 'Sin proveedor';
+                grupos[nombre] = grupos[nombre] || [];
+                grupos[nombre].push(`- ${cantidadJefe(entry.cantidad)} ${unidadPedido(entry)} x ${entry.producto}`);
+            });
+            const lineas = ['PEDIDO'];
+            Object.keys(grupos).forEach((nombre) => {
+                lineas.push(nombre);
+                grupos[nombre].forEach((linea) => lineas.push(linea));
+            });
+            return lineas.join('\n');
+        }
+
+        function abrirWhatsappPedido(ev) {
+            if (ev) ev.stopPropagation();
+            const texto = mensajeDelCarrito();
+            if (!texto || texto === 'PEDIDO') return;
+            window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+        }
+
+        async function copiarPedidoCarrito(ev) {
+            if (ev) ev.stopPropagation();
+            const texto = mensajeDelCarrito();
+            if (!texto || texto === 'PEDIDO') return;
+            await navigator.clipboard.writeText(texto);
+            if (typeof toast === 'function') toast('Pedido copiado');
+        }
+
+        function abrirCarrito() {
+            const entradas = entradasCarrito();
+            if (!entradas.length) return;
+            cerrarFaltante();
+            const total = entradas.reduce((suma, [, entry]) => suma + entry.cantidad * entry.costo, 0);
+            const fondo = document.createElement('div');
+            fondo.id = 'pedidoSheet';
+            fondo.className = 'pedido-sheet-back';
+            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Pedido">
+                <strong class="pedido-sheet-titulo">Pedido</strong>
+                ${entradas.map(([clave, entry]) => {
+                    alinearCarrito(clave, entry);
+                    return `<div class="carrito-item">
+                    <div><b>${textoJefe(entry.producto)}</b><span>${cantidadJefe(entry.cantidad)} ${textoJefe(unidadPedido(entry))}</span><span>Costo ${plataJefe(entry.cantidad * entry.costo)}</span>${entry.precio > 0 ? '' : '<span>Sin precio de lista</span>'}</div>
+                    <div class="carrito-step">
+                        <button type="button" data-menos="${textoJefe(clave)}" aria-label="Restar">−</button>
+                        <b>${cantidadJefe(entry.cantidad)}</b>
+                        <button type="button" data-mas="${textoJefe(clave)}" aria-label="Sumar">+</button>
+                    </div>
+                </div>`;
+                }).join('')}
+                <div class="pedido-dato"><span>Costo</span><b>${plataJefe(total)}</b></div>
+                <button type="button" class="carrito-compartir" data-wasap>WhatsApp</button>
+                <button type="button" class="carrito-copiar" data-copiar>Copiar</button>
+                <button type="button" class="pedido-cerrar" data-cerrar>Cerrar</button>
+            </div>`;
+            fondo.addEventListener('click', (ev) => {
+                const menos = ev.target.closest('[data-menos]');
+                const mas = ev.target.closest('[data-mas]');
+                if (menos) { ev.stopPropagation(); cambiarCarrito(menos.dataset.menos, -1); return; }
+                if (mas) { ev.stopPropagation(); cambiarCarrito(mas.dataset.mas, 1); return; }
+                if (ev.target.closest('[data-wasap]')) { abrirWhatsappPedido(ev); return; }
+                if (ev.target.closest('[data-copiar]')) { copiarPedidoCarrito(ev); return; }
+                if (ev.target === fondo || ev.target.closest('[data-cerrar]')) cerrarFaltante();
+            });
+            document.body.appendChild(fondo);
+        }
+
+        function abrirFiltroProveedor() {
+            cerrarFaltante();
+            const proveedores = [...new Set(faltantesEnPantalla.map(item => item.proveedor || 'Sin proveedor'))].sort((a, b) => a.localeCompare(b, 'es'));
+            const opciones = [{ id: '', nombre: 'Todos' }].concat(proveedores.map(nombre => ({ id: nombre, nombre })));
+            const fondo = document.createElement('div');
+            fondo.id = 'pedidoSheet';
+            fondo.className = 'pedido-sheet-back';
+            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Proveedores">
+                <strong class="pedido-sheet-titulo">Proveedores</strong>
+                ${opciones.map(opcion => `<button type="button" class="pedido-opcion${opcion.id === filtroProveedorPedido ? ' active' : ''}" data-proveedor="${textoJefe(opcion.id)}">${textoJefe(opcion.nombre)}</button>`).join('')}
+                <button type="button" class="pedido-cerrar" data-cerrar>Cerrar</button>
+            </div>`;
+            fondo.addEventListener('click', (ev) => {
+                const opcion = ev.target.closest('[data-proveedor]');
+                if (opcion) {
+                    filtroProveedorPedido = opcion.dataset.proveedor;
+                    const refresh = $('btnRefresh');
+                    if (refresh) refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
+                    cerrarFaltante();
+                    pintarFaltantes();
+                    if (window.ModuloPanel) ModuloPanel.recoger('pedidos');
+                    return;
+                }
+                if (ev.target === fondo || ev.target.closest('[data-cerrar]')) cerrarFaltante();
+            });
+            document.body.appendChild(fondo);
+        }
+
+        window.copiarPedidoWhatsapp = function (ev) {
+            if (ev) ev.stopPropagation();
+            const texto = document.getElementById('txtWspPedido');
+            if (!texto) return;
+            navigator.clipboard.writeText(texto.value);
+            alert('Mensaje copiado. Abrí WhatsApp y pegalo.');
+        };
+
+        function abrirFaltante(indice) {
+            const item = faltantesEnPantalla[indice];
+            if (!item) return;
+            cerrarFaltante();
+            const filas = [
+                ['Proveedor', item.proveedor || 'Sin proveedor'],
+                ['Stock', cantidadJefe(item.stock_actual)],
+                ['Mínimo', cantidadJefe(item.minimo)],
+                ['Máximo', cantidadJefe(item.maximo)],
+                ['Unidad', unidadPedido(item)],
+                ['A pedir', cantidadJefe(item.a_pedir) + ' ' + unidadPedido(item)],
+                ['Costo', plataJefe(item.costo_unit)],
+                ['Precio de lista', item.precio > 0 ? plataJefe(item.precio) : 'Sin precio de lista'],
+                ['Subtotal', plataJefe(item.subtotal)],
+            ];
+            if (item.codigo) filas.push(['Código', item.codigo]);
+            const fondo = document.createElement('div');
+            fondo.id = 'pedidoSheet';
+            fondo.className = 'pedido-sheet-back';
+            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="${textoJefe(item.producto)}">
+                <strong class="pedido-sheet-titulo">${textoJefe(item.producto)}</strong>
+                ${filas.map(([etiqueta, valor]) => `<div class="pedido-dato"><span>${textoJefe(etiqueta)}</span><b>${textoJefe(valor)}</b></div>`).join('')}
+                <button type="button" class="pedido-cerrar" data-cerrar>Cerrar</button>
+            </div>`;
+            fondo.addEventListener('click', (ev) => {
+                if (ev.target === fondo || ev.target.closest('[data-cerrar]')) cerrarFaltante();
+            });
+            document.body.appendChild(fondo);
+        }
+
+        function pintarFaltantes() {
+            const cuerpo = $('pedidosCuerpo');
+            if (!cuerpo) return;
+            const lista = faltantesEnPantalla
+                .map((item, indice) => ({ item, indice }))
+                .filter(({ item }) => !filtroProveedorPedido || (item.proveedor || 'Sin proveedor') === filtroProveedorPedido);
+            const filas = lista.length
+                ? lista.map(({ item, indice }) => {
+                    const enCarrito = carritoPedido[clavePedido(item)];
+                    const unidad = unidadPedido(item);
+                    const accion = enCarrito
+                        ? `<b>${cantidadJefe(enCarrito.cantidad)}</b><small>${textoJefe(unidad)}</small>`
+                        : '+';
+                    return `<div class="pedido-fila">
+                        <button type="button" class="pedido-cuerpo" data-pedido="${indice}">
+                            <span class="pedido-nombre">${textoJefe(item.producto)}</span>
+                            <span class="pedido-meta"><b class="pedido-stock">${cantidadJefe(item.stock_actual)}</b><span class="pedido-pedir">pedir ${cantidadJefe(item.a_pedir)} ${textoJefe(unidad)}</span></span>
+                        </button>
+                        <button type="button" class="pedido-mas${enCarrito ? ' en-carrito' : ''}" data-sumar="${indice}" aria-label="Sumar al pedido">${accion}</button>
+                    </div>`;
+                }).join('')
+                : `<p class="pedido-vacio">${faltantesEnPantalla.length ? 'Ese proveedor no tiene faltantes.' : 'Todo el stock está por encima del mínimo.'}</p>`;
+            cuerpo.innerHTML = `
+                <div class="pedido-lista">
+                    ${filas}
+                </div>
+                <div data-herramienta="whatsapp" data-titulo="Mensaje al frigorífico" class="pedido-wsp">
+                    <textarea id="txtWspPedido" readonly>${textoJefe(mensajePedido)}</textarea>
+                    <button type="button" class="btn btn-primary pedido-copiar" onclick="copiarPedidoWhatsapp(event)">Copiar para WhatsApp</button>
+                </div>`;
         }
 
         function pintarBarraJefe(panel, dato) {
@@ -2961,59 +3253,11 @@ const $ = id => document.getElementById(id);
             // 5. PEDIDOS AL FRIGORÍFICO (ABASTECIMIENTO & WHATSAPP)
             if (panel === 'pedidos' && $('pedidosCuerpo')) {
                 const ped = dato.pedidos || {};
-                const faltantes = ped.faltantes || [];
-
-                let html = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px;">
-                    <!-- Tabla de Artículos a Pedir -->
-                    <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
-                        <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">
-                            🥩 Faltantes y Stock a Pedir (${faltantes.length})
-                        </div>
-                        <div style="overflow-x:auto; -webkit-overflow-scrolling:touch;">
-                            <table class="data-table" style="width:100%; border-collapse:collapse;">
-                                <thead>
-                                    <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
-                                        <th style="padding:8px 10px; text-align:left;">Producto</th>
-                                        <th style="padding:8px 10px; text-align:center;">Stock</th>
-                                        <th style="padding:8px 10px; text-align:center;">Mín</th>
-                                        <th style="padding:8px 10px; text-align:center; font-weight:800; color:#dc2626;">A Pedir</th>
-                                        <th style="padding:8px 10px; text-align:right;">Subtotal</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
-                if (faltantes.length === 0) {
-                    html += `<tr><td colspan="5" style="padding:16px; text-align:center; color:#64748b;">¡Excelente! Todo el stock está por encima del mínimo.</td></tr>`;
-                } else {
-                    faltantes.forEach(item => {
-                        html += `
-                        <tr style="border-bottom:1px solid #f1f5f9; font-size:12px;">
-                            <td style="padding:8px 10px; font-weight:700; color:#1e293b;">${textoJefe(item.producto)}</td>
-                            <td style="padding:8px 10px; text-align:center; color:#64748b;">${item.stock_actual}</td>
-                            <td style="padding:8px 10px; text-align:center; color:#64748b;">${item.minimo}</td>
-                            <td style="padding:8px 10px; text-align:center; font-weight:900; color:#dc2626; background:#fef2f2; border-radius:6px;">${item.a_pedir}</td>
-                            <td style="padding:8px 10px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(item.subtotal)}</td>
-                        </tr>`;
-                    });
-                }
-                html += `</tbody></table></div></div>
-
-                    <!-- Mensaje de WhatsApp Listo -->
-                    <div data-herramienta="whatsapp" data-titulo="Mensaje al frigorífico" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; display:flex; flex-direction:column;">
-                        <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:8px;">
-                            📲 Mensaje de WhatsApp Listo para el Frigorífico
-                        </div>
-                        <div style="font-size:12px; color:#64748b; margin-bottom:10px;">
-                            Generado automáticamente según el quiebre de stock del negocio.
-                        </div>
-                        <textarea id="txtWspPedido" readonly style="flex:1; min-height:220px; font-family:monospace; font-size:12px; padding:12px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; resize:none; line-height:1.5;">${textoJefe(ped.mensaje_whatsapp || '')}</textarea>
-                        <button type="button" class="btn btn-primary" onclick="navigator.clipboard.writeText($('txtWspPedido').value); alert('¡Mensaje copiado al portapapeles! Abrí WhatsApp y pegalo.');" style="margin-top:12px; padding:12px; border-radius:10px; font-weight:800; background:#16a34a; border-color:#16a34a; font-size:14px; display:flex; align-items:center; justify-content:center; gap:8px;">
-                            📋 Copiar para WhatsApp
-                        </button>
-                    </div>
-                </div>`;
-
-                $('pedidosCuerpo').innerHTML = html;
+                faltantesEnPantalla = ped.faltantes || [];
+                mensajePedido = ped.mensaje_whatsapp || '';
+                const nombres = new Set(faltantesEnPantalla.map(item => item.proveedor || 'Sin proveedor'));
+                if (filtroProveedorPedido && !nombres.has(filtroProveedorPedido)) filtroProveedorPedido = '';
+                pintarFaltantes();
             }
 
             // 4. PROVEEDOR
@@ -3048,13 +3292,28 @@ const $ = id => document.getElementById(id);
 
         function marcarEntrada(name) {
             const boton = $('menuToggle');
-            if (!boton) return;
             const raiz = vistasRaiz.has(name);
             if (raiz) moduloActual = name;
-            boton.classList.toggle('es-atras', !raiz);
-            const etiqueta = raiz ? 'Opciones del módulo' : 'Volver';
-            boton.setAttribute('aria-label', etiqueta);
-            boton.title = etiqueta;
+            if (boton) {
+                boton.classList.toggle('es-atras', !raiz);
+                const etiqueta = raiz ? 'Opciones del módulo' : 'Volver';
+                boton.setAttribute('aria-label', etiqueta);
+                boton.title = etiqueta;
+            }
+            const refresh = $('btnRefresh');
+            if (refresh) {
+                const filtrar = name === 'pedidos';
+                refresh.classList.toggle('es-filtro', filtrar);
+                if (!filtrar) refresh.classList.remove('filtrando');
+                refresh.setAttribute('aria-label', filtrar ? 'Filtrar proveedor' : 'Actualizar');
+                refresh.title = filtrar ? 'Filtrar proveedor' : 'Actualizar';
+                const icono = refresh.querySelector('svg');
+                if (icono && !icono.classList.contains('ico-filtro')) icono.classList.add('ico-refresh');
+                if (!refresh.querySelector('.ico-filtro')) {
+                    refresh.insertAdjacentHTML('beforeend', '<svg class="ico-filtro" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5z"/></svg>');
+                }
+            }
+            pintarCarritoFlotante();
         }
 
         function switchView(name) {
@@ -3092,6 +3351,7 @@ const $ = id => document.getElementById(id);
             if ($('jefeBar')) {
                 $('jefeBar').classList.toggle('field-hidden', !jefeVistas.includes(name));
             }
+            cerrarFaltante();
             if (['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) cargarJefe(name);
             if ($('cobranzasBar')) {
                 if (name === 'cobranzas') {
@@ -3181,6 +3441,10 @@ const $ = id => document.getElementById(id);
         
         $('btnRefresh').addEventListener('click', () => {
             const btn = $('btnRefresh');
+            if (btn.classList.contains('es-filtro')) {
+                abrirFiltroProveedor();
+                return;
+            }
             if (btn.disabled) return;
             btn.disabled = true;
             btn.classList.add('btn-spinning');
@@ -4395,6 +4659,15 @@ const $ = id => document.getElementById(id);
         window.addEventListener('offline', updateConnectionStatus);
         
         document.getElementById('offlineBadge')?.addEventListener('click', sincronizarSolicitudesPendientes);
+        document.getElementById('pedidosCuerpo')?.addEventListener('click', (ev) => {
+            const sumar = ev.target.closest('[data-sumar]');
+            if (sumar) {
+                sumarAlCarrito(Number(sumar.dataset.sumar));
+                return;
+            }
+            const fila = ev.target.closest('[data-pedido]');
+            if (fila) abrirFaltante(Number(fila.dataset.pedido));
+        });
         actualizarUIOffline();
         window.abrirNuevaVenta = function() {
             $('formRemito').reset();
