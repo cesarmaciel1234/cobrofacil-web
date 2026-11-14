@@ -66,6 +66,17 @@ def guardar_parte(
                     "DELETE FROM pos_base WHERE tabla = ? AND sucursal_id = ?",
                     (tabla, sid),
                 )
+        else:
+            if sid is None:
+                conn.execute(
+                    "DELETE FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL AND parte = ?",
+                    (tabla, parte),
+                )
+            else:
+                conn.execute(
+                    "DELETE FROM pos_base WHERE tabla = ? AND sucursal_id = ? AND parte = ?",
+                    (tabla, sid, parte),
+                )
         conn.execute(
             """
             INSERT INTO pos_base
@@ -108,6 +119,22 @@ def resumen_base() -> list[dict]:
         }
         for r in rows
     ]
+
+
+def ultima_carga(sucursal_id: int | None = None) -> str | None:
+    """Cuándo llegó el último trozo del libro a la nube."""
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        if sucursal_id is None:
+            row = conn.execute("SELECT MAX(actualizado_en) AS marca FROM pos_base").fetchone()
+        else:
+            row = conn.execute(
+                "SELECT MAX(actualizado_en) AS marca FROM pos_base WHERE sucursal_id = ?",
+                (int(sucursal_id),),
+            ).fetchone()
+    if not row:
+        return None
+    return row["marca"] or None
 
 
 def listar_sucursales() -> list[dict]:
