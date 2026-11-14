@@ -185,6 +185,12 @@ def _olvidar_tabla(tabla: str) -> None:
         for clave in list(_cache):
             if clave[1] == tabla:
                 _cache.pop(clave, None)
+    if tabla in ("clientes", "cuenta_corriente", "configuracion"):
+        try:
+            from app.services.pos_jefe import olvidar_cartera
+            olvidar_cartera()
+        except Exception:
+            pass
 
 
 def _sello(conn, tabla: str, sucursal_id: int | None) -> tuple:

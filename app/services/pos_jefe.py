@@ -1,12 +1,23 @@
 """Cara del panel del jefe, contabilidad y admin. Los números salen del libro de Cobro Fácil guardado en la nube."""
 from __future__ import annotations
 
+import threading
+import time
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.services.pos_base import filas_de, listar_sucursales, ultima_carga
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
+_CARTERA_TTL = 45.0
+_cartera_lock = threading.Lock()
+_cartera_cache: dict[tuple, tuple[float, dict]] = {}
+
+
+def olvidar_cartera() -> None:
+    """El libro cambió: la cartera armada deja de servir."""
+    with _cartera_lock:
+        _cartera_cache.clear()
 
 
 def _indice(columnas: list) -> dict[str, int]:
@@ -400,8 +411,20 @@ def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
     }
 
 
-def _interes_del_libro(sucursal_id: int | None) -> dict[str, dict]:
-    """Días y mantenimiento reales, un cliente a la vez, con una sola lectura del libro."""
+def _porcentaje(tasa) -> int:
+    try:
+        return int(round(float(tasa) * 100))
+    except (TypeError, ValueError):
+        return 0
+
+
+def _interes_del_libro(
+    sucursal_id: int | None,
+    columnas: list | None = None,
+    filas: list | None = None,
+    solo: set[str] | None = None,
+) -> tuple[dict[str, dict], str, str]:
+    """Días y mantenimiento del libro. Una sola lectura, y solo de quien tiene deuda."""
     from app.services.pos_historial import _activacion, _dicts, _politica
     from app.services.pos_interes import proyectar_interes
 
@@ -411,22 +434,32 @@ def _interes_del_libro(sucursal_id: int | None) -> dict[str, dict]:
     configs = _dicts(col_cfg, filas_cfg) if col_cfg else []
     activacion = _activacion(configs)
     tasa_base, tasa_apal, plazo = _politica(configs)
+    tarifa_base = f"{_porcentaje(tasa_base)}%"
+    tarifa_morosa = f"{_porcentaje(tasa_base + tasa_apal)}%"
 
-    columnas, filas = filas_de("cuenta_corriente", sucursal_id)
-    if not columnas:
-        return {}
+    if columnas is None or filas is None:
+        columnas, filas = filas_de("cuenta_corriente", sucursal_id)
+    if not columnas or (solo is not None and not solo):
+        return {}, tarifa_base, tarifa_morosa
     idx = _indice(columnas)
     if "cliente_id" not in idx:
-        return {}
+        return {}, tarifa_base, tarifa_morosa
     grupos: dict[str, list[dict]] = {}
     for fila in filas:
         cliente = _clave(_valor(fila, idx, "cliente_id"))
-        if not cliente:
+        if not cliente or (solo is not None and cliente not in solo):
             continue
         desc = str(_valor(fila, idx, "descripcion") or "")
         if "MANTENIMIENTO" in desc.upper():
             continue
-        grupos.setdefault(cliente, []).append({columnas[i]: fila[i] for i in range(min(len(columnas), len(fila)))})
+        grupos.setdefault(cliente, []).append({
+            "tipo": _valor(fila, idx, "tipo"),
+            "descripcion": desc,
+            "fecha": _valor(fila, idx, "fecha"),
+            "id": _valor(fila, idx, "id"),
+            "monto": _valor(fila, idx, "monto"),
+            "venta_id": _valor(fila, idx, "venta_id"),
+        })
 
     ahora = datetime.now(_ZONA).replace(tzinfo=None)
     salida: dict[str, dict] = {}
@@ -449,7 +482,7 @@ def _interes_del_libro(sucursal_id: int | None) -> dict[str, dict]:
             "mantenimiento": round(float(proyeccion.get("interes_acumulado") or 0), 2),
             "en_apalancamiento": any(t.get("en_apalancamiento") for t in tickets.values()),
         }
-    return salida
+    return salida, tarifa_base, tarifa_morosa
 
 
 def _nombres_en_crm() -> dict[str, dict]:
@@ -500,6 +533,21 @@ def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
 
 
 def _cartera_admin(sucursal_id: int | None = None) -> dict:
+    from app.services.pos_base import _ambito_cache
+
+    clave = (_ambito_cache(), sucursal_id)
+    ahora = time.monotonic()
+    with _cartera_lock:
+        guardada = _cartera_cache.get(clave)
+        if guardada and ahora - guardada[0] < _CARTERA_TTL:
+            return guardada[1]
+    resultado = _calcular_cartera(sucursal_id)
+    with _cartera_lock:
+        _cartera_cache[clave] = (time.monotonic(), resultado)
+    return resultado
+
+
+def _calcular_cartera(sucursal_id: int | None = None) -> dict:
     columnas, filas = _filas_clientes(sucursal_id)
     idx = _indice(columnas)
     total_deuda = 0.0
@@ -526,7 +574,17 @@ def _cartera_admin(sucursal_id: int | None = None) -> dict:
                 if f_fecha.startswith(mes_actual):
                     cobros_mes += _numero(_valor(f, idx_cc, "monto"))
 
-    intereses = _interes_del_libro(sucursal_id)
+    con_deuda_ids = {
+        _clave(_valor(fila, idx, "id"))
+        for fila in filas
+        if _clave(_valor(fila, idx, "id")) and _numero(_valor(fila, idx, "deuda_actual", "deuda")) > 0.009
+    }
+    intereses, tarifa_base, tarifa_morosa = _interes_del_libro(
+        sucursal_id,
+        columnas=col_cc,
+        filas=filas_cc,
+        solo=con_deuda_ids,
+    )
     for fila in filas:
         deuda = _numero(_valor(fila, idx, "deuda_actual", "deuda"))
         nombre = str(_valor(fila, idx, "nombre") or "Cliente").strip()
@@ -540,7 +598,7 @@ def _cartera_admin(sucursal_id: int | None = None) -> dict:
         if cliente_id in intereses:
             dias = int(libro.get("dias") or 0)
             mantenimiento = float(libro["mantenimiento"])
-            tarifa_str = "10%" if libro.get("en_apalancamiento") else "3%"
+            tarifa_str = tarifa_morosa if libro.get("en_apalancamiento") else tarifa_base
             origen = "libro"
         elif dias_crudo not in (None, ""):
             dias = int(_numero(dias_crudo))
