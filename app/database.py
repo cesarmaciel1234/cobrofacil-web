@@ -78,7 +78,9 @@ class PostgresCursorWrapper:
 
         is_insert = query.strip().upper().startswith("INSERT")
         if is_insert and "RETURNING" not in query.upper():
-            query += " RETURNING id"
+            # sync_nodos se identifica por device_id. Pedir id corta el guardado y la consola se llena de 500.
+            if not re.search(r"\bINTO\s+sync_nodos\b", query, re.IGNORECASE):
+                query += " RETURNING id"
 
         self.cursor.execute(query, vars)
         

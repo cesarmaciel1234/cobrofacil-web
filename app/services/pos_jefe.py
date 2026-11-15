@@ -6,6 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.services.pos_base import filas_de, listar_sucursales, ultima_carga
+from app.services.pos_historial import historial_ventas
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 _cartera_lock = threading.Lock()
@@ -819,6 +820,7 @@ def panel(
     periodo: str = "Hoy",
     desde: str | None = None,
     hasta: str | None = None,
+    filtro: dict | None = None,
 ) -> dict:
     dato = _armar_panel(
         nombre,
@@ -826,6 +828,7 @@ def panel(
         periodo=periodo,
         desde=desde,
         hasta=hasta,
+        filtro=filtro,
     )
     dato["actualizado_en"] = ultima_carga(sucursal_id)
     return dato
@@ -837,6 +840,7 @@ def _armar_panel(
     periodo: str = "Hoy",
     desde: str | None = None,
     hasta: str | None = None,
+    filtro: dict | None = None,
 ) -> dict:
     sucursales_disp = listar_sucursales()
 
@@ -952,17 +956,17 @@ def _armar_panel(
             "sucursal_id": sucursal_id,
         }
     if nombre == "ticket":
-        del_dia = [v for v in ventas if v["dia"] == dia]
-        del_dia.sort(key=lambda v: v["fecha"], reverse=True)
+        libro = historial_ventas(sucursal_id, filtro, datetime.now(_ZONA).date().isoformat())
         return {
             "ok": True,
-            "libro": True,
+            "libro": libro["libro"],
             "panel": nombre,
             "resumen": resumen,
-            "tickets": [
-                {"id": v["id"], "fecha": v["fecha"], "total": round(v["total"], 2), "pago": v["pago"]}
-                for v in del_dia[:80]
-            ],
+            "tickets": libro["tickets"],
+            "filtrado": libro["filtrado"],
+            "tickets_ok": libro["tickets_ok"],
+            "cajas": libro["cajas"],
+            "recorte": libro["recorte"],
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }

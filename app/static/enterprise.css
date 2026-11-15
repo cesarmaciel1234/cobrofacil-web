@@ -183,33 +183,6 @@ body::before {
     border-radius: 0 3px 3px 0;
 }
 
-.sidebar-history {
-    display: flex; flex-direction: column;
-    border-top: 1px solid var(--border-subtle);
-    margin-top: 4px;
-}
-.hist-list { padding: 0 10px 10px; }
-
-.hist-item {
-    padding: 10px 12px; margin-bottom: 6px;
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    cursor: pointer;
-    transition: all 0.15s var(--ease);
-}
-.hist-item:hover { border-color: var(--border-strong); background: var(--bg-surface-2); transform: translateY(-1px); box-shadow: var(--shadow-sm); }
-.hist-item.vencido { border-color: rgba(239, 68, 68, 0.35); background: var(--danger-muted); }
-.hist-item.proximo { border-color: rgba(245, 158, 11, 0.3); }
-.hist-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
-.hist-alias { font-size: 12px; font-weight: 600; }
-.hist-pagar { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
-.hist-msg { font-size: 10px; margin-top: 5px; font-weight: 600; }
-.hist-msg.vencido { color: var(--danger); }
-.hist-msg.proximo { color: var(--warning); }
-.hist-msg.ok { color: var(--success); }
-.hist-empty { padding: 16px; font-size: 11px; color: var(--text-tertiary); text-align: center; }
-
 .sidebar-foot {
     padding: 14px 20px;
     border-top: 1px solid var(--border-subtle);
@@ -838,7 +811,7 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
 .venc-banner.hoy { background: var(--warning-muted); color: var(--warning); border: 1px solid rgba(245,158,11,0.3); }
 
 /* ─── Views & misc ─── */
-.view { display: none; animation: fadeIn 0.25s var(--ease); }
+.view { display: none; }
 .view.active { display: block; }
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
@@ -1801,11 +1774,10 @@ select.periodo-pill.active option { color: #0F172A; }
         right: 0;
         height: calc(60px + env(safe-area-inset-bottom, 0px));
         padding-bottom: env(safe-area-inset-bottom, 0px);
-        background: rgba(15, 23, 42, 0.94);
-        backdrop-filter: blur(20px);
-        -webkit-backdrop-filter: blur(20px);
+        background: #0f172a;
         border-top: 1px solid rgba(255, 255, 255, 0.08);
         z-index: 999;
+        touch-action: manipulation;
         justify-content: space-around;
         align-items: center;
         box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.25);
@@ -1822,12 +1794,14 @@ select.periodo-pill.active option { color: #0F172A; }
         font-weight: 700;
         letter-spacing: 0.02em;
         gap: 3px;
-        padding: 6px 10px;
-        min-width: 50px;
+        padding: 4px 0;
+        min-width: 0;
+        flex: 1 1 0;
+        width: 0;
         cursor: pointer;
         border-radius: 12px;
-        transition: all 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
         -webkit-tap-highlight-color: transparent;
+        touch-action: manipulation;
         user-select: none;
         -webkit-user-select: none;
         text-decoration: none;
@@ -1835,10 +1809,9 @@ select.periodo-pill.active option { color: #0F172A; }
     .pwa-nav-btn .pwa-icon {
         font-size: 18px;
         line-height: 1;
-        transition: transform 0.18s ease;
     }
     .pwa-nav-btn:active {
-        transform: scale(0.92);
+        color: #e2e8f0;
     }
     .pwa-nav-btn.active {
         color: #38bdf8;
@@ -1902,13 +1875,18 @@ select.periodo-pill.active option { color: #0F172A; }
     bottom: 0;
     left: 0;
     right: 0;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     height: calc(60px + env(safe-area-inset-bottom, 0px));
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    background: rgba(15, 23, 42, 0.94);
+    padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+    background: #0f172a;
     border-top: 1px solid rgba(255, 255, 255, 0.08);
     z-index: 1001;
-    justify-content: space-around;
+    justify-content: space-between;
     align-items: center;
+    touch-action: manipulation;
+    overflow: hidden;
 }
 .herramientas-detalle {
     margin: 8px 8px 12px;
@@ -1985,9 +1963,35 @@ select.periodo-pill.active option { color: #0F172A; }
 .pedido-dato { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #f1f5f9; font-size: 14px; }
 .pedido-dato span { color: #64748b; }
 .pedido-cerrar { margin-top: 14px; width: 100%; height: 46px; border: 0; border-radius: 14px; background: #111827; color: #fff; font-weight: 700; }
+.filtro-venta { display: flex; flex-direction: column; overflow: hidden; }
+.filtro-venta label { display: block; margin-top: 12px; color: #64748b; font-size: 12px; font-weight: 700; }
+.filtro-venta label[hidden] { display: none; }
+.filtro-venta input[type="search"],
+.filtro-venta input[type="text"],
+.filtro-venta input[type="date"],
+.filtro-venta select { display: block; width: 100%; height: 44px; margin-top: 4px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 12px; font: inherit; color: #0f172a; background: #fff; }
+.filtro-periodos { display: flex; gap: 6px; margin-top: 12px; }
+.filtro-periodo { flex: 1; min-height: 40px; padding: 0 6px !important; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; color: #0f172a; font-weight: 800; }
+.filtro-periodo.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+.filtro-venta .pedido-cerrar { flex: none; }
+.filtro-cabeza { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.filtro-cabeza .pedido-sheet-titulo { margin-bottom: 0; }
+.filtro-tuerca { width: 36px; height: 36px; min-height: 36px; padding: 0 !important; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; color: #64748b; display: inline-flex; align-items: center; justify-content: center; }
+.filtro-tuerca.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+.filtro-horas { display: flex; gap: 8px; }
+.filtro-horas[hidden] { display: none; }
+.filtro-horas label { flex: 1; margin-top: 12px; }
+.filtro-venta input[type="time"] { display: block; width: 100%; height: 44px; margin-top: 4px; border: 1px solid #e2e8f0; border-radius: 12px; padding: 0 12px; font: inherit; color: #0f172a; background: #fff; }
+.topbar-empresa { width: 36px; height: 36px; min-height: 36px; padding: 0 !important; border: 0; border-radius: 12px; background: transparent; color: #0f172a; display: inline-flex; align-items: center; justify-content: center; }
+.topbar-empresa.activa { background: #0f172a; color: #fff; }
+.ticket-suma { margin: 0 0 8px; padding: 8px 12px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 10px; font-weight: 700; color: #0f172a; }
+#ticketCuerpo tr.ticket-fila { cursor: pointer; }
+#ticketCuerpo tr.ticket-cancel td { color: #b91c1c; }
 .modulo-esencial { margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.4; }
 .pwa-nav-btn {
     display: flex;
+    flex: 1 1 0;
+    width: 0;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -1998,9 +2002,13 @@ select.periodo-pill.active option { color: #0F172A; }
     font-size: 10px;
     font-weight: 700;
     text-decoration: none;
-    min-width: 52px;
+    min-width: 0;
+    max-width: 20%;
     min-height: 48px;
+    padding: 4px 0;
     cursor: pointer;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
 }
 .pwa-nav-btn.active { color: #38bdf8; }
 .nav-sucursal { padding: 0 10px 8px; }
@@ -2017,6 +2025,226 @@ select.periodo-pill.active option { color: #0F172A; }
     justify-content: flex-start;
 }
 .content { padding-bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+
+#view-cartera .buscar {
+    width: 100%;
+    height: 44px;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    background: #fff;
+    padding: 0 14px;
+    margin-bottom: 12px;
+}
+html, body { max-width: 100%; overflow-x: hidden; }
+.main, .content, .view { max-width: 100%; min-width: 0; }
+#view-cartera, #carteraLista, #view-cartera .cards, #view-cartera .debt-card { max-width: 100%; min-width: 0; }
+#view-cartera .resumen {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 2px;
+    width: 100%;
+    margin: 0 0 14px;
+    padding: 12px 4px;
+    border-radius: 18px;
+    background: #0f172a;
+}
+#view-cartera .resumen button {
+    border: 0;
+    background: transparent;
+    padding: 4px 2px;
+    cursor: pointer;
+    min-width: 0;
+    border-radius: 12px;
+    color: inherit;
+}
+#view-cartera .resumen button.on { background: rgba(255, 255, 255, 0.08); }
+#view-cartera .resumen small {
+    display: block;
+    color: #94a3b8;
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+#view-cartera .resumen b {
+    display: block;
+    margin-top: 3px;
+    font-size: clamp(0.72rem, 3.4vw, 0.92rem);
+    letter-spacing: -0.03em;
+    color: #f8fafc;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+#view-cartera .resumen .sub {
+    display: block;
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 9px;
+    font-weight: 650;
+}
+#barDeuda { color: #ea580c; }
+#barRiesgo { color: #ef4444; }
+#barCobros { color: #059669; }
+#view-cartera .cards { display: grid; gap: 14px; }
+#view-cartera .debt-card {
+    background: linear-gradient(160deg, #1e293b, #0f172a);
+    color: #fff;
+    border-radius: 22px;
+    padding: 18px 18px 16px;
+    border: 1px solid rgba(255,255,255,0.08);
+    cursor: pointer;
+}
+#view-cartera .card-top, #view-cartera .card-foot {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+#view-cartera .who { display: flex; gap: 12px; min-width: 0; }
+#view-cartera .avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: rgba(255,255,255,0.06);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex: none;
+}
+#view-cartera .who h2 {
+    margin: 0;
+    color: #fff;
+    font-size: 1.15rem;
+    letter-spacing: -0.02em;
+    line-height: 1.15;
+}
+#view-cartera .pill {
+    display: inline-block;
+    margin-top: 6px;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.1);
+    color: #cbd5e1;
+    font-size: 11px;
+    font-weight: 700;
+}
+#view-cartera .late {
+    background: #ffe4e6;
+    color: #e11d48;
+    border-radius: 999px;
+    padding: 6px 10px;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 1.15;
+    text-align: center;
+    flex: none;
+}
+#view-cartera .late.ok { background: #dcfce7; color: #15803d; }
+#view-cartera .metrics {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 16px 0 14px;
+    padding: 14px 12px;
+    border-radius: 16px;
+    background: rgba(0,0,0,0.22);
+}
+#view-cartera .metrics span { display: block; color: #94a3b8; font-size: 11px; font-weight: 700; }
+#view-cartera .metrics strong { display: block; margin-top: 4px; font-size: 15px; }
+#view-cartera .card-foot { align-items: flex-end; padding-top: 8px; min-width: 0; }
+#view-cartera .amount-label { color: #94a3b8; font-size: 11px; font-weight: 700; }
+#view-cartera .amount { display: block; margin-top: 2px; font-size: clamp(1.35rem, 7vw, 1.7rem); font-weight: 800; }
+#view-cartera .amount.hot { color: #fecaca; }
+#view-cartera .amount.cool { color: #86efac; }
+#view-cartera .foot-note { color: #94a3b8; font-size: 12px; text-align: right; }
+#view-cartera .empty { padding: 48px 12px; text-align: center; color: #64748b; }
+#view-cartera .empty[hidden], #view-cartera .ficha[hidden], #carteraLista[hidden] { display: none !important; }
+#view-cartera .ficha-numeros {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+    margin: 14px 0;
+}
+#view-cartera .ficha-numeros div, #view-cartera .ficha-total {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 14px;
+    padding: 10px 12px;
+}
+#view-cartera .ficha-numeros span, #view-cartera .ficha-total span {
+    display: block;
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 800;
+}
+#view-cartera .ficha-numeros strong { display: block; margin-top: 3px; font-size: 14px; }
+#view-cartera .ficha-total { margin-bottom: 14px; }
+#view-cartera .ficha-total strong { display: block; margin-top: 2px; font-size: 1.35rem; }
+#view-cartera .ficha-nota { margin: 0 0 12px; color: #64748b; font-size: 12px; font-weight: 700; }
+#view-cartera .movs { display: flex; flex-direction: column; gap: 8px; }
+#view-cartera .mov {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    min-height: 64px;
+    padding: 12px 14px;
+    border: 1px solid #e5e7eb;
+    border-radius: 16px;
+    background: #fff;
+    text-align: left;
+    cursor: pointer;
+    color: #111827;
+}
+#view-cartera .mov strong, #view-cartera .mov-num b { display: block; font-size: 14px; }
+#view-cartera .mov span, #view-cartera .mov-num span { display: block; margin-top: 3px; color: #64748b; font-size: 12px; }
+#view-cartera .mov-num { text-align: right; flex: none; }
+#view-cartera .mov.cobro .mov-num b { color: #047857; }
+#view-cartera .mov.venta .mov-num b { color: #dc2626; }
+#sheetHost[hidden] { display: none !important; }
+#btnPerfil[hidden], #btnRefresh[hidden] { display: none !important; }
+.sheet-back {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    z-index: 1100;
+}
+.sheet {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1101;
+    max-height: min(88vh, 640px);
+    overflow: auto;
+    background: #fff;
+    border-radius: 24px 24px 0 0;
+    padding: 18px 18px calc(22px + env(safe-area-inset-bottom));
+    box-shadow: 0 -16px 40px rgba(15, 23, 42, 0.16);
+}
+.sheet h3 { margin: 0 0 4px; font-size: 1.25rem; }
+.sheet p { margin: 0 0 14px; color: #64748b; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.fact { background: #f8fafc; border-radius: 14px; padding: 10px 12px; }
+.fact span { display: block; color: #94a3b8; font-size: 11px; font-weight: 700; }
+.fact strong { display: block; margin-top: 2px; }
+button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: inherit; color: inherit; }
+.perfil-aviso { margin: 0 0 12px; color: #64748b; font-size: 13px; }
+.perfil-campo { display: block; margin-bottom: 10px; }
+.perfil-campo span { display: block; margin-bottom: 4px; color: #94a3b8; font-size: 11px; font-weight: 800; }
+.perfil-campo input { width: 100%; height: 44px; border: 1px solid #e5e7eb; border-radius: 12px; padding: 0 12px; }
+.sheet-close {
+    margin-top: 14px;
+    width: 100%;
+    height: 46px;
+    border: 0;
+    border-radius: 14px;
+    background: #111827;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+}
 
 
 

@@ -225,9 +225,31 @@ def auth_reset_password():
     return jsonify({"ok": True})
 
 
+def nombre_empresa_sesion():
+    """El nombre va en la plantilla. La barra no espera al script para pintarlo."""
+    if not is_authenticated():
+        return ""
+    empresa_id = session.get("empresa_id") or 1
+    try:
+        with get_db(empresa_id=0) as conn:
+            row = conn.execute(
+                "SELECT nombre FROM empresas WHERE id = ?",
+                (empresa_id,),
+            ).fetchone()
+            if row:
+                return row["nombre"] or ""
+    except Exception:
+        return ""
+    return ""
+
+
 @views_bp.route("/")
 def index():
-    resp = make_response(render_template("terminal.html", app_version=Config.APP_VERSION))
+    resp = make_response(render_template(
+        "terminal.html",
+        app_version=Config.APP_VERSION,
+        empresa_nombre=nombre_empresa_sesion(),
+    ))
     resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     resp.headers["Pragma"] = "no-cache"
     return resp
@@ -240,8 +262,8 @@ def pos():
 
 @views_bp.route("/cartera")
 def cartera():
-    """Vista de cartera de clientes estilo Cobro Fácil POS."""
-    return render_template("cartera_clientes.html")
+    """Cartera vive en la misma plantilla que el resto de los módulos."""
+    return redirect("/?view=cartera")
 
 
 @views_bp.route("/manifest.json")

@@ -4,13 +4,11 @@ Cinco botones. Cada uno es una carpeta. La pantalla muestra lo esencial. El men�
 
 ```
 barra
-├── ventas     vitrina
+├── ventas     botón Reporte, vitrina
 │   ├── alertas
-│   ├── rendimiento por sucursal
 │   ├── ranking de cortes
-│   └── tickets recientes
-├── cobros     cobros del día
-│   └── libro de auditoría
+│   └── rendimiento por sucursal
+├── cobros     botón Ventas, historial de tickets
 ├── caja       arqueo del día
 ├── cartera    tarjetas          página /cartera
 │   ├── sucursal y filtros
@@ -21,4 +19,4 @@ barra
     └── mensaje al frigorífico
 ```
 
-`armar.js` pinta la barra de Ventas y la de Cartera con esta misma lista.
+`armar.js` pinta la barra de Reporte y la de Cartera con esta misma lista.

@@ -425,13 +425,25 @@ def api_pos_jefe():
     periodo = (request.args.get("periodo") or "Hoy").strip()
     desde = request.args.get("desde")
     hasta = request.args.get("hasta")
+    filtro = None
+    if nombre == "ticket":
+        filtro = {
+            "texto": request.args.get("q") or "",
+            "metodo": request.args.get("pago") or "TODOS",
+            "alcance": request.args.get("alcance") or "dia",
+            "fecha": request.args.get("fecha") or "",
+            "historico": request.args.get("historico") in ("1", "true", "si"),
+            "hora_desde": request.args.get("hora_desde") or "00:00",
+            "hora_hasta": request.args.get("hora_hasta") or "23:59",
+            "caja": request.args.get("caja") or "",
+        }
     if nombre not in (
         "reporte", "jefe", "vitrina", "contabilidad", "admin", "cartera", "clientes",
         "digitales", "cobros_digitales", "pedidos", "abastecimiento",
         "proveedor", "promedio", "ticket"
     ):
         return jsonify({"error": "Panel desconocido"}), 400
-    return jsonify(panel(nombre, sucursal_id=sucursal_id, periodo=periodo, desde=desde, hasta=hasta))
+    return jsonify(panel(nombre, sucursal_id=sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro))
 
 
 @api_bp.route("/pos/sucursales", methods=["GET"])

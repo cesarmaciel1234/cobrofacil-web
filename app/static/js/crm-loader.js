@@ -56,6 +56,7 @@
     }
 
     async function loadAllCore(opts = {}) {
+        if (!document.getElementById('kpiMeta')) return;
         const forzarServidor = !!opts.forzarServidor;
         const sincronizarOutbox = !!opts.sincronizarOutbox;
         const enSegundoPlano = !!opts.enSegundoPlano;
@@ -330,7 +331,9 @@
             document.documentElement.dataset.boot = 'cached';
         }
 
-        if (new URLSearchParams(window.location.search).get('view')) {
+        if (window.__barraPedido) {
+            bus().emit('switchView', window.__barraPedido);
+        } else if (new URLSearchParams(window.location.search).get('view')) {
             bus().emit('applyPwaDeepLink');
         } else {
             bus().emit('switchView', 'reporte');

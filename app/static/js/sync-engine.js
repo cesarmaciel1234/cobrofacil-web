@@ -308,16 +308,24 @@
 
         async pushNode(snapshot) {
             if (!this._api || !navigator.onLine || !snapshot) return null;
-            return this._api('/api/sync/nodo', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    device_id: this.deviceId,
-                    etiqueta: this.etiqueta,
-                    snapshot,
-                    updated_at_utc: this.utcNow(),
-                }),
-            });
+            const ahora = Date.now();
+            if (this._nodoEn && ahora - this._nodoEn < 60000) return null;
+            this._nodoEn = ahora;
+            try {
+                return await this._api('/api/sync/nodo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        device_id: this.deviceId,
+                        etiqueta: this.etiqueta,
+                        snapshot,
+                        updated_at_utc: this.utcNow(),
+                    }),
+                });
+            } catch (err) {
+                this._nodoEn = Date.now() - 45000;
+                throw err;
+            }
         },
 
         async syncSafe(options) {

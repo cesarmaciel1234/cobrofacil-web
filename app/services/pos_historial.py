@@ -161,11 +161,18 @@ def _proyeccion(movimientos: list[dict]) -> dict:
         return {"tickets": {}, "interes_acumulado": 0.0}
 
 
+_mov_armado: dict[tuple, list[dict]] = {}
+
+
 def movimientos_de(pos_id) -> list[dict]:
     columnas, crudas = filas_de("cuenta_corriente")
     if not columnas:
         return []
     buscado = str(pos_id)
+    clave = (id(crudas), buscado)
+    guardado = _mov_armado.get(clave)
+    if guardado is not None:
+        return guardado
     filas = [
         fila for fila in _dicts(columnas, crudas)
         if str(fila.get("cliente_id")) == buscado
@@ -174,6 +181,9 @@ def movimientos_de(pos_id) -> list[dict]:
     tickets = _proyeccion(filas).get("tickets") or {}
     armadas = [_armar(fila, tickets) for fila in filas]
     armadas.sort(key=lambda fila: (str(fila["fecha"]), int(fila["id"] or 0)), reverse=True)
+    if len(_mov_armado) > 300:
+        _mov_armado.clear()
+    _mov_armado[clave] = armadas
     return armadas
 
 
@@ -272,6 +282,11 @@ def ticket_de(venta_id) -> dict:
         "total": _num(_tomar(venta, idx, "total")),
         "pago": str(_tomar(venta, idx, "metodo_pago", "medio_pago") or "—"),
         "estado": str(_tomar(venta, idx, "estado") or ""),
+        "usuario": str(_tomar(venta, idx, "usuario") or ""),
+        "caja": _id_texto(_tomar(venta, idx, "caja_id")) or "1",
+        "cliente": str(_tomar(venta, idx, "cliente_nombre") or ""),
+        "descuento": _num(_tomar(venta, idx, "descuento")),
+        "recargo": _num(_tomar(venta, idx, "recargo")),
         "items": _items_del_ticket(buscado),
     }
 
@@ -294,3 +309,219 @@ def resumen_todos() -> list[dict]:
             "movimientos": len(dato["movimientos"]),
         })
     return salida
+
+
+_TOPE_LISTA = 400
+
+
+def es_credito(filtro: str) -> bool:
+    return str(filtro or "").strip().upper() in ("CRÉDITO", "CREDITO", "FIADO", "CLIENTES")
+
+
+def _minutos(hm: str | None):
+    if not hm:
+        return None
+    try:
+        partes = str(hm).strip().replace(".", ":").split(":")
+        return int(partes[0]) * 60 + int(partes[1] if len(partes) > 1 else 0)
+    except (TypeError, ValueError, IndexError):
+        return None
+
+
+def _dia_iso(valor) -> str:
+    texto = str(valor or "").strip().replace("T", " ")
+    return texto[:10] if len(texto) >= 10 and texto[4] == "-" else ""
+
+
+def _hora_minutos(valor):
+    texto = str(valor or "").strip().replace("T", " ")
+    if len(texto) < 16 or texto[13] != ":":
+        return None
+    try:
+        return int(texto[11:13]) * 60 + int(texto[14:16])
+    except ValueError:
+        return None
+
+
+def rango_fechas(alcance: str, fecha: str, historico: bool, hoy: str) -> tuple[str | None, str | None]:
+    """Día o mes del calendario. El histórico no recorta fechas."""
+    if historico:
+        return None, None
+    dia = _dia_iso(fecha) or hoy
+    if str(alcance or "").lower() == "mes":
+        anio, mes = int(dia[:4]), int(dia[5:7])
+        import calendar
+        ultimo = calendar.monthrange(anio, mes)[1]
+        return f"{anio:04d}-{mes:02d}-01", f"{anio:04d}-{mes:02d}-{ultimo:02d}"
+    return dia, dia
+
+
+def evaluar_ticket(
+    venta: dict,
+    nombres: str = "",
+    *,
+    texto: str = "",
+    metodo: str = "TODOS",
+    caja: str = "",
+    hora_desde: str = "00:00",
+    hora_hasta: str = "23:59",
+    fecha_ini: str | None = None,
+    fecha_fin: str | None = None,
+) -> tuple[bool, float]:
+    """Misma regla que el historial de Cobro Fácil. El segundo valor entra en la suma."""
+    dia = _dia_iso(venta.get("fecha"))
+    if fecha_ini and (not dia or dia < fecha_ini or dia > (fecha_fin or fecha_ini)):
+        return False, 0.0
+    m0 = _minutos(hora_desde)
+    m1 = _minutos(hora_hasta)
+    if m0 is not None and m1 is not None and not (m0 == 0 and m1 >= 23 * 60 + 59):
+        mins = _hora_minutos(venta.get("fecha"))
+        if mins is not None and not (m0 <= mins <= m1):
+            return False, 0.0
+    pago = str(venta.get("metodo_pago") or "").upper()
+    metodo_u = (metodo or "TODOS").upper()
+    credito = es_credito(metodo_u)
+    descuento = _num(venta.get("descuento"))
+    recargo = _num(venta.get("recargo"))
+    aporte = None
+    if metodo_u == "REDONDEO":
+        if descuento <= 0:
+            return False, 0.0
+    elif metodo_u == "RECARGO":
+        if recargo <= 0:
+            return False, 0.0
+    elif metodo_u != "TODOS":
+        if pago.startswith("MIXTO"):
+            if metodo_u == "EFECTIVO":
+                aporte = _num(venta.get("pago_efectivo")) - _num(venta.get("cambio"))
+            else:
+                if credito and "CLIENTE" not in pago:
+                    return False, 0.0
+                if not credito and "CLIENTE" in pago:
+                    return False, 0.0
+                aporte = _num(venta.get("pago_otro"))
+            if aporte <= 0:
+                return False, 0.0
+        elif credito:
+            if pago not in ("FIADO", "CLIENTES"):
+                return False, 0.0
+        elif metodo_u not in pago:
+            return False, 0.0
+    if str(caja or "").strip():
+        try:
+            if int(float(venta.get("caja_id") or 1)) != int(float(caja)):
+                return False, 0.0
+        except (TypeError, ValueError):
+            pass
+    busqueda = (texto or "").strip().lower()
+    if busqueda:
+        pool = (
+            f"{venta.get('id')} {venta.get('usuario') or ''} {venta.get('fecha') or ''} "
+            f"{venta.get('metodo_pago') or ''} {venta.get('total') or ''} {nombres or ''}"
+        ).lower()
+        if busqueda not in pool:
+            return False, 0.0
+    cancelada = str(venta.get("estado") or "").upper().startswith("CANCELAD")
+    if cancelada:
+        return True, 0.0
+    if aporte is not None:
+        return True, float(aporte)
+    return True, _num(venta.get("total"))
+
+
+def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> dict:
+    """Lista del historial. La suma no cuenta canceladas ni la parte de un mixto que no pidieron."""
+    pedido = filtro or {}
+    columnas, filas = filas_de("ventas", sucursal_id)
+    if not columnas:
+        return {
+            "libro": False,
+            "tickets": [],
+            "filtrado": 0.0,
+            "tickets_ok": 0,
+            "cajas": [],
+            "recorte": False,
+        }
+    idx = {str(col).lower(): i for i, col in enumerate(columnas)}
+    ini, fin = rango_fechas(
+        str(pedido.get("alcance") or "dia"),
+        str(pedido.get("fecha") or ""),
+        bool(pedido.get("historico")),
+        hoy,
+    )
+    texto = str(pedido.get("texto") or "")
+    nombres: dict[str, str] = {}
+    if texto.strip():
+        dcols, dfilas = filas_de("detalles_ventas", sucursal_id)
+        didx = {str(col).lower(): i for i, col in enumerate(dcols)}
+        enlace = next((nombre for nombre in ("id_venta", "venta_id", "ticket_id", "venta") if nombre in didx), "")
+        nombre_col = next((nombre for nombre in ("nombre_producto", "nombre", "producto") if nombre in didx), "")
+        if enlace and nombre_col:
+            for fila in dfilas:
+                vid = _id_texto(_tomar(fila, didx, enlace))
+                nombre = str(_tomar(fila, didx, nombre_col) or "").strip()
+                if vid and nombre:
+                    nombres[vid] = (nombres.get(vid, "") + " " + nombre).strip()
+    cajas = set()
+    elegidas = []
+    suma = 0.0
+    ok = 0
+    for fila in filas:
+        venta = {
+            "id": _id_texto(_tomar(fila, idx, "id")),
+            "fecha": str(_tomar(fila, idx, "fecha") or "").split(".")[0],
+            "total": _num(_tomar(fila, idx, "total")),
+            "usuario": str(_tomar(fila, idx, "usuario") or ""),
+            "estado": str(_tomar(fila, idx, "estado") or ""),
+            "metodo_pago": str(_tomar(fila, idx, "metodo_pago", "medio_pago") or "Efectivo"),
+            "descuento": _num(_tomar(fila, idx, "descuento")),
+            "recargo": _num(_tomar(fila, idx, "recargo")),
+            "caja_id": _tomar(fila, idx, "caja_id"),
+            "pago_efectivo": _num(_tomar(fila, idx, "pago_efectivo")),
+            "pago_otro": _num(_tomar(fila, idx, "pago_otro")),
+            "cambio": _num(_tomar(fila, idx, "cambio")),
+            "cliente_nombre": str(_tomar(fila, idx, "cliente_nombre") or ""),
+        }
+        try:
+            cajas.add(int(float(venta["caja_id"] or 1)))
+        except (TypeError, ValueError):
+            cajas.add(1)
+        mostrar, aporte = evaluar_ticket(
+            venta,
+            nombres.get(venta["id"], ""),
+            texto=texto,
+            metodo=str(pedido.get("metodo") or "TODOS"),
+            caja=str(pedido.get("caja") or ""),
+            hora_desde=str(pedido.get("hora_desde") or "00:00"),
+            hora_hasta=str(pedido.get("hora_hasta") or "23:59"),
+            fecha_ini=ini,
+            fecha_fin=fin,
+        )
+        if not mostrar:
+            continue
+        suma += aporte
+        if not str(venta["estado"] or "").upper().startswith("CANCELAD"):
+            ok += 1
+        elegidas.append(venta)
+    elegidas.sort(key=lambda item: (item["fecha"], item["id"]), reverse=True)
+    recorte = len(elegidas) > _TOPE_LISTA
+    visibles = elegidas[:_TOPE_LISTA]
+    return {
+        "libro": True,
+        "tickets": [
+            {
+                "id": item["id"],
+                "fecha": item["fecha"],
+                "total": round(item["total"], 2),
+                "pago": item["metodo_pago"],
+                "estado": item["estado"],
+                "caja": _id_texto(item["caja_id"]) or "1",
+                "cliente": item["cliente_nombre"],
+            }
+            for item in visibles
+        ],
+        "filtrado": round(suma, 2),
+        "tickets_ok": ok,
+        "cajas": sorted(cajas),
+        "recorte": recorte,
+    }

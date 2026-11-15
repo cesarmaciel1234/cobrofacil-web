@@ -107,7 +107,8 @@
         const pantallas = deTipo(activo, 'pantalla');
         const bloques = piezas();
         const vistas = deTipo(activo, 'vista');
-        const vacio = !pantallas.length && !bloques.length && !vistas.length;
+        const filtros = deTipo(activo, 'filtro');
+        const vacio = !pantallas.length && !bloques.length && !vistas.length && !filtros.length;
 
         lista.innerHTML = vacio
             ? '<p class="herramientas-vacio">Esta pantalla ya muestra lo esencial. No hay herramientas aparte.</p>'
@@ -136,6 +137,26 @@
             boton.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 elegir(id);
+            });
+            lista.appendChild(boton);
+        });
+
+        const filtroActual = global.CarteraLibro && global.CarteraLibro.filtroActual
+            ? global.CarteraLibro.filtroActual()
+            : '';
+        filtros.forEach((accion) => {
+            const boton = document.createElement('button');
+            boton.type = 'button';
+            boton.className = 'nav-item herramienta-btn' + (filtroActual === accion.filtro ? ' active' : '');
+            boton.dataset.filtro = accion.filtro;
+            boton.textContent = accion.titulo;
+            boton.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                cerrarMenu();
+                if (global.CarteraLibro) global.CarteraLibro.filtrar(accion.filtro);
+                lista.querySelectorAll('[data-filtro]').forEach((item) => {
+                    item.classList.toggle('active', item.dataset.filtro === accion.filtro);
+                });
             });
             lista.appendChild(boton);
         });

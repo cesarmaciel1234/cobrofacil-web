@@ -1,12 +1,12 @@
-/* Cobros. Primera pantalla: el aviso del módulo. La auditoría está en el menú. */
+/* Ventas. Primera pantalla: el historial de tickets del día. */
 window.BarraModulos = window.BarraModulos || [];
 window.BarraModulos.push({
     id: 'cobros',
-    nombre: 'Cobros',
-    icono: '💳',
-    vista: 'digitales',
-    pantalla: 'Cobros digitales del día',
+    nombre: 'Ventas',
+    icono: '🧺',
+    vista: 'ticket',
+    pantalla: 'Historial del día',
     herramientas: [
-        { id: 'auditoria', titulo: 'Libro de auditoría', tipo: 'bloque' }
+        { id: 'historial', titulo: 'Historial del día', tipo: 'pantalla' }
     ]
 });
