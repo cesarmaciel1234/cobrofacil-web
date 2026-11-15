@@ -2097,7 +2097,7 @@ const $ = id => document.getElementById(id);
                 }
                 await api('/auth/logout', { method: 'POST' });
             } catch (_) {}
-            window.location.href = '/login';
+            window.location.href = '/inicio';
         }
 
         $('btnLogout')?.addEventListener('click', logout);

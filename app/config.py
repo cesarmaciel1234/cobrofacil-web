@@ -39,6 +39,10 @@ class Config:
     )
     PERMANENT_SESSION_LIFETIME = 86400 * 400  # tope del navegador; cada visita lo renueva
     APP_VERSION = os.environ.get("APP_VERSION", "3.7")
+    INSTALADOR_URL = os.environ.get(
+        "INSTALADOR_URL",
+        "https://github.com/cesarmaciel1234/cobrofacil_instalador/releases/latest/download/Setup_CobroFacil_Web.exe",
+    )
 
     # Email informe empresarial (Resend HTTPS)
     SMTP_HOST = os.environ.get("SMTP_HOST", "")

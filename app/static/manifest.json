@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Master Total — CRM Frigorífico",
-  "short_name": "Master Total",
-  "description": "Panel financiero y comercial para distribuidoras de carne. Cobranzas, ventas y tesorería.",
+  "name": "Cobro Fácil",
+  "short_name": "Cobro Fácil",
+  "description": "Caja de la sucursal y tablero de todas las sucursales.",
   "lang": "es-AR",
   "dir": "ltr",
   "start_url": "/?source=pwa",

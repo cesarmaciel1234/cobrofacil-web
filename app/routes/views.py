@@ -243,8 +243,65 @@ def nombre_empresa_sesion():
     return ""
 
 
+def _url_descarga() -> str:
+    externa = os.environ.get("RENDER_EXTERNAL_URL", "").strip().rstrip("/")
+    if externa:
+        return externa + "/descarga"
+    return request.url_root.rstrip("/") + "/descarga"
+
+
+def _venta():
+    resp = make_response(render_template(
+        "venta.html",
+        adentro=bool(session.get("authenticated")),
+        instalador=Config.INSTALADOR_URL,
+    ))
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return resp
+
+
+@views_bp.route("/inicio")
+def inicio():
+    return _venta()
+
+
+@views_bp.route("/descarga")
+def descarga():
+    from app.services.descarga_release import enlace_temporal
+
+    try:
+        destino = enlace_temporal()
+    except Exception:
+        current_app.logger.warning("descarga no disponible")
+        return "La descarga no está disponible.", 503
+    resp = redirect(destino, code=302)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+
+@views_bp.route("/descarga/version")
+def descarga_version():
+    from app.services.descarga_release import ultima_publicacion
+
+    try:
+        dato = ultima_publicacion()
+    except Exception:
+        current_app.logger.warning("version de descarga no disponible")
+        return jsonify({"ok": False}), 503
+    return jsonify({
+        "ok": True,
+        "app_version": dato["tag"],
+        "tag": dato["tag"],
+        "nombre": dato["nombre"],
+        "archivo": dato["archivo"],
+        "descarga": _url_descarga(),
+    })
+
+
 @views_bp.route("/")
 def index():
+    if not is_authenticated() and not request.args.get("view") and request.args.get("source") != "pwa":
+        return _venta()
     resp = make_response(render_template(
         "terminal.html",
         app_version=Config.APP_VERSION,

@@ -6,7 +6,7 @@ class TestAPI:
     def test_index_html(self, client):
         r = client.get("/")
         assert r.status_code == 200
-        assert b"Master Total" in r.data
+        assert "Cobro Fácil".encode() in r.data
 
     def test_dashboard(self, client):
         r = client.get("/api/dashboard")

@@ -41,6 +41,10 @@ services:
         generateValue: true
       - key: RESEND_API_KEY
         sync: false
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: INSTALADOR_URL
+        value: https://github.com/cesarmaciel1234/cobrofacil_instalador/releases/latest/download/Setup_CobroFacil_Web.exe
       - key: REPORT_TIMEZONE
         value: America/Argentina/Buenos_Aires
 
