@@ -444,6 +444,10 @@ def api_pos_jefe():
             "hora_hasta": request.args.get("hora_hasta") or "23:59",
             "caja": request.args.get("caja") or "",
         }
+        if nombre == "contabilidad" and request.args.get("periodo"):
+            filtro["periodo"] = request.args.get("periodo")
+            filtro["desde"] = request.args.get("desde") or ""
+            filtro["hasta"] = request.args.get("hasta") or ""
     if nombre not in (
         "reporte", "jefe", "vitrina", "contabilidad", "admin", "cartera", "clientes",
         "digitales", "cobros_digitales", "pedidos", "abastecimiento",

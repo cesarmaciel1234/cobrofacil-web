@@ -444,12 +444,16 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             "recorte": False,
         }
     idx = {str(col).lower(): i for i, col in enumerate(columnas)}
-    ini, fin = rango_fechas(
-        str(pedido.get("alcance") or "dia"),
-        str(pedido.get("fecha") or ""),
-        bool(pedido.get("historico")),
-        hoy,
-    )
+    if pedido.get("fecha_ini"):
+        ini = str(pedido.get("fecha_ini"))[:10]
+        fin = str(pedido.get("fecha_fin") or ini)[:10]
+    else:
+        ini, fin = rango_fechas(
+            str(pedido.get("alcance") or "dia"),
+            str(pedido.get("fecha") or ""),
+            bool(pedido.get("historico")),
+            hoy,
+        )
     texto = str(pedido.get("texto") or "")
     nombres: dict[str, str] = {}
     if texto.strip():

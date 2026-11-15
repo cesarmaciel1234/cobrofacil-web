@@ -309,6 +309,11 @@ const $ = id => document.getElementById(id);
         };
         let cajaPantalla = 'arqueo';
         let periodoDigital = 'Semana';
+        let periodoDigitalDesde = '';
+        let periodoDigitalHasta = '';
+        let periodoCaja = 'Hoy';
+        let periodoCajaDesde = '';
+        let periodoCajaHasta = '';
         let libroDigital = null;
 
         const titles = {
@@ -3018,7 +3023,9 @@ const $ = id => document.getElementById(id);
                 usuario = (sessionUser && (sessionUser.username || sessionUser.usuario || sessionUser.nombre)) || '';
             } catch (e) {}
             const suc = activeSucursalId == null ? 'todas' : String(activeSucursalId);
-            const per = (panel === 'reporte' && window.vitrinaPeriodo) ? (':' + window.vitrinaPeriodo) : '';
+            const per = (panel === 'reporte' && window.vitrinaPeriodo)
+                ? (':' + window.vitrinaPeriodo + (window.vitrinaPeriodo === 'Período' ? (':' + (window.vitrinaDesde || '') + ':' + (window.vitrinaHasta || '')) : ''))
+                : (panel === 'contabilidad' ? (':' + periodoCaja + (periodoCaja === 'Período' ? (':' + periodoCajaDesde + ':' + periodoCajaHasta) : '')) : '');
             const filtro = panel === 'ticket' ? (':' + claveFiltroVentas()) : '';
             return 'crm-jefe:' + usuario + ':' + empresa + ':' + panel + per + filtro + ':' + suc;
         }
@@ -3082,10 +3089,58 @@ const $ = id => document.getElementById(id);
             lote();
         }
 
-        window.cambiarPeriodoVitrina = function(periodo) {
-            window.vitrinaPeriodo = periodo;
+        window.cambiarPeriodoVitrina = function(periodo, desde, hasta) {
+            window.vitrinaPeriodo = periodo || 'Hoy';
+            window.vitrinaDesde = window.vitrinaPeriodo === 'Período' ? (desde || '') : '';
+            window.vitrinaHasta = window.vitrinaPeriodo === 'Período' ? (hasta || '') : '';
+            const refresh = $('btnRefresh');
+            if (refresh && refresh.classList.contains('es-filtro')) {
+                refresh.classList.toggle('filtrando', window.vitrinaPeriodo !== 'Hoy');
+            }
             cargarJefe('reporte');
         };
+
+        function abrirFiltroPeriodo(opciones) {
+            cerrarTicket();
+            const actual = opciones.actual || 'Hoy';
+            const modos = ['Hoy', 'Semana', 'Mes', 'Período'];
+            const hoy = hoyLocal();
+            const fondo = document.createElement('div');
+            fondo.id = 'ticketSheet';
+            fondo.className = 'pedido-sheet-back';
+            fondo.innerHTML = `<div class="pedido-sheet filtro-venta" role="dialog" aria-label="Período">
+                <strong class="pedido-sheet-titulo">Período</strong>
+                <div class="filtro-periodos" role="group" aria-label="Período">
+                    ${modos.map((nombre) => `<button type="button" class="filtro-periodo${nombre === actual ? ' active' : ''}" data-modo="${nombre}">${nombre}</button>`).join('')}
+                </div>
+                <div class="filtro-horas" id="filtroRango"${actual === 'Período' ? '' : ' hidden'}>
+                    <label>Desde<input id="filtroDesdeDia" type="date" value="${textoJefe(opciones.desde || hoy)}"></label>
+                    <label>Hasta<input id="filtroHastaDia" type="date" value="${textoJefe(opciones.hasta || hoy)}"></label>
+                </div>
+                <button type="button" class="pedido-cerrar" data-aplicar>Aplicar</button>
+            </div>`;
+            fondo.addEventListener('click', (ev) => {
+                const periodo = ev.target.closest('[data-modo]');
+                if (periodo) {
+                    fondo.querySelectorAll('[data-modo]').forEach((boton) => {
+                        boton.classList.toggle('active', boton.dataset.modo === periodo.dataset.modo);
+                    });
+                    const rango = fondo.querySelector('#filtroRango');
+                    if (rango) rango.hidden = periodo.dataset.modo !== 'Período';
+                    return;
+                }
+                if (ev.target.closest('[data-aplicar]')) {
+                    const elegido = fondo.querySelector('.filtro-periodo.active')?.dataset.modo || 'Hoy';
+                    const desde = fondo.querySelector('#filtroDesdeDia')?.value || hoy;
+                    const hasta = fondo.querySelector('#filtroHastaDia')?.value || hoy;
+                    cerrarTicket();
+                    opciones.alAplicar(elegido, desde, hasta);
+                    return;
+                }
+                if (ev.target === fondo) cerrarTicket();
+            });
+            document.body.appendChild(fondo);
+        }
 
         function leerPanelJefe(clave) {
             try {
@@ -3180,6 +3235,17 @@ const $ = id => document.getElementById(id);
                 let url = '/api/pos/jefe?panel=' + encodeURIComponent(panel);
                 if (panel === 'reporte' && window.vitrinaPeriodo) {
                     url += '&periodo=' + encodeURIComponent(window.vitrinaPeriodo);
+                    if (window.vitrinaPeriodo === 'Período' && window.vitrinaDesde) {
+                        url += '&desde=' + encodeURIComponent(window.vitrinaDesde);
+                    }
+                    if (window.vitrinaPeriodo === 'Período' && window.vitrinaHasta) {
+                        url += '&hasta=' + encodeURIComponent(window.vitrinaHasta);
+                    }
+                }
+                if (panel === 'contabilidad') {
+                    url += '&periodo=' + encodeURIComponent(periodoCaja || 'Hoy');
+                    if (periodoCaja === 'Período' && periodoCajaDesde) url += '&desde=' + encodeURIComponent(periodoCajaDesde);
+                    if (periodoCaja === 'Período' && periodoCajaHasta) url += '&hasta=' + encodeURIComponent(periodoCajaHasta);
                 }
                 if (panel === 'ticket') url += queryFiltroVentas();
                 if (activeSucursalId !== null && activeSucursalId !== undefined) {
@@ -3201,24 +3267,94 @@ const $ = id => document.getElementById(id);
             aplicarDatosJefe(panel, dato, false);
         }
 
+        function claseDigital(estado) {
+            const texto = String(estado || '');
+            if (texto === 'OK' || texto === 'FIRMADO' || texto === 'COBRADO') return 'dig-ok';
+            if (texto.includes('SIN TICKET')) return 'dig-sin-ticket';
+            if (texto === 'SIN ID' || texto === 'EN TICKET' || texto.includes('SIN FIRMAR')) return 'dig-sin-id';
+            return '';
+        }
+
         function badgeDigital(estado) {
             const texto = String(estado || '');
+            const clase = claseDigital(texto);
             let fondo = '#e2e8f0';
             let tinta = '#334155';
-            if (texto.includes('SIN TICKET')) { fondo = '#fee2e2'; tinta = '#b91c1c'; }
-            else if (texto.includes('SIN FIRMAR')) { fondo = '#fef3c7'; tinta = '#92400e'; }
+            if (clase === 'dig-ok') { fondo = '#dcfce7'; tinta = '#15803d'; }
+            else if (clase === 'dig-sin-ticket') { fondo = '#ffedd5'; tinta = '#c2410c'; }
+            else if (clase === 'dig-sin-id') { fondo = '#fee2e2'; tinta = '#b91c1c'; }
             else if (texto.includes('CANCEL')) { fondo = '#f1f5f9'; tinta = '#64748b'; }
-            else if (texto === 'FIRMADO' || texto === 'COBRADO') { fondo = '#dcfce7'; tinta = '#15803d'; }
-            else if (texto === 'EN TICKET') { fondo = '#dbeafe'; tinta = '#1d4ed8'; }
             return `<span class="dig-estado" style="background:${fondo};color:${tinta};">${textoJefe(texto || '—')}</span>`;
         }
+
+        function fechaEnPeriodoDigital(fecha) {
+            const dia = String(fecha || '').slice(0, 10);
+            if (!dia) return false;
+            const hoy = hoyLocal();
+            if (periodoDigital === 'Hoy') return dia === hoy;
+            if (periodoDigital === 'Semana') {
+                const base = new Date(hoy + 'T12:00:00');
+                const lunes = new Date(base);
+                lunes.setDate(base.getDate() - ((base.getDay() + 6) % 7));
+                const mes = String(lunes.getMonth() + 1).padStart(2, '0');
+                const numero = String(lunes.getDate()).padStart(2, '0');
+                return dia >= (lunes.getFullYear() + '-' + mes + '-' + numero) && dia <= hoy;
+            }
+            if (periodoDigital === 'Mes') return dia.slice(0, 7) === hoy.slice(0, 7);
+            if (periodoDigital === 'Período') {
+                const desde = periodoDigitalDesde || hoy;
+                const hasta = periodoDigitalHasta || desde;
+                return dia >= (desde < hasta ? desde : hasta) && dia <= (desde < hasta ? hasta : desde);
+            }
+            return true;
+        }
+
+        function abrirLibroLocal() {
+            return new Promise((resolve, reject) => {
+                const pedido = indexedDB.open('crm-digital', 1);
+                pedido.onupgradeneeded = () => {
+                    const base = pedido.result;
+                    if (!base.objectStoreNames.contains('libro')) base.createObjectStore('libro');
+                };
+                pedido.onsuccess = () => resolve(pedido.result);
+                pedido.onerror = () => reject(pedido.error);
+            });
+        }
+
+        async function leerLibroLocal(clave) {
+            try {
+                const base = await abrirLibroLocal();
+                return await new Promise((resolve) => {
+                    const tx = base.transaction('libro', 'readonly');
+                    const pedido = tx.objectStore('libro').get(clave);
+                    pedido.onsuccess = () => resolve(pedido.result || null);
+                    pedido.onerror = () => resolve(null);
+                });
+            } catch (e) {
+                return null;
+            }
+        }
+
+        async function guardarLibroLocal(clave, libro) {
+            try {
+                const base = await abrirLibroLocal();
+                await new Promise((resolve) => {
+                    const tx = base.transaction('libro', 'readwrite');
+                    tx.objectStore('libro').put(libro, clave);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => resolve();
+                });
+            } catch (e) {}
+        }
+
+        let visiblesDigital = [];
 
         function pintarLibroDigital() {
             const cuerpo = $('contaCuerpo');
             const dig = libroDigital || {};
             if (!cuerpo) return;
-            const txs = dig.transacciones || [];
-            const periodos = ['Hoy', 'Semana', 'Mes', 'Año'];
+            const txs = ((dig.transacciones) || []).filter((t) => fechaEnPeriodoDigital(t.fecha));
+            visiblesDigital = txs;
             const corta = (n) => {
                 const x = Number(n);
                 if (!Number.isFinite(x)) return '—';
@@ -3228,36 +3364,116 @@ const $ = id => document.getElementById(id);
                 if (abs >= 1000) return signo + '$' + Math.round(abs).toLocaleString('es-AR');
                 return plataJefe(x);
             };
+            let bruto = 0;
+            let tickets = 0;
+            let cliente = 0;
+            let sinTicket = 0;
+            txs.forEach((t) => {
+                const monto = Number(t.monto) || 0;
+                bruto += monto;
+                if (t.origen === 'abono') cliente += monto;
+                else if (t.estado === 'SIN TICKET') sinTicket += monto;
+                else tickets += monto;
+            });
             const cards = [
-                ['Bruto', corta(dig.bruto_mp), 'cobros'],
-                ['Tickets', corta(dig.tickets_digitales), 'ventas'],
-                ['Cliente', corta(dig.cliente_cobros), 'abonos'],
-                ['Sin ticket', corta(dig.sin_ticket), 'sin venta']
+                ['Bruto', corta(bruto), 'cobros'],
+                ['Tickets', corta(tickets), 'ventas'],
+                ['Cliente', corta(cliente), 'abonos'],
+                ['Sin ticket', corta(sinTicket), 'sin venta']
             ];
+            const filas = txs.length
+                ? txs.map((t, i) => {
+                    const fecha = (t.fecha || '').replace('T', ' ').slice(0, 16) || '—';
+                    return `<button type="button" class="dig-fila ${claseDigital(t.estado)}" data-dig="${i}">
+                        <b>${textoJefe(t.concepto || t.cuenta || 'Cobro')}</b>
+                        <strong>${plataJefe(t.monto)}</strong>
+                        <span>${textoJefe(fecha)}</span>
+                        ${badgeDigital(t.estado)}
+                    </button>`;
+                }).join('')
+                : '<p class="dig-vacio">Sin cobros digitales en este período.</p>';
+            const nota = dig.fuente === 'libro'
+                ? 'El libro queda en el aparato. El ticket y el id digital no se repiten.'
+                : (txs.length ? 'Estos tickets todavía no tienen id digital.' : 'Todavía no hay cobros digitales en la nube.');
             cuerpo.innerHTML = `<div class="pago-digital">
-                <div class="vitrina-periodos dig-periodos">${periodos.map((nombre) => `<button type="button" class="periodo-pill${nombre === periodoDigital ? ' active' : ''}" data-dig-periodo="${nombre}">${nombre}</button>`).join('')}</div>
-                <div class="dig-numeros">${cards.map(([titulo, valor, nota]) => `<div><small>${titulo}</small><b>${valor}</b><span>${nota}</span></div>`).join('')}</div>
-                <div class="table-wrap"><table class="data-table dig-tabla"><thead><tr><th>Fecha</th><th>ID de pago</th><th>Cuenta</th><th>Concepto</th><th>Monto</th><th>Estado</th><th>Ticket</th><th>Cobro</th></tr></thead><tbody>
-                ${txs.length ? txs.map((t) => `<tr>
-                    <td>${textoJefe((t.fecha || '').replace('T', ' ').slice(0, 16))}</td>
-                    <td>${textoJefe(t.id_pago || '—')}</td>
-                    <td>${textoJefe(t.cuenta || '—')}</td>
-                    <td>${textoJefe(t.concepto || '—')}</td>
-                    <td>${plataJefe(t.monto)}</td>
-                    <td>${badgeDigital(t.estado)}</td>
-                    <td>${textoJefe(t.ticket_venta || '—')}</td>
-                    <td>${textoJefe(t.ticket_cobro || '—')}</td>
-                </tr>`).join('') : `<tr><td colspan="8">Sin cobros digitales en este período.</td></tr>`}
-                </tbody></table></div>
-                ${dig.recorte ? '<p class="dig-nota">Se muestran los 400 cobros más nuevos.</p>' : ''}
-                <p class="dig-nota">${dig.fuente === 'libro' ? 'Sale del libro de cobros digitales.' : (dig.fuente === 'ticket' ? 'El libro de cobros todavía no llegó: esto sale de los tickets.' : 'Todavía no hay cobros digitales en la nube.')}</p>
+                <div class="dig-numeros">${cards.map(([titulo, valor, pie]) => `<div><small>${titulo}</small><b>${valor}</b><span>${pie}</span></div>`).join('')}</div>
+                <div class="dig-lista">${filas}</div>
+                <p class="dig-nota">${nota}</p>
             </div>`;
+            cuerpo.querySelectorAll('[data-dig]').forEach((boton) => {
+                boton.addEventListener('click', () => abrirCobroDigital(Number(boton.dataset.dig)));
+            });
+        }
+
+        function abrirCobroDigital(indice) {
+            const t = visiblesDigital[indice];
+            if (!t) return;
+            cerrarTicket();
+            const fecha = (t.fecha || '').replace('T', ' ').slice(0, 16) || '—';
+            const datos = [
+                ['Fecha', fecha],
+                ['ID de pago', t.id_pago || '—'],
+                ['Cuenta', t.cuenta || '—'],
+                ['Concepto', t.concepto || '—'],
+                ['Monto', plataJefe(t.monto)],
+                ['Estado', t.estado || '—'],
+                ['Ticket', t.ticket_venta || '—'],
+                ['Cobro', t.ticket_cobro || '—']
+            ];
+            const fondo = document.createElement('div');
+            fondo.id = 'ticketSheet';
+            fondo.className = 'pedido-sheet-back';
+            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Cobro digital">
+                <strong class="pedido-sheet-titulo">${textoJefe(t.concepto || 'Cobro')}</strong>
+                ${datos.map(([nombre, valor]) => `<div class="pedido-dato"><span>${nombre}</span><b>${textoJefe(valor)}</b></div>`).join('')}
+                <button type="button" class="pedido-cerrar" data-cerrar>Cerrar</button>
+            </div>`;
+            fondo.addEventListener('click', (ev) => {
+                if (ev.target === fondo || ev.target.closest('[data-cerrar]')) cerrarTicket();
+            });
+            document.body.appendChild(fondo);
+        }
+
+        let digitalCarga = 0;
+
+        function leerDigitalRapido(clave) {
+            try {
+                const texto = localStorage.getItem('crm-digital:' + clave);
+                return texto ? JSON.parse(texto) : null;
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function guardarDigitalRapido(clave, libro) {
+            try {
+                localStorage.setItem('crm-digital:' + clave, JSON.stringify(libro));
+            } catch (e) {}
         }
 
         async function cargarPagoDigital() {
+            const token = ++digitalCarga;
+            const clave = claveJefe('digitales');
             const cuerpo = $('contaCuerpo');
-            if (cuerpo && !libroDigital) cuerpo.innerHTML = '<p>Cargando cobros digitales…</p>';
-            let url = '/api/pos/jefe?panel=digitales&periodo=' + encodeURIComponent(periodoDigital);
+            if (!libroDigital || libroDigital.clave !== clave) {
+                const rapido = leerDigitalRapido(clave);
+                if (rapido && rapido.transacciones) libroDigital = rapido;
+            }
+            if (libroDigital && libroDigital.clave === clave && cajaPantalla === 'digital') {
+                pintarLibroDigital();
+            }
+            if (!libroDigital || libroDigital.clave !== clave) {
+                const guardado = await leerLibroLocal(clave);
+                if (token !== digitalCarga) return;
+                if (guardado && guardado.transacciones) {
+                    libroDigital = guardado;
+                    if (cajaPantalla === 'digital') pintarLibroDigital();
+                }
+            }
+            if (cuerpo && cajaPantalla === 'digital' && (!libroDigital || libroDigital.clave !== clave) && !cuerpo.querySelector('.dig-lista')) {
+                cuerpo.innerHTML = '<p>Cargando cobros digitales…</p>';
+            }
+            let url = '/api/pos/jefe?panel=digitales&periodo=Todo';
             if (activeSucursalId !== null && activeSucursalId !== undefined) {
                 url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
             }
@@ -3265,11 +3481,18 @@ const $ = id => document.getElementById(id);
                 const res = await fetch(url);
                 if (!res.ok) throw new Error('digital');
                 const dato = await res.json();
-                libroDigital = dato.digitales || {};
-                if (dato.digitales && dato.digitales.periodo) periodoDigital = dato.digitales.periodo;
+                if (token !== digitalCarga) return;
+                const libro = dato.digitales || { fuente: 'vacio', transacciones: [] };
+                libro.clave = clave;
+                libroDigital = libro;
+                guardarDigitalRapido(clave, libro);
+                void guardarLibroLocal(clave, libro);
             } catch (e) {
-                libroDigital = libroDigital || { fuente: 'vacio', transacciones: [] };
+                if (!libroDigital || libroDigital.clave !== clave) {
+                    libroDigital = { clave: clave, fuente: 'vacio', transacciones: [] };
+                }
             }
+            if (token !== digitalCarga) return;
             if (cajaPantalla === 'digital') {
                 pintarLibroDigital();
                 document.querySelectorAll('#herramientasLista .herramienta-btn').forEach((boton) => {
@@ -3309,12 +3532,11 @@ const $ = id => document.getElementById(id);
                     $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
                     const medios = c.medios_pago || [];
-                    const totalMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0) || 1;
-                    let html = `<div data-pantalla="arqueo" class="arqueo-lista">
-                        <div class="arqueo-top"><span>Arqueo por medio de pago</span><b>${plataJefe(medios.reduce((acc, m) => acc + (m.monto || 0), 0))}</b></div>
-                        <div class="arqueo-head"><span>Medio</span><span>Operaciones</span><span>Monto</span></div>`;
+                    const sumaMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0);
+                    const totalMedios = sumaMedios || 1;
+                    let html = `<div data-pantalla="arqueo" class="arqueo-lista">`;
                     if (medios.length === 0) {
-                        html += `<p class="caja-vacio" style="padding:14px;">Sin movimientos de pago ese día.</p>`;
+                        html += `<p class="caja-vacio" style="padding:14px;">${(c.etiqueta && !String(c.etiqueta).startsWith('Hoy')) ? 'Sin movimientos de pago en este período.' : 'Sin movimientos de pago ese día.'}</p>`;
                     } else {
                         medios.forEach((m) => {
                             const pct = Math.round((m.monto / totalMedios) * 100);
@@ -3322,7 +3544,7 @@ const $ = id => document.getElementById(id);
                             html += `<div class="arqueo-fila"><b>${textoJefe(m.medio)}</b><span>${textoJefe(tickets)}</span><span><b>${plataJefe(m.monto)}</b><small class="arqueo-pct">${pct}%</small></span></div>`;
                         });
                     }
-                    html += `</div>`;
+                    html += `<div class="arqueo-pie"><span>Total</span><b>${plataJefe(sumaMedios)}</b></div></div>`;
 
                     $('contaCuerpo').innerHTML = html;
                 }
@@ -3523,38 +3745,25 @@ const $ = id => document.getElementById(id);
                     }
 
                     if (des.length > 0) {
+                        const locales = des.length === 1 ? '1 local' : (des.length + ' locales');
                         html += `
-                        <div data-herramienta="sucursales" data-titulo="Rendimiento por sucursal" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
-                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                                <span>🏢 Rendimiento Multi-Sucursal</span>
-                                <span style="font-size:12px; font-weight:600; color:#64748b;">${des.length} locales sincronizados</span>
+                        <div class="sucursal-rend" data-herramienta="sucursales" data-titulo="Rendimiento por sucursal">
+                            <div class="sucursal-rend-head">
+                                <span>Rendimiento por sucursal</span>
+                                <span>${locales}</span>
                             </div>
-                            <div style="overflow-x:auto;">
-                                <table class="data-table" style="width:100%; border-collapse:collapse;">
-                                    <thead>
-                                        <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
-                                            <th style="padding:10px 14px; text-align:left;">Sucursal</th>
-                                            <th style="padding:10px 14px; text-align:right;">Ventas</th>
-                                            <th style="padding:10px 14px; text-align:right;">Tickets</th>
-                                            <th style="padding:10px 14px; text-align:right;">Promedio</th>
-                                            <th style="padding:10px 14px; text-align:right;">Participación</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>`;
-                        des.forEach(s => {
-                            const pct = Math.round((s.ventas / totalVentas) * 100);
-                            html += `
-                            <tr style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:10px 14px; font-weight:700; color:#1e293b;">📍 ${textoJefe(s.nombre)}</td>
-                                <td style="padding:10px 14px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(s.ventas)}</td>
-                                <td style="padding:10px 14px; text-align:right; color:#64748b;">${s.tickets}</td>
-                                <td style="padding:10px 14px; text-align:right; color:#475569;">${plataJefe(s.promedio)}</td>
-                                <td style="padding:10px 14px; text-align:right;">
-                                    <span style="background:#dbeafe; color:#1d4ed8; padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700;">${pct}%</span>
-                                </td>
-                            </tr>`;
-                        });
-                        html += `</tbody></table></div></div>`;
+                            ${des.map((s) => {
+                                const pct = Math.round((s.ventas / totalVentas) * 100);
+                                return `<article class="sucursal-rend-fila">
+                                    <div class="sucursal-rend-top"><b>${textoJefe(s.nombre)}</b><span>${pct}%</span></div>
+                                    <div class="sucursal-rend-nums">
+                                        <div><small>Ventas</small><b>${plataJefe(s.ventas)}</b></div>
+                                        <div><small>Tickets</small><b>${s.tickets}</b></div>
+                                        <div><small>Promedio</small><b>${plataJefe(s.promedio)}</b></div>
+                                    </div>
+                                </article>`;
+                            }).join('')}
+                        </div>`;
                     }
 
                     $('reporteCuerpo').innerHTML = html;
@@ -3694,12 +3903,17 @@ const $ = id => document.getElementById(id);
             }
             const refresh = $('btnRefresh');
             if (refresh) {
-                const filtrar = name === 'pedidos' || name === 'ticket';
+                const caja = name === 'contabilidad';
+                const digital = caja && cajaPantalla === 'digital';
+                const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja;
                 refresh.classList.toggle('es-filtro', filtrar);
                 if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
                 else if (name === 'pedidos') refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
+                else if (name === 'reporte') refresh.classList.toggle('filtrando', (window.vitrinaPeriodo || 'Hoy') !== 'Hoy');
+                else if (digital) refresh.classList.toggle('filtrando', periodoDigital !== 'Semana');
+                else if (caja) refresh.classList.toggle('filtrando', (periodoCaja || 'Hoy') !== 'Hoy');
                 else refresh.classList.remove('filtrando');
-                const etiqueta = name === 'pedidos' ? 'Filtrar proveedor' : (name === 'ticket' ? 'Filtrar ventas' : 'Actualizar');
+                const etiqueta = name === 'pedidos' ? 'Filtrar proveedor' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar'));
                 refresh.setAttribute('aria-label', etiqueta);
                 refresh.title = etiqueta;
                 const icono = refresh.querySelector('svg');
@@ -3771,13 +3985,22 @@ const $ = id => document.getElementById(id);
                 $('jefeBar').classList.toggle('field-hidden', !jefeVistas.includes(name));
             }
             cerrarFaltante();
-            if (name === 'reporte') window.vitrinaPeriodo = 'Hoy';
+            if (name === 'reporte') {
+                window.vitrinaPeriodo = 'Hoy';
+                window.vitrinaDesde = '';
+                window.vitrinaHasta = '';
+            }
             if (name === 'ticket') {
                 filtroVentas.alcance = 'mes';
                 filtroVentas.historico = false;
                 filtroVentas.fecha = '';
             }
-            if (name === 'contabilidad') cajaPantalla = 'arqueo';
+            if (name === 'contabilidad') {
+                cajaPantalla = 'arqueo';
+                periodoCaja = 'Hoy';
+                periodoCajaDesde = '';
+                periodoCajaHasta = '';
+            }
             programarDatos(name);
             if ($('cobranzasBar')) {
                 if (name === 'cobranzas') {
@@ -3849,6 +4072,36 @@ const $ = id => document.getElementById(id);
                 const vista = document.querySelector('.view.active');
                 const nombre = vista && vista.id.startsWith('view-') ? vista.id.slice(5) : '';
                 if (nombre === 'ticket') abrirFiltroVentas();
+                else if (nombre === 'reporte') abrirFiltroPeriodo({
+                    actual: window.vitrinaPeriodo || 'Hoy',
+                    desde: window.vitrinaDesde,
+                    hasta: window.vitrinaHasta,
+                    alAplicar: (elegido, desde, hasta) => window.cambiarPeriodoVitrina(elegido, desde, hasta)
+                });
+                else if (nombre === 'contabilidad' && cajaPantalla !== 'digital') abrirFiltroPeriodo({
+                    actual: periodoCaja || 'Hoy',
+                    desde: periodoCajaDesde,
+                    hasta: periodoCajaHasta,
+                    alAplicar: (elegido, desde, hasta) => {
+                        periodoCaja = elegido;
+                        periodoCajaDesde = elegido === 'Período' ? desde : '';
+                        periodoCajaHasta = elegido === 'Período' ? hasta : '';
+                        marcarEntrada('contabilidad');
+                        void cargarJefe('contabilidad');
+                    }
+                });
+                else if (nombre === 'contabilidad' && cajaPantalla === 'digital') abrirFiltroPeriodo({
+                    actual: periodoDigital || 'Semana',
+                    desde: periodoDigitalDesde,
+                    hasta: periodoDigitalHasta,
+                    alAplicar: (elegido, desde, hasta) => {
+                        periodoDigital = elegido;
+                        periodoDigitalDesde = elegido === 'Período' ? desde : '';
+                        periodoDigitalHasta = elegido === 'Período' ? hasta : '';
+                        marcarEntrada('contabilidad');
+                        pintarLibroDigital();
+                    }
+                });
                 else abrirFiltroProveedor();
                 return;
             }
@@ -5083,6 +5336,11 @@ const $ = id => document.getElementById(id);
         window.addEventListener('offline', updateConnectionStatus);
         
         document.getElementById('offlineBadge')?.addEventListener('click', sincronizarSolicitudesPendientes);
+        document.getElementById('contaCuerpo')?.addEventListener('click', (ev) => {
+            const fila = ev.target.closest('[data-dig]');
+            if (!fila || cajaPantalla !== 'digital') return;
+            abrirCobroDigital(Number(fila.dataset.dig));
+        });
         document.getElementById('ticketCuerpo')?.addEventListener('click', (ev) => {
             const fila = ev.target.closest('[data-ticket]');
             if (fila) void abrirTicket(fila.dataset.ticket);
@@ -5280,18 +5538,15 @@ const $ = id => document.getElementById(id);
                 cajaPantalla = id || 'arqueo';
                 if (cajaPantalla === 'digital') {
                     periodoDigital = 'Semana';
-                    libroDigital = null;
+                    periodoDigitalDesde = '';
+                    periodoDigitalHasta = '';
+                    marcarEntrada('contabilidad');
                     void cargarPagoDigital();
                     return;
                 }
+                marcarEntrada('contabilidad');
                 const vistaActiva = document.querySelector('.view.active');
                 if (vistaActiva && vistaActiva.id === 'view-contabilidad') void cargarJefe('contabilidad');
-            });
-            document.addEventListener('click', (ev) => {
-                const periodo = ev.target.closest('[data-dig-periodo]');
-                if (!periodo || cajaPantalla !== 'digital') return;
-                periodoDigital = periodo.dataset.digPeriodo;
-                void cargarPagoDigital();
             });
             CrmBus.on('applyPwaDeepLink', () => applyPwaDeepLink());
             CrmBus.on('aplicarCambioOptimista', (url, method, body) => aplicarCambioOptimista(url, method, body));

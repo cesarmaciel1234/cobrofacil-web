@@ -221,14 +221,28 @@ def _ranking_cortes(dia: str, sucursal_id: int | None, ventas: list[dict]) -> li
 
 
 def _en_dias(fecha, ini: str, fin: str) -> bool:
+    if not ini and not fin:
+        return True
     dia = _dia(fecha)
-    return bool(dia) and ini <= dia <= fin
+    return bool(dia) and (ini or "") <= dia <= (fin or "9999-99-99")
+
+
+def _ref(valor) -> str:
+    texto = _clave(valor)
+    if texto.upper() in ("", "—", "-", "NONE", "NULL"):
+        return ""
+    return texto
 
 
 def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | None = None) -> dict:
+    """Cruza tickets e ids de todas las sucursales. Un ticket y un id digital entran una sola vez."""
     ini = (dia or "")[:10]
-    fin = (hasta or dia or "")[:10]
-    col_v, filas_v = filas_de("ventas", sucursal_id)
+    fin = (hasta or "")[:10] if not dia else (hasta or dia or "")[:10]
+    if dia and not hasta:
+        fin = ini
+    pedido = _clave(sucursal_id) if sucursal_id is not None else ""
+
+    col_v, filas_v = filas_de("ventas", None)
     idx_v = _indice(col_v)
     vivas = []
     cancelados = 0.0
@@ -244,108 +258,180 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | Non
                 cancelados += monto
                 continue
             vivas.append({
-                "id": _valor(f, idx_v, "id"),
+                "id": _ref(_valor(f, idx_v, "id")),
+                "sucursal": _ref(_valor(f, idx_v, "sucursal_id")),
                 "fecha": str(_valor(f, idx_v, "fecha") or ""),
-                "pago": pago or "QR",
+                "pago": str(pago or "QR"),
                 "total": monto,
-                "id_pago": _valor(f, idx_v, "id_pago", "mp_id", "payment_id"),
+                "id_pago": _ref(_valor(f, idx_v, "id_pago", "mp_id", "payment_id")),
             })
 
-    col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
+    col_cc, filas_cc = filas_de("cuenta_corriente", None)
     idx_cc = _indice(col_cc)
-    cobros_dig = []
+    abonos = []
     if col_cc:
         for f in filas_cc:
-            if _en_dias(_valor(f, idx_cc, "fecha"), ini, fin) and str(_valor(f, idx_cc, "tipo") or "").upper() == "ABONO":
-                desc = str(_valor(f, idx_cc, "descripcion") or "")
-                if _es_digital(desc):
-                    cobros_dig.append({
-                        "id": _valor(f, idx_cc, "id"),
-                        "monto": _numero(_valor(f, idx_cc, "monto")),
-                        "desc": desc or "Cobro digital fiado",
-                        "fecha": str(_valor(f, idx_cc, "fecha") or ""),
-                    })
+            if not _en_dias(_valor(f, idx_cc, "fecha"), ini, fin):
+                continue
+            if str(_valor(f, idx_cc, "tipo") or "").upper() != "ABONO":
+                continue
+            desc = str(_valor(f, idx_cc, "descripcion") or "")
+            if not _es_digital(desc):
+                continue
+            abonos.append({
+                "id": _ref(_valor(f, idx_cc, "id")),
+                "sucursal": _ref(_valor(f, idx_cc, "sucursal_id")),
+                "monto": _numero(_valor(f, idx_cc, "monto")),
+                "desc": desc or "Cobro digital fiado",
+                "fecha": str(_valor(f, idx_cc, "fecha") or ""),
+            })
 
-    col_cd, filas_cd = filas_de("cobros_digitales", sucursal_id)
+    col_cd, filas_cd = filas_de("cobros_digitales", None)
     idx_cd = _indice(col_cd)
-    registros = []
-    netos_reales = []
-    fuente = "vacio"
+    cobros = []
     if col_cd:
-        fuente = "libro"
         for f in filas_cd:
             if not _en_dias(_valor(f, idx_cd, "fecha"), ini, fin):
                 continue
             neto = _valor(f, idx_cd, "neto", "monto_neto", "liquido")
-            if neto not in (None, ""):
-                netos_reales.append(_numero(neto))
-            registros.append({
-                "id": _valor(f, idx_cd, "id"),
-                "id_pago": _valor(f, idx_cd, "id_pago", "mp_id") or "—",
+            cobros.append({
+                "id": _ref(_valor(f, idx_cd, "id")),
+                "sucursal": _ref(_valor(f, idx_cd, "sucursal_id")),
+                "id_pago": _ref(_valor(f, idx_cd, "id_pago", "mp_id")),
                 "fecha": str(_valor(f, idx_cd, "fecha") or ""),
                 "cuenta": str(_valor(f, idx_cd, "cuenta", "titular") or "—"),
                 "concepto": str(_valor(f, idx_cd, "concepto", "tipo") or "Cobro digital"),
                 "monto": _numero(_valor(f, idx_cd, "monto")),
-                "estado": str(_valor(f, idx_cd, "estado") or "FIRMADO").upper(),
-                "ticket_venta": _valor(f, idx_cd, "ticket_venta", "ticket_id") or "—",
-                "ticket_cobro": _valor(f, idx_cd, "ticket_cobro") or "—",
+                "neto": None if neto in (None, "") else _numero(neto),
+                "ticket": _ref(_valor(f, idx_cd, "ticket_venta", "ticket_id")),
+                "ticket_cobro": _ref(_valor(f, idx_cd, "ticket_cobro")),
             })
 
-    if not registros:
-        fuente = "ticket" if (vivas or cobros_dig) else "vacio"
-        for venta in vivas:
-            pago = str(venta["pago"])
-            registros.append({
-                "id": venta["id"],
-                "id_pago": venta["id_pago"] or "—",
-                "fecha": venta["fecha"],
-                "cuenta": pago,
-                "concepto": f"Ticket {pago}",
-                "monto": venta["total"],
-                "estado": "EN TICKET",
-                "ticket_venta": str(venta["id"]),
-                "ticket_cobro": "—",
-            })
-        for cobro in cobros_dig:
-            registros.append({
-                "id": cobro["id"],
-                "id_pago": "—",
-                "fecha": cobro["fecha"],
-                "cuenta": "Cuenta corriente",
-                "concepto": cobro["desc"],
-                "monto": cobro["monto"],
-                "estado": "COBRADO",
-                "ticket_venta": "—",
-                "ticket_cobro": str(cobro["id"]),
-            })
+    por_pago: dict[str, dict] = {}
+    por_ticket: dict[tuple[str, str], dict] = {}
+    for cobro in cobros:
+        if cobro["id_pago"] and cobro["id_pago"] not in por_pago:
+            por_pago[cobro["id_pago"]] = cobro
+        if cobro["ticket"]:
+            por_ticket.setdefault((cobro["sucursal"], cobro["ticket"]), cobro)
 
-    bruto = sum(r["monto"] for r in registros)
-    tickets_digitales = sum(v["total"] for v in vivas)
+    usados = set()
+    usados_vista: dict[str, set] = {}
+    pagos_usados = set()
+    tickets_usados = set()
+    registros = []
+
+    def tomar_cobro(venta: dict) -> dict | None:
+        if venta["id_pago"] and venta["id_pago"] in por_pago:
+            return por_pago[venta["id_pago"]]
+        mismo = por_ticket.get((venta["sucursal"], venta["id"]))
+        if mismo:
+            return mismo
+        if not venta["id"]:
+            return None
+        candidatos = [c for c in cobros if c["ticket"] == venta["id"] and id(c) not in usados]
+        return candidatos[0] if len(candidatos) == 1 else None
+
+    for venta in vivas:
+        ticket_clave = (venta["sucursal"], venta["id"])
+        if ticket_clave in tickets_usados:
+            continue
+        cobro = tomar_cobro(venta)
+        id_pago = venta["id_pago"] or (cobro["id_pago"] if cobro else "")
+        if id_pago and id_pago in pagos_usados:
+            continue
+        tickets_usados.add(ticket_clave)
+        if id_pago:
+            pagos_usados.add(id_pago)
+        if cobro:
+            usados.add(id(cobro))
+            usados_vista.setdefault(venta["sucursal"], set()).add(id(cobro))
+        registros.append({
+            "id": venta["id"],
+            "sucursal": venta["sucursal"],
+            "id_pago": id_pago or "—",
+            "fecha": venta["fecha"],
+            "cuenta": venta["pago"],
+            "concepto": f"Ticket {venta['pago']}",
+            "monto": venta["total"],
+            "estado": "OK" if id_pago else "SIN ID",
+            "origen": "ticket",
+            "ticket_venta": venta["id"] or "—",
+            "ticket_cobro": (cobro["ticket_cobro"] if cobro and cobro["ticket_cobro"] else "—"),
+            "del_libro": cobro is not None,
+        })
+
+    for cobro in cobros:
+        if id(cobro) in usados:
+            continue
+        if cobro["id_pago"] and cobro["id_pago"] in pagos_usados:
+            continue
+        if cobro["id_pago"]:
+            pagos_usados.add(cobro["id_pago"])
+        usados.add(id(cobro))
+        registros.append({
+            "id": cobro["id"],
+            "sucursal": cobro["sucursal"],
+            "id_pago": cobro["id_pago"] or "—",
+            "fecha": cobro["fecha"],
+            "cuenta": cobro["cuenta"],
+            "concepto": cobro["concepto"],
+            "monto": cobro["monto"],
+            "estado": "SIN TICKET",
+            "origen": "cobro",
+            "ticket_venta": cobro["ticket"] or "—",
+            "ticket_cobro": cobro["ticket_cobro"] or "—",
+            "del_libro": True,
+        })
+
+    for abono in abonos:
+        registros.append({
+            "id": abono["id"],
+            "sucursal": abono["sucursal"],
+            "id_pago": "—",
+            "fecha": abono["fecha"],
+            "cuenta": "Cuenta corriente",
+            "concepto": abono["desc"],
+            "monto": abono["monto"],
+            "estado": "COBRADO",
+            "origen": "abono",
+            "ticket_venta": "—",
+            "ticket_cobro": abono["id"] or "—",
+            "del_libro": False,
+        })
+
+    if pedido:
+        registros = [fila for fila in registros if fila["sucursal"] == pedido]
+        vivas = [venta for venta in vivas if venta["sucursal"] == pedido]
+        abonos = [abono for abono in abonos if abono["sucursal"] == pedido]
+        cobros = [cobro for cobro in cobros if cobro["sucursal"] == pedido or id(cobro) in usados_vista.get(pedido, set())]
+
+    hay_libro = any(fila.get("del_libro") for fila in registros)
+    fuente = "libro" if hay_libro else ("ticket" if (vivas or abonos or registros) else "vacio")
+    bruto = sum(fila["monto"] for fila in registros)
+    tickets_digitales = sum(venta["total"] for venta in vivas)
+    netos_reales = [cobro["neto"] for cobro in cobros if cobro["neto"] is not None]
     if fuente == "libro" and netos_reales:
         neto = round(sum(netos_reales), 2)
         neto_estimado = False
     else:
         neto = round(bruto, 2)
-        neto_estimado = fuente != "libro" or not netos_reales
-    firmados = sum(r["monto"] for r in registros if r["estado"] == "FIRMADO")
-    sin_firmar = sum(r["monto"] for r in registros if "SIN FIRMAR" in r["estado"])
-    sin_ticket = sum(r["monto"] for r in registros if "SIN TICKET" in r["estado"])
-    brecha = round(tickets_digitales - bruto, 2) if fuente == "libro" else 0.0
-
+        neto_estimado = True
+    monto_cobros = sum(cobro["monto"] for cobro in cobros)
     return {
         "fuente": fuente,
         "bruto_mp": round(bruto, 2),
         "neto_mp": neto,
         "neto_estimado": neto_estimado,
         "tickets_digitales": round(tickets_digitales, 2),
-        "brecha_ticket": brecha,
-        "firmados_ticket": round(firmados, 2),
-        "sin_firmar": round(sin_firmar, 2),
-        "sin_ticket": round(sin_ticket, 2),
-        "cliente_cobros": round(sum(c["monto"] for c in cobros_dig), 2),
+        "brecha_ticket": round(tickets_digitales - monto_cobros, 2) if cobros else 0.0,
+        "firmados_ticket": round(sum(fila["monto"] for fila in registros if fila["estado"] == "OK"), 2),
+        "sin_firmar": round(sum(fila["monto"] for fila in registros if fila["estado"] == "SIN ID"), 2),
+        "sin_ticket": round(sum(fila["monto"] for fila in registros if fila["estado"] == "SIN TICKET"), 2),
+        "cliente_cobros": round(sum(abono["monto"] for abono in abonos), 2),
         "cancelados": round(cancelados, 2),
-        "transacciones": sorted(registros, key=lambda fila: str(fila.get("fecha") or ""), reverse=True)[:400],
-        "recorte": len(registros) > 400,
+        "transacciones": sorted(registros, key=lambda fila: str(fila.get("fecha") or ""), reverse=True),
+        "recorte": False,
     }
 
 
@@ -905,7 +991,11 @@ def _armar_panel(
         desde_iso, hasta_iso, nombre_periodo = resolver_rango(
             periodo=periodo, desde_custom=desde, hasta_custom=hasta
         )
-        digitales = _cobros_digitales(desde_iso[:10], sucursal_id, hasta_iso[:10])
+        if str(periodo or "").strip().lower() in ("todo", "todos", "historico", "histórico"):
+            digitales = _cobros_digitales("", sucursal_id, "")
+            nombre_periodo = "Todo"
+        else:
+            digitales = _cobros_digitales(desde_iso[:10], sucursal_id, hasta_iso[:10])
         digitales["periodo"] = nombre_periodo
         return {
             "ok": True,
@@ -962,12 +1052,30 @@ def _armar_panel(
         pedido = dict(filtro or {})
         pedido.setdefault("alcance", "dia")
         pedido.setdefault("metodo", "TODOS")
-        ini, fin = rango_fechas(
-            str(pedido.get("alcance") or "dia"),
-            str(pedido.get("fecha") or ""),
-            bool(pedido.get("historico")),
-            hoy,
-        )
+        if pedido.get("periodo"):
+            from app.services.pos_vitrina import resolver_rango
+            desde_iso, hasta_iso, nombre_periodo = resolver_rango(
+                str(pedido.get("periodo")),
+                desde_custom=pedido.get("desde") or None,
+                hasta_custom=pedido.get("hasta") or None,
+            )
+            pedido["fecha_ini"] = desde_iso[:10]
+            pedido["fecha_fin"] = hasta_iso[:10]
+            ini, fin = pedido["fecha_ini"], pedido["fecha_fin"]
+            if nombre_periodo == "Hoy":
+                etiqueta = "Hoy · " + ini
+            elif nombre_periodo == "Período":
+                etiqueta = "Período · " + ini + (" → " + fin if fin != ini else "")
+            else:
+                etiqueta = nombre_periodo
+        else:
+            ini, fin = rango_fechas(
+                str(pedido.get("alcance") or "dia"),
+                str(pedido.get("fecha") or ""),
+                bool(pedido.get("historico")),
+                hoy,
+            )
+            etiqueta = _etiqueta_caja(pedido, ini, fin, hoy)
         libro = historial_ventas(sucursal_id, pedido, hoy)
         return {
             "ok": True,
@@ -980,7 +1088,7 @@ def _armar_panel(
                 ini,
                 fin,
                 sucursal_id,
-                _etiqueta_caja(pedido, ini, fin, hoy),
+                etiqueta,
             ),
             "desglose_sucursales": desglose_suc,
             "sucursales": sucursales_disp,

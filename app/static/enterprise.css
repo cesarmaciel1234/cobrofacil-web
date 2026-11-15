@@ -1491,8 +1491,17 @@ body.sidebar-open .dashboard-bar,
 .dig-numeros small { display: block; color: #94a3b8; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
 .dig-numeros b { display: block; margin-top: 3px; font-size: clamp(0.72rem, 3.4vw, 0.92rem); letter-spacing: -0.03em; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .dig-numeros span { display: block; margin-top: 2px; color: #64748b; font-size: 9px; font-weight: 650; }
-.dig-tabla { font-size: 13px; }
-.dig-tabla td, .dig-tabla th { white-space: nowrap; }
+.dig-lista { width: 100%; max-width: 100%; min-width: 0; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+.dig-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; column-gap: 10px; row-gap: 2px; align-items: center; width: 100%; min-width: 0; box-sizing: border-box; padding: 12px 14px; border: 0; border-top: 1px solid #f1f5f9; background: #fff; text-align: left; cursor: pointer; font: inherit; color: inherit; }
+.dig-fila:first-child { border-top: 0; }
+.dig-fila.dig-ok { box-shadow: inset 3px 0 0 #16a34a; }
+.dig-fila.dig-sin-ticket { box-shadow: inset 3px 0 0 #ea580c; }
+.dig-fila.dig-sin-id { box-shadow: inset 3px 0 0 #dc2626; }
+.dig-fila b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; font-size: 15px; }
+.dig-fila strong { font-size: 15px; color: #0f172a; white-space: nowrap; }
+.dig-fila > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #64748b; font-size: 12px; font-weight: 650; }
+.dig-fila .dig-estado { justify-self: end; }
+.dig-vacio { margin: 0; padding: 16px; color: #64748b; }
 .dig-estado { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
 .dig-nota { color: #64748b; font-size: 12px; margin: 8px 0 0; }
 .vitrina-periodos {
@@ -1922,11 +1931,14 @@ select.periodo-pill.active option { color: #0F172A; }
 .caja-lado small { font-size: 12px; color: #64748b; font-weight: 600; }
 .caja-vacio { margin: 0; color: #64748b; }
 .arqueo-lista { width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
-.arqueo-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 14px 14px 8px; font-weight: 800; color: #0f172a; }
-.arqueo-head, .arqueo-fila { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(72px, 1fr); gap: 6px; align-items: center; padding: 10px 14px; }
-.arqueo-head { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b; background: #f8fafc; }
-.arqueo-head span:nth-child(n+2), .arqueo-fila span:nth-child(n+2) { text-align: right; }
+.arqueo-top { padding: 14px 14px 8px; font-weight: 800; color: #0f172a; }
+.arqueo-pie { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px; border-top: 1px solid #e2e8f0; background: #f8fafc; color: #0f172a; }
+.arqueo-pie span { color: #64748b; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.arqueo-pie b { font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
+.arqueo-fila { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(72px, 1fr); gap: 6px; align-items: center; padding: 10px 14px; }
+.arqueo-fila span:nth-child(n+2) { text-align: right; }
 .arqueo-fila { border-top: 1px solid #f1f5f9; color: #0f172a; font-size: 14px; }
+.arqueo-fila:first-child { border-top: 0; }
 .arqueo-fila b { font-weight: 800; }
 .arqueo-fila span:nth-child(2) { color: #64748b; }
 .arqueo-pct { display: block; font-size: 11px; font-weight: 700; color: #0369a1; }
@@ -2047,7 +2059,19 @@ select.periodo-pill.active option { color: #0F172A; }
     padding: 0 14px;
     margin-bottom: 12px;
 }
-html, body { max-width: 100%; overflow-x: hidden; }
+html, body { max-width: 100%; overflow-x: clip; overflow-y: visible; }
+.sucursal-rend { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 14px; margin: 0 0 20px; max-width: 100%; min-width: 0; box-sizing: border-box; }
+.sucursal-rend-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 10px; color: #1e293b; font-size: 14px; font-weight: 800; }
+.sucursal-rend-head span:last-child { flex: none; color: #64748b; font-size: 12px; font-weight: 600; }
+.sucursal-rend-fila { border-top: 1px solid #f1f5f9; padding: 12px 0 2px; }
+.sucursal-rend-fila:first-of-type { border-top: 0; padding-top: 0; }
+.sucursal-rend-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; min-width: 0; }
+.sucursal-rend-top b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #0f172a; }
+.sucursal-rend-top span { flex: none; background: #dbeafe; color: #1d4ed8; padding: 3px 8px; border-radius: 12px; font-size: 11px; font-weight: 800; }
+.sucursal-rend-nums { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.sucursal-rend-nums div { min-width: 0; }
+.sucursal-rend-nums small { display: block; color: #94a3b8; font-size: 10px; font-weight: 800; letter-spacing: 0.03em; text-transform: uppercase; }
+.sucursal-rend-nums b { display: block; margin-top: 2px; color: #0f172a; font-size: clamp(0.78rem, 3.2vw, 0.95rem); letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .main, .content, .view { max-width: 100%; min-width: 0; }
 #view-cartera, #carteraLista, #view-cartera .cards, #view-cartera .debt-card { max-width: 100%; min-width: 0; }
 #view-cartera .resumen {
