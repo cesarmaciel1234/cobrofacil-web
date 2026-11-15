@@ -3468,21 +3468,30 @@ const $ = id => document.getElementById(id);
                 return;
             }
             if (btn.disabled) return;
-            void bajarNovedades();
             btn.disabled = true;
             btn.classList.add('btn-spinning');
-            void refrescarManual().then(() => {
-                const v = document.querySelector('.nav-item.active')?.dataset.view;
-                if (v === 'remitos') void renderRemitosFull();
-                if (v === 'historial-pagos') renderHistorialPagos();
-                if (v === 'auditoria') renderAuditoria();
-                if (v === 'usuarios') renderUsuarios();
-                if (v === 'finanzas-aging') renderFinanzasAging();
-                if (v === 'finanzas-margenes') renderFinanzasMargenes();
-            }).catch(() => {}).finally(() => {
-                btn.disabled = false;
-                btn.classList.remove('btn-spinning');
-            });
+            void (async () => {
+                try {
+                    await bajarNovedades();
+                    const vista = document.querySelector('.view.active');
+                    const nombre = vista && vista.id.startsWith('view-') ? vista.id.slice(5) : '';
+                    if (['reporte', 'digitales', 'contabilidad', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(nombre)) {
+                        await cargarJefe(nombre);
+                    }
+                    await refrescarManual();
+                    const v = document.querySelector('.nav-item.active')?.dataset.view;
+                    if (v === 'remitos') void renderRemitosFull();
+                    if (v === 'historial-pagos') renderHistorialPagos();
+                    if (v === 'auditoria') renderAuditoria();
+                    if (v === 'usuarios') renderUsuarios();
+                    if (v === 'finanzas-aging') renderFinanzasAging();
+                    if (v === 'finanzas-margenes') renderFinanzasMargenes();
+                } catch (e) {
+                } finally {
+                    btn.disabled = false;
+                    btn.classList.remove('btn-spinning');
+                }
+            })();
         });
 
         function setSidebarOpen(open) {
