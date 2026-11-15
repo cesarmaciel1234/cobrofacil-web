@@ -12,9 +12,9 @@
         return mapa;
     }
 
-    function accionesDe(vista) {
+    function deTipo(vista, tipo) {
         const mod = piramide().find((item) => item.vista === vista);
-        return ((mod && mod.herramientas) || []).filter((item) => item.tipo === 'vista');
+        return ((mod && mod.herramientas) || []).filter((item) => item.tipo === tipo);
     }
 
     let activo = 'reporte';
@@ -43,21 +43,89 @@
         detalle.hidden = true;
     }
 
+    function cerrarMenu() {
+        const sidebar = $('sidebar');
+        const backdrop = $('sidebarBackdrop');
+        if (sidebar) sidebar.classList.remove('open');
+        if (backdrop) {
+            backdrop.classList.remove('active');
+            backdrop.setAttribute('aria-hidden', 'true');
+        }
+        document.body.classList.remove('sidebar-open');
+    }
+
+    function vistaActiva() {
+        return $('view-' + activo);
+    }
+
+    function slotActivo() {
+        const vista = vistaActiva();
+        if (!vista) return null;
+        return vista.querySelector('.card-body') || vista.querySelector('[id$="Cuerpo"]') || vista;
+    }
+
+    function soltar() {
+        const vista = vistaActiva();
+        const caja = bolsa();
+        if (!vista || !caja) return;
+        vista.querySelectorAll('[data-herramienta]').forEach((nodo) => {
+            nodo.hidden = true;
+            caja.appendChild(nodo);
+        });
+        vista.querySelectorAll('[data-oculto-herramienta]').forEach((nodo) => {
+            nodo.hidden = false;
+            nodo.removeAttribute('data-oculto-herramienta');
+        });
+    }
+
+    function mostrar(id) {
+        soltar();
+        if (!id) return;
+        const nodo = document.querySelector('[data-modulo="' + activo + '"][data-herramienta="' + id + '"]');
+        const slot = slotActivo();
+        if (!nodo || !slot) return;
+        [...slot.children].forEach((hijo) => {
+            hijo.hidden = true;
+            hijo.setAttribute('data-oculto-herramienta', '1');
+        });
+        nodo.hidden = false;
+        slot.appendChild(nodo);
+    }
+
     function pintar() {
         guardarDetalle();
         const titulo = $('herramientasTitulo');
         const lista = $('herramientasLista');
         const detalle = $('herramientasDetalle');
+        if (detalle) {
+            detalle.hidden = true;
+            detalle.replaceChildren();
+        }
         if (!lista) return;
         if (titulo) titulo.textContent = 'Herramientas · ' + (nombres()[activo] || 'Módulo');
 
-        const listaAcciones = accionesDe(activo);
+        const pantallas = deTipo(activo, 'pantalla');
         const bloques = piezas();
-        const vacio = !listaAcciones.length && !bloques.length;
+        const vistas = deTipo(activo, 'vista');
+        const vacio = !pantallas.length && !bloques.length && !vistas.length;
 
         lista.innerHTML = vacio
             ? '<p class="herramientas-vacio">Esta pantalla ya muestra lo esencial. No hay herramientas aparte.</p>'
             : '';
+
+        pantallas.forEach((accion) => {
+            const boton = document.createElement('button');
+            boton.type = 'button';
+            boton.className = 'nav-item herramienta-btn' + (elegida ? '' : ' active');
+            boton.textContent = accion.titulo;
+            boton.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                elegida = '';
+                pintar();
+                cerrarMenu();
+            });
+            lista.appendChild(boton);
+        });
 
         bloques.forEach((nodo) => {
             const id = nodo.dataset.herramienta;
@@ -72,28 +140,21 @@
             lista.appendChild(boton);
         });
 
-        listaAcciones.forEach((accion) => {
+        vistas.forEach((accion) => {
             const boton = document.createElement('button');
             boton.type = 'button';
             boton.className = 'nav-item herramienta-btn';
             boton.textContent = accion.titulo;
             boton.addEventListener('click', (ev) => {
                 ev.stopPropagation();
+                cerrarMenu();
                 if (global.CrmBus) global.CrmBus.emit('switchView', accion.vista);
             });
             lista.appendChild(boton);
         });
 
-        if (detalle) {
-            detalle.hidden = true;
-            detalle.replaceChildren();
-            const nodo = bloques.find((item) => item.dataset.herramienta === elegida);
-            if (nodo) {
-                nodo.hidden = false;
-                detalle.hidden = false;
-                detalle.appendChild(nodo);
-            }
-        }
+        if (elegida) mostrar(elegida);
+        else soltar();
     }
 
     function elegir(id) {
@@ -107,6 +168,7 @@
         }
         elegida = elegida === id ? '' : id;
         pintar();
+        cerrarMenu();
     }
 
     function recoger(modulo) {
@@ -123,6 +185,7 @@
     }
 
     function usar(modulo) {
+        soltar();
         activo = modulo || 'reporte';
         elegida = '';
         pintar();

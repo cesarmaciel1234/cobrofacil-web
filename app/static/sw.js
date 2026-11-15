@@ -1,5 +1,5 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.12';
+const CACHE_VERSION = 'crm-frigorifico-v4.13';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',
@@ -40,6 +40,7 @@ const NETWORK_FIRST_PATHS = [
   '/static/js/crm-delete.js',
   '/static/enterprise.css',
   '/static/js/crm-safe.js',
+  '/static/js/barra/',
 ];
 
 function cacheKey(request) {

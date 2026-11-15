@@ -11,10 +11,7 @@ barra
 │   └── tickets recientes
 ├── cobros     cobros del día
 │   └── libro de auditoría
-├── caja       medios de pago
-│   ├── arqueo
-│   ├── cobros y gastos
-│   └── balance corporativo
+├── caja       arqueo del día
 ├── cartera    tarjetas          página /cartera
 │   ├── sucursal y filtros
 │   ├── perfil

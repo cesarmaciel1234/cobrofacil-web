@@ -836,6 +836,16 @@ def _run_migrations(conn):
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
             ON pos_base(COALESCE(sucursal_id, 0), tabla, parte);
+        CREATE TABLE IF NOT EXISTS pos_novedad (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sucursal_id INTEGER,
+            tabla TEXT NOT NULL,
+            fila_id TEXT,
+            columnas TEXT NOT NULL,
+            filas TEXT NOT NULL,
+            baja INTEGER NOT NULL DEFAULT 0,
+            actualizado_en TEXT
+        );
         """
     )
 

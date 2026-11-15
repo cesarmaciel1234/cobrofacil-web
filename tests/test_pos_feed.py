@@ -215,3 +215,33 @@ def test_la_base_se_guarda_aparte_y_sin_claves(auth_client):
         with get_db() as conn:
             guardadas = json.loads(conn.execute("SELECT filas FROM pos_base").fetchone()["filas"])
     assert guardadas == [[2, "caja", None]]
+
+
+def test_el_delta_agrega_los_tickets_nuevos_y_no_borra_el_libro(auth_client):
+    base = {
+        "tabla": "ventas",
+        "columnas": ["id", "total"],
+        "parte": 1,
+        "partes": 1,
+        "sucursal_id": 1,
+        "sucursal": "Maciel",
+    }
+    primero = auth_client.post("/api/pos/base/tabla", json={**base, "filas": [[1, 100], [2, 200]]})
+    assert primero.status_code == 200
+    delta = auth_client.post(
+        "/api/pos/base/tabla",
+        json={**base, "modo": "delta", "filas": [[3, 50], [4, 70], [5, 80], [6, 90], [7, 110]]},
+    )
+    assert delta.status_code == 200
+    assert delta.get_json()["filas"] == 5
+    from app.services.pos_base import filas_de, novedades_desde
+    with auth_client.application.app_context():
+        columnas, filas = filas_de("ventas", 1)
+        assert [fila[columnas.index("id")] for fila in filas] == [1, 2, 3, 4, 5, 6, 7]
+        vacio = novedades_desde("")
+        assert vacio["cantidad"] == 0
+        marca = vacio["actualizado_en"]
+        llegaron = novedades_desde("1970-01-01T00:00:00+00:00", 1)
+    assert llegaron["cantidad"] == 5
+    assert [item["id"] for item in llegaron["filas"]] == ["3", "4", "5", "6", "7"]
+    assert marca

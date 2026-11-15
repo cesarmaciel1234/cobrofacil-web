@@ -1932,6 +1932,16 @@ select.periodo-pill.active option { color: #0F172A; }
 .caja-lado b { font-size: 15px; }
 .caja-lado small { font-size: 12px; color: #64748b; font-weight: 600; }
 .caja-vacio { margin: 0; color: #64748b; }
+.arqueo-lista { width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
+.arqueo-top { display: flex; justify-content: space-between; gap: 8px; align-items: center; padding: 14px 14px 8px; font-weight: 800; color: #0f172a; }
+.arqueo-head, .arqueo-fila { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr) minmax(72px, 1fr); gap: 6px; align-items: center; padding: 10px 14px; }
+.arqueo-head { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: #64748b; background: #f8fafc; }
+.arqueo-head span:nth-child(n+2), .arqueo-fila span:nth-child(n+2) { text-align: right; }
+.arqueo-fila { border-top: 1px solid #f1f5f9; color: #0f172a; font-size: 14px; }
+.arqueo-fila b { font-weight: 800; }
+.arqueo-fila span:nth-child(2) { color: #64748b; }
+.arqueo-pct { display: block; font-size: 11px; font-weight: 700; color: #0369a1; }
+.herramientas-detalle { display: none !important; }
 .pedido-lista { width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
 .pedido-fila { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; box-sizing: border-box; min-height: 64px; padding: 8px 10px 8px 14px; border-top: 1px solid #f1f5f9; background: #fff; }
 .pedido-fila:first-child { border-top: 0; }

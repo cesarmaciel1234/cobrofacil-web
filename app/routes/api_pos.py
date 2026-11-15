@@ -291,6 +291,20 @@ def api_pos_proveedores_export():
     return jsonify({"proveedores": proveedores, "total": len(proveedores)})
 
 
+@api_bp.route("/pos/novedades", methods=["GET"])
+def api_pos_novedades():
+    """Los tickets nuevos desde la última bajada. Sin marca, no manda el libro."""
+    from app.services.pos_base import novedades_desde
+
+    sucursal = request.args.get("sucursal_id", type=int)
+    if sucursal is None:
+        sucursal = request.args.get("branch_id", type=int)
+    return jsonify(novedades_desde(
+        request.args.get("desde") or request.args.get("last_sync") or "",
+        sucursal,
+    ))
+
+
 @api_bp.route("/pos/base", methods=["GET"])
 def api_pos_base():
     """Lista las tablas de Cobro Fácil que ya están en la nube."""
@@ -317,8 +331,10 @@ def api_pos_base_tabla():
             data.get("filas") or [],
             data.get("parte") or 1,
             data.get("partes") or 1,
-            data.get("sucursal_id"),
+            data.get("sucursal_id") if data.get("sucursal_id") not in (None, "") else data.get("branch_id"),
             data.get("sucursal") or data.get("sucursal_nombre"),
+            str(data.get("modo") or "reemplazo"),
+            data.get("bajas") or [],
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400

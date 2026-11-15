@@ -291,7 +291,6 @@ const $ = id => document.getElementById(id);
         let mensajePedido = '';
         let filtroProveedorPedido = '';
         let carritoPedido = {};
-        let cajaEnPantalla = [];
 
         const titles = {
             home: ['Inicio', 'Resumen rápido', 'Inicio'],
@@ -2308,91 +2307,6 @@ const $ = id => document.getElementById(id);
             }[c]));
         }
 
-        function cuboDeMedio(nombre) {
-            const t = String(nombre || '').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-            if (t.includes('QR') || t.includes('MERCADO') || /(^|[^A-Z])MP([^A-Z]|$)/.test(t)) return 'qr';
-            if (t.includes('TRANSF')) return 'transferencia';
-            if (t.includes('TARJETA') || t.includes('DEBITO') || t.includes('CREDITO') || t.includes('VISA') || t.includes('MASTER') || t.includes('POINT')) return 'tarjeta';
-            if (t.includes('FIADO') || t.includes('CUENTA') || t.includes('CTA')) return 'fiado';
-            if (!t || t.includes('EFECTIVO') || t.includes('CASH') || t.includes('CONTADO')) return 'efectivo';
-            return '';
-        }
-
-        function armarCaja(c) {
-            const base = [
-                { id: 'efectivo', nombre: 'Efectivo' },
-                { id: 'transferencia', nombre: 'Transferencia' },
-                { id: 'tarjeta', nombre: 'Tarjeta' },
-                { id: 'qr', nombre: 'QR' },
-                { id: 'fiado', nombre: 'Fiado' },
-            ].map((m) => ({ ...m, monto: 0, tickets: 0, lineas: [] }));
-            const porId = Object.fromEntries(base.map((m) => [m.id, m]));
-            const otros = [];
-            (c.medios_pago || []).forEach((m) => {
-                const linea = {
-                    nombre: m.medio,
-                    monto: Number(m.monto) || 0,
-                    tickets: Number(m.tickets) || 0,
-                };
-                const id = cuboDeMedio(m.medio);
-                const destino = id && porId[id];
-                if (destino) {
-                    destino.monto += linea.monto;
-                    destino.tickets += linea.tickets;
-                    destino.lineas.push(linea);
-                } else {
-                    otros.push({
-                        id: 'otro:' + String(m.medio || ''),
-                        nombre: m.medio || 'Otro',
-                        monto: linea.monto,
-                        tickets: linea.tickets,
-                        lineas: [linea],
-                    });
-                }
-            });
-            const cobros = c.detalle_cobros || [];
-            const pago = {
-                id: 'pago-cliente',
-                nombre: 'Pago cliente',
-                monto: Number(c.cobros) || 0,
-                tickets: cobros.length,
-                lineas: cobros.map((cob) => ({
-                    nombre: cob.descripcion || 'Cobro',
-                    monto: Number(cob.monto) || 0,
-                    tickets: 0,
-                })),
-                esCobro: true,
-            };
-            return [...base, ...otros, pago].map((m) => {
-                m.monto = Math.round(m.monto * 100) / 100;
-                if (m.esCobro) m.detalle = m.tickets ? (m.tickets + (m.tickets === 1 ? ' cobro' : ' cobros')) : 'Sin cobros';
-                else m.detalle = m.tickets ? (m.tickets + (m.tickets === 1 ? ' ticket' : ' tickets')) : 'Sin movimientos';
-                return m;
-            });
-        }
-
-        function abrirCaja(id) {
-            const metodo = cajaEnPantalla.find((m) => m.id === id);
-            if (!metodo) return;
-            cerrarFaltante();
-            const fondo = document.createElement('div');
-            fondo.id = 'pedidoSheet';
-            fondo.className = 'pedido-sheet-back';
-            const lineas = metodo.lineas.length
-                ? metodo.lineas.map((l) => `<div class="pedido-dato"><span>${textoJefe(l.nombre)}${l.tickets ? ' · ' + l.tickets + (l.tickets === 1 ? ' ticket' : ' tickets') : ''}</span><b>${plataJefe(l.monto)}</b></div>`).join('')
-                : '<p class="caja-vacio">Sin movimientos ese día.</p>';
-            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="${textoJefe(metodo.nombre)}">
-                <strong class="pedido-sheet-titulo">${textoJefe(metodo.nombre)}</strong>
-                ${lineas}
-                <div class="pedido-dato"><span>Total</span><b>${plataJefe(metodo.monto)}</b></div>
-                <button type="button" class="btn" data-cerrar-caja>Cerrar</button>
-            </div>`;
-            fondo.addEventListener('click', (ev) => {
-                if (ev.target === fondo || ev.target.closest('[data-cerrar-caja]')) cerrarFaltante();
-            });
-            document.body.appendChild(fondo);
-        }
-
         function cerrarFaltante() {
             document.getElementById('pedidoSheet')?.remove();
         }
@@ -2918,6 +2832,60 @@ const $ = id => document.getElementById(id);
             try { sessionStorage.setItem(clave, texto); } catch (e) {}
         }
 
+        function avisarDesacoplado() {
+            window.__crmDesacoplado = true;
+            document.querySelectorAll('.vitrina-banner span:last-child').forEach((nodo) => {
+                nodo.textContent = 'Motor desacoplado / Operando 100% offline';
+            });
+        }
+
+        function despertarNube() {
+            const corte = new AbortController();
+            const reloj = setTimeout(() => corte.abort(), 8000);
+            return fetch('/health', { cache: 'no-store', signal: corte.signal })
+                .finally(() => clearTimeout(reloj));
+        }
+
+        async function bajarNovedades() {
+            if (!navigator.onLine) {
+                avisarDesacoplado();
+                return;
+            }
+            const desde = localStorage.getItem('crm-novedad') || '';
+            const params = new URLSearchParams();
+            params.set('desde', desde);
+            params.set('last_sync', desde);
+            if (sessionUser && sessionUser.empresa_id) params.set('tenant_id', String(sessionUser.empresa_id));
+            if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                params.set('sucursal_id', String(activeSucursalId));
+                params.set('branch_id', String(activeSucursalId));
+            }
+            const ping = despertarNube().catch(() => {});
+            try {
+                const res = await fetch('/api/pos/novedades?' + params.toString());
+                if (!res.ok) throw new Error('novedades');
+                const dato = await res.json();
+                await ping;
+                window.__crmDesacoplado = false;
+                if (dato && dato.actualizado_en) localStorage.setItem('crm-novedad', dato.actualizado_en);
+                try {
+                    localStorage.setItem('crm-replica', JSON.stringify({
+                        filas: dato && dato.cantidad ? dato.cantidad : 0,
+                        ultimo: (dato && dato.actualizado_en) || ''
+                    }));
+                } catch (e) {}
+                const vista = document.querySelector('.view.active');
+                const nombre = vista && vista.id.startsWith('view-') ? vista.id.slice(5) : '';
+                const aviso = document.querySelector('.vitrina-banner');
+                const hayQueRedibujar = (dato && dato.cantidad) || (aviso && aviso.textContent.includes('Motor desacoplado'));
+                if (hayQueRedibujar && ['reporte', 'digitales', 'contabilidad', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(nombre)) {
+                    cargarJefe(nombre);
+                }
+            } catch (e) {
+                avisarDesacoplado();
+            }
+        }
+
         async function cargarJefe(panel) {
             const token = ++jefeCargaToken;
             const clave = claveJefe(panel);
@@ -2966,89 +2934,27 @@ const $ = id => document.getElementById(id);
             // 1. CONTABILIDAD & CAJA
             if (panel === 'contabilidad' && $('contaCuerpo')) {
                 const c = dato.contabilidad || {};
-                $('contaDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
+                if ($('contaDia')) $('contaDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
                 if (!dato.libro) {
                     $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
-                    const metodos = armarCaja(c);
-                    cajaEnPantalla = metodos;
-                    let html = '<div class="caja-lista">' + metodos.map((m) => `<button type="button" class="caja-fila" data-caja="${textoJefe(m.id)}"><span class="caja-nombre">${textoJefe(m.nombre)}</span><span class="caja-lado"><b>${plataJefe(m.monto)}</b><small>${textoJefe(m.detalle)}</small></span></button>`).join('') + '</div>';
-
                     const medios = c.medios_pago || [];
                     const totalMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0) || 1;
-                    html += `
-                    <div data-herramienta="arqueo" data-titulo="Arqueo por medio de pago" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
-                        <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                            <span>💳 Arqueo por Medio de Pago</span>
-                            <span style="font-size:12px; font-weight:600; color:#64748b;">Total: ${plataJefe(totalMedios)}</span>
-                        </div>
-                        <div style="overflow-x:auto;">
-                            <table class="data-table" style="width:100%; border-collapse:collapse;">
-                                <thead>
-                                    <tr style="background:#f8fafc; font-size:11px; color:#64748b; text-transform:uppercase; border-bottom:1px solid #e2e8f0;">
-                                        <th style="padding:10px 14px; text-align:left;">Medio de Pago</th>
-                                        <th style="padding:10px 14px; text-align:right;">Operaciones</th>
-                                        <th style="padding:10px 14px; text-align:right;">Monto</th>
-                                        <th style="padding:10px 14px; text-align:right;">Participación</th>
-                                    </tr>
-                                </thead>
-                                <tbody>`;
+                    let html = `<div data-pantalla="arqueo" class="arqueo-lista">
+                        <div class="arqueo-top"><span>Arqueo por medio de pago</span><b>${plataJefe(medios.reduce((acc, m) => acc + (m.monto || 0), 0))}</b></div>
+                        <div class="arqueo-head"><span>Medio</span><span>Operaciones</span><span>Monto</span></div>`;
                     if (medios.length === 0) {
-                        html += `<tr><td colspan="4" style="padding:12px; text-align:center; color:#64748b;">Sin movimientos de pago ese día.</td></tr>`;
+                        html += `<p class="caja-vacio" style="padding:14px;">Sin movimientos de pago ese día.</p>`;
                     } else {
-                        medios.forEach(m => {
+                        medios.forEach((m) => {
                             const pct = Math.round((m.monto / totalMedios) * 100);
-                            html += `
-                            <tr style="border-bottom:1px solid #f1f5f9;">
-                                <td style="padding:10px 14px; font-weight:700; color:#1e293b;">${textoJefe(m.medio)}</td>
-                                <td style="padding:10px 14px; text-align:right; color:#64748b;">${m.tickets} tickets</td>
-                                <td style="padding:10px 14px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(m.monto)}</td>
-                                <td style="padding:10px 14px; text-align:right;">
-                                    <span style="background:#e0f2fe; color:#0369a1; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:700;">${pct}%</span>
-                                </td>
-                            </tr>`;
+                            const tickets = m.tickets + (m.tickets === 1 ? ' ticket' : ' tickets');
+                            html += `<div class="arqueo-fila"><b>${textoJefe(m.medio)}</b><span>${textoJefe(tickets)}</span><span><b>${plataJefe(m.monto)}</b><small class="arqueo-pct">${pct}%</small></span></div>`;
                         });
                     }
-                    html += `</tbody></table></div></div>`;
-
-                    html += `
-                    <div data-herramienta="movimientos" data-titulo="Cobros y gastos del día" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(300px, 1fr)); gap:16px;">
-                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
-                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">📥 Cobros de Fiado del Día (${(c.detalle_cobros || []).length})</div>
-                            <div style="max-height:260px; overflow-y:auto;">`;
-                    if ((c.detalle_cobros || []).length === 0) {
-                        html += `<p style="color:#64748b; font-size:13px; margin:0;">Sin cobros de cuenta corriente registrados ese día.</p>`;
-                    } else {
-                        c.detalle_cobros.forEach(cob => {
-                            html += `<div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:13px;">
-                                <span style="color:#334155;">${textoJefe(cob.descripcion)}</span>
-                                <strong style="color:#16a34a;">+${plataJefe(cob.monto)}</strong>
-                            </div>`;
-                        });
-                    }
-                    html += `</div></div>
-
-                        <div style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px;">
-                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:12px;">📤 Gastos de Caja del Día (${(c.detalle_gastos || []).length})</div>
-                            <div style="max-height:260px; overflow-y:auto;">`;
-                    if ((c.detalle_gastos || []).length === 0) {
-                        html += `<p style="color:#64748b; font-size:13px; margin:0;">Sin gastos de caja registrados ese día.</p>`;
-                    } else {
-                        c.detalle_gastos.forEach(g => {
-                            html += `<div style="display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid #f1f5f9; font-size:13px;">
-                                <span><strong style="color:#475569;">${textoJefe(g.categoria)}:</strong> ${textoJefe(g.detalle)}</span>
-                                <strong style="color:#dc2626;">-${plataJefe(g.monto)}</strong>
-                            </div>`;
-                        });
-                    }
-                    html += `</div></div></div>`;
+                    html += `</div>`;
 
                     $('contaCuerpo').innerHTML = html;
-                    $('contaCuerpo').onclick = (ev) => {
-                        const fila = ev.target.closest('[data-caja]');
-                        if (!fila) return;
-                        abrirCaja(fila.getAttribute('data-caja'));
-                    };
                 }
             }
 
@@ -3086,7 +2992,7 @@ const $ = id => document.getElementById(id);
 
                             <div class="vitrina-banner">
                                 <span>⚠️</span>
-                                <span>En línea — datos de la tienda al ${v.actualizado_en_texto || '13/11 17:08'} (copia en la nube)</span>
+                                <span>${window.__crmDesacoplado ? 'Motor desacoplado / Operando 100% offline' : ('En línea — datos de la tienda al ' + (v.actualizado_en_texto || '—'))}</span>
                             </div>
 
                             <div class="vitrina-grid">
@@ -3562,6 +3468,7 @@ const $ = id => document.getElementById(id);
                 return;
             }
             if (btn.disabled) return;
+            void bajarNovedades();
             btn.disabled = true;
             btn.classList.add('btn-spinning');
             void refrescarManual().then(() => {

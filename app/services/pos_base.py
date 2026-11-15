@@ -33,6 +33,127 @@ def columna_secreta(nombre: str) -> bool:
     return any(marca in n for marca in _SECRETOS)
 
 
+def _indice_id(columnas: list) -> int | None:
+    for i, col in enumerate(columnas):
+        if str(col).lower() == "id":
+            return i
+    return None
+
+
+def _leer_crudo(conn, tabla: str, sid: int | None) -> tuple[list, list]:
+    if sid is None:
+        partes = conn.execute(
+            "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL ORDER BY parte",
+            (tabla,),
+        ).fetchall()
+    else:
+        partes = conn.execute(
+            "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id = ? ORDER BY parte",
+            (tabla, sid),
+        ).fetchall()
+    if not partes:
+        return [], []
+    columnas = list(json.loads(partes[0]["columnas"]))
+    filas: list[list] = []
+    for parte in partes:
+        filas.extend(json.loads(parte["filas"]))
+    return columnas, filas
+
+
+def _borrar_partes(conn, tabla: str, sid: int | None) -> None:
+    if sid is None:
+        conn.execute("DELETE FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL", (tabla,))
+    else:
+        conn.execute("DELETE FROM pos_base WHERE tabla = ? AND sucursal_id = ?", (tabla, sid))
+
+
+def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | None, columnas: list, filas: list, ahora: str) -> None:
+    _borrar_partes(conn, tabla, sid)
+    bloques = [filas[i : i + 150] for i in range(0, len(filas), 150)] or [[]]
+    for numero, bloque in enumerate(bloques, start=1):
+        conn.execute(
+            """
+            INSERT INTO pos_base
+            (sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                sid,
+                (sucursal_nombre or "").strip() or None,
+                tabla,
+                numero,
+                json.dumps(columnas, ensure_ascii=False),
+                json.dumps(bloque, ensure_ascii=False),
+                len(bloque),
+                ahora,
+            ),
+        )
+
+
+def _anotar_novedad(conn, sid: int | None, tabla: str, columnas: list, fila: list | None, fila_id: str, baja: bool, ahora: str) -> None:
+    conn.execute(
+        """
+        INSERT INTO pos_novedad
+        (sucursal_id, tabla, fila_id, columnas, filas, baja, actualizado_en)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            sid,
+            tabla,
+            fila_id,
+            json.dumps(columnas, ensure_ascii=False),
+            json.dumps(fila, ensure_ascii=False) if fila is not None else "null",
+            1 if baja else 0,
+            ahora,
+        ),
+    )
+
+
+def novedades_desde(desde: str | None, sucursal_id: int | None = None) -> dict[str, Any]:
+    """Filas que llegaron después de la marca. Sin marca, no manda el libro."""
+    ahora = _utc_now()
+    if not desde:
+        return {"ok": True, "cantidad": 0, "filas": [], "actualizado_en": ahora}
+    sid = _sucursal_id(sucursal_id)
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        if sid is None:
+            rows = conn.execute(
+                """
+                SELECT tabla, fila_id, columnas, filas, baja, actualizado_en
+                FROM pos_novedad
+                WHERE actualizado_en > ?
+                ORDER BY actualizado_en, id
+                LIMIT 500
+                """,
+                (desde,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """
+                SELECT tabla, fila_id, columnas, filas, baja, actualizado_en
+                FROM pos_novedad
+                WHERE actualizado_en > ? AND (sucursal_id = ? OR sucursal_id IS NULL)
+                ORDER BY actualizado_en, id
+                LIMIT 500
+                """,
+                (desde, sid),
+            ).fetchall()
+    marca = desde
+    filas = []
+    for row in rows:
+        marca = row["actualizado_en"] or marca
+        filas.append({
+            "tabla": row["tabla"],
+            "id": row["fila_id"],
+            "columnas": json.loads(row["columnas"]),
+            "fila": json.loads(row["filas"]) if row["filas"] not in (None, "null") else None,
+            "baja": bool(row["baja"]),
+            "actualizado_en": row["actualizado_en"],
+        })
+    return {"ok": True, "cantidad": len(filas), "filas": filas, "actualizado_en": marca if filas else ahora}
+
+
 def guardar_parte(
     tabla: str,
     columnas: list,
@@ -41,6 +162,8 @@ def guardar_parte(
     partes: int,
     sucursal_id: Any = None,
     sucursal_nombre: str | None = None,
+    modo: str = "reemplazo",
+    bajas: list | None = None,
 ) -> dict[str, Any]:
     if not _TABLA.match(tabla or ""):
         raise ValueError("Nombre de tabla inválido")
@@ -59,6 +182,8 @@ def guardar_parte(
             None if columna_secreta(col) else valor
             for col, valor in zip(columnas, fila)
         ])
+    if str(modo or "reemplazo") == "delta":
+        return _guardar_delta(tabla, columnas, limpias, sid, sucursal_nombre, list(bajas or []))
     with get_db() as conn:
         ensure_tenant_migrations(conn)
         if parte == 1:
@@ -102,6 +227,57 @@ def guardar_parte(
         )
     _olvidar_tabla(tabla)
     return {"ok": True, "tabla": tabla, "parte": parte, "filas": len(limpias)}
+
+
+def _guardar_delta(tabla: str, columnas: list, limpias: list, sid: int | None, sucursal_nombre: str | None, bajas: list) -> dict[str, Any]:
+    """Mete las filas nuevas en la copia. No borra el resto del libro."""
+    ahora = _utc_now()
+    idx = _indice_id(columnas)
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        previas_col, previas = _leer_crudo(conn, tabla, sid)
+        if previas_col and previas_col != columnas:
+            previas_col, previas = columnas, []
+        if not previas_col:
+            previas_col = columnas
+        por_id: dict[str, list] = {}
+        orden: list[str] = []
+        idx_prev = _indice_id(previas_col) if previas_col else None
+        if idx_prev is not None:
+            for fila in previas:
+                clave = str(fila[idx_prev])
+                if clave not in por_id:
+                    orden.append(clave)
+                por_id[clave] = fila
+        elif not limpias and not bajas:
+            return {"ok": True, "tabla": tabla, "parte": 1, "filas": 0, "modo": "delta"}
+        else:
+            _escribir_partes(conn, tabla, sid, sucursal_nombre, columnas, limpias, ahora)
+            _olvidar_tabla(tabla)
+            return {"ok": True, "tabla": tabla, "parte": 1, "filas": len(limpias), "modo": "reemplazo"}
+        tocadas = 0
+        if idx is None:
+            raise ValueError("El cambio no trae id")
+        for fila in limpias:
+            clave = str(fila[idx])
+            if clave not in por_id:
+                orden.append(clave)
+            por_id[clave] = fila
+            _anotar_novedad(conn, sid, tabla, columnas, fila, clave, False, ahora)
+            tocadas += 1
+        for baja in bajas:
+            clave = str(baja)
+            if clave in por_id:
+                del por_id[clave]
+                orden = [item for item in orden if item != clave]
+                _anotar_novedad(conn, sid, tabla, columnas, None, clave, True, ahora)
+                tocadas += 1
+        finales = [por_id[clave] for clave in orden if clave in por_id]
+        _escribir_partes(conn, tabla, sid, sucursal_nombre, previas_col, finales, ahora)
+        corte = datetime.now(timezone.utc).timestamp() - 48 * 3600
+        conn.execute("DELETE FROM pos_novedad WHERE actualizado_en < ?", (datetime.fromtimestamp(corte, timezone.utc).isoformat(),))
+    _olvidar_tabla(tabla)
+    return {"ok": True, "tabla": tabla, "parte": 1, "filas": tocadas, "modo": "delta"}
 
 
 def resumen_base() -> list[dict]:

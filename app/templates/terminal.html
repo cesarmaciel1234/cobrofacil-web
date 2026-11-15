@@ -26,7 +26,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.10">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.11">
     <style>
         .balance-grid {
             display: grid;
@@ -232,15 +232,13 @@
                     <p>Financial Command</p>
                 </div>
             </div>
-            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; margin-top: 4px;">
+            <div style="display: flex; align-items: center; width: 100%; margin-top: 4px;">
                 <span id="mobileConnPill" class="mobile-conn-pill online" aria-live="polite" style="margin: 0; flex: 1; justify-content: center;"><span class="dot"></span><span id="mobileConnText">En línea</span></span>
-                <button type="button" class="btn btn-ghost" id="btnEditEmpresa" style="padding: 4px 8px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: white; cursor: pointer; transition: all 0.2s;" title="Datos de la Empresa" onclick="abrirModalEmpresa()">
-                    ⚙️
-                </button>
             </div>
         </div>
         <nav class="nav" id="herramientasNav" aria-label="Herramientas del módulo">
-            <div class="nav-sucursal" id="branchSelectorBar">
+            <!-- Sucursal: fuera del menú. El selector sigue en el código para volver a usarlo. -->
+            <div class="nav-sucursal" id="branchSelectorBar" hidden>
                 <div class="nav-label">Sucursal</div>
                 <div id="sucursalPillsContainer" class="sucursal-pills-container">
                     <button type="button" class="btn btn-sm btn-primary sucursal-pill active" data-sucursal="todas">Consolidado (Todas)</button>
@@ -264,7 +262,6 @@
                 <span>Casa central</span>
                 <span class="version-tag">v{{ app_version }} PRO</span>
             </div>
-            <button type="button" class="btn btn-ghost btn-sm" id="btnBackup" style="width:100%; color:#3b82f6;">⛁ Backup / Nube</button>
             <button type="button" class="btn btn-ghost btn-sm" id="btnLogoutSidebar" style="width:100%;">Cerrar sesión</button>
         </div>
     </aside>
@@ -420,7 +417,6 @@
 
             <div class="view" id="view-contabilidad">
                 <div class="card">
-                    <div class="card-head"><h2>Contabilidad & Caja</h2><span id="contaDia">Espejo de la caja</span></div>
                     <div class="card-body" id="contaCuerpo">Cargando el libro…</div>
                 </div>
             </div>
@@ -1753,11 +1749,11 @@
     <script src="/static/js/crm-backup.js?v=3.7"></script>
     <script src="/static/js/barra/ventas.js?v=1"></script>
     <script src="/static/js/barra/cobros.js?v=1"></script>
-    <script src="/static/js/barra/caja.js?v=1"></script>
+    <script src="/static/js/barra/caja.js?v=3"></script>
     <script src="/static/js/barra/cartera.js?v=1"></script>
     <script src="/static/js/barra/pedidos.js?v=1"></script>
     <script src="/static/js/barra/armar.js?v=1"></script>
-    <script src="/static/js/modulo-panel.js?v=2"></script>
-    <script src="/static/js/app.js?v=4.13"></script>
+    <script src="/static/js/modulo-panel.js?v=3"></script>
+    <script src="/static/js/app.js?v=4.21"></script>
 </body>
 </html>
