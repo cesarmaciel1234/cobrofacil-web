@@ -19,6 +19,7 @@
 
     let activo = 'reporte';
     let elegida = '';
+    let pantalla = '';
 
     function $(id) {
         return document.getElementById(id);
@@ -114,16 +115,20 @@
             ? '<p class="herramientas-vacio">Esta pantalla ya muestra lo esencial. No hay herramientas aparte.</p>'
             : '';
 
+        const marca = pantalla || ((pantallas[0] && pantallas[0].id) || '');
         pantallas.forEach((accion) => {
+            const id = accion.id || '';
             const boton = document.createElement('button');
             boton.type = 'button';
-            boton.className = 'nav-item herramienta-btn' + (elegida ? '' : ' active');
+            boton.className = 'nav-item herramienta-btn' + ((id === marca || (!id && !marca)) ? ' active' : '');
             boton.textContent = accion.titulo;
             boton.addEventListener('click', (ev) => {
                 ev.stopPropagation();
+                pantalla = id;
                 elegida = '';
                 pintar();
                 cerrarMenu();
+                if (global.CrmBus) global.CrmBus.emit('pantallaModulo', activo, id);
             });
             lista.appendChild(boton);
         });
@@ -209,6 +214,7 @@
         soltar();
         activo = modulo || 'reporte';
         elegida = '';
+        pantalla = '';
         pintar();
     }
 

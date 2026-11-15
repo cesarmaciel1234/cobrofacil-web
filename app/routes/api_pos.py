@@ -13,7 +13,7 @@ Endpoints para recibir datos del servidor POS:
 - GET /api/pos/sync/logs - Obtener historial de sincronización
 - GET /api/pos/sync/status - Obtener estado de última sincronización
 """
-from flask import jsonify, request
+from flask import jsonify, request, session
 
 from app.routes.api import api_bp
 from app.services.pos_config import (
@@ -338,6 +338,13 @@ def api_pos_base_tabla():
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    parte = int(data.get("parte") or 1)
+    partes = int(data.get("partes") or 1)
+    completo = str(data.get("modo") or "reemplazo") == "delta" or parte >= partes
+    if completo and resultado.get("ok"):
+        from app.services.signal_bus import broadcast_refresh
+
+        broadcast_refresh(int(session.get("empresa_id") or 1), reason="libro")
     return jsonify(resultado)
 
 
@@ -426,7 +433,7 @@ def api_pos_jefe():
     desde = request.args.get("desde")
     hasta = request.args.get("hasta")
     filtro = None
-    if nombre == "ticket":
+    if nombre in ("ticket", "contabilidad"):
         filtro = {
             "texto": request.args.get("q") or "",
             "metodo": request.args.get("pago") or "TODOS",

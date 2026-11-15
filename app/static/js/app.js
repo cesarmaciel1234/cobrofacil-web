@@ -291,6 +291,7 @@ const $ = id => document.getElementById(id);
         let mensajePedido = '';
         let filtroProveedorPedido = '';
         let carritoPedido = {};
+        const CARRITO_LOCAL = 'crm-carrito-pedido';
         let ticketsEnPantalla = [];
         let cajasVentas = [];
         let ticketsResumen = { total: 0, ok: 0, recorte: false };
@@ -298,7 +299,7 @@ const $ = id => document.getElementById(id);
         let filtroVentas = {
             q: '',
             pago: 'TODOS',
-            alcance: 'dia',
+            alcance: 'mes',
             fecha: '',
             historico: false,
             franja: false,
@@ -306,6 +307,9 @@ const $ = id => document.getElementById(id);
             hora_hasta: '21:00',
             caja: ''
         };
+        let cajaPantalla = 'arqueo';
+        let periodoDigital = 'Semana';
+        let libroDigital = null;
 
         const titles = {
             home: ['Inicio', 'Resumen rápido', 'Inicio'],
@@ -2021,9 +2025,10 @@ const $ = id => document.getElementById(id);
         function updateSessionGreetingUI() {
             const nameEl = document.getElementById('empresaNombre');
             if (!nameEl) return;
+            nameEl.title = 'Cuenta: ' + sessionUser.username + ' (empresa #' + sessionUser.empresa_id + ')';
+            if (window.CarteraLibro && window.CarteraLibro.cromo && window.CarteraLibro.cromo()) return;
             const etiqueta = (sessionUser.empresa_nombre || sessionUser.username || '').toUpperCase();
             if (etiqueta && nameEl.textContent !== etiqueta) nameEl.textContent = etiqueta;
-            nameEl.title = 'Cuenta: ' + sessionUser.username + ' (empresa #' + sessionUser.empresa_id + ')';
         }
 
         function hydrateSessionLocal() {
@@ -2283,6 +2288,19 @@ const $ = id => document.getElementById(id);
             document.getElementById('pedidoSheet')?.remove();
         }
 
+        function guardarCarrito() {
+            try { sessionStorage.setItem(CARRITO_LOCAL, JSON.stringify(carritoPedido)); } catch (e) {}
+        }
+
+        function restaurarCarrito() {
+            try {
+                const crudo = sessionStorage.getItem(CARRITO_LOCAL);
+                if (!crudo) return;
+                const dato = JSON.parse(crudo);
+                if (dato && typeof dato === 'object') carritoPedido = dato;
+            } catch (e) {}
+        }
+
         function clavePedido(item) {
             return String(item.codigo || '') + '|' + String(item.producto || '');
         }
@@ -2382,6 +2400,7 @@ const $ = id => document.getElementById(id);
             }
             marcarMasCarrito();
             pintarCarritoFlotante();
+            guardarCarrito();
         }
 
         function cambiarCarrito(clave, delta) {
@@ -2389,6 +2408,17 @@ const $ = id => document.getElementById(id);
             if (!entry) return;
             entry.cantidad = Math.round((entry.cantidad + delta) * 10) / 10;
             if (entry.cantidad <= 0) delete carritoPedido[clave];
+            guardarCarrito();
+            marcarMasCarrito();
+            pintarCarritoFlotante();
+            if (entradasCarrito().length) abrirCarrito();
+            else cerrarFaltante();
+        }
+
+        function quitarDelCarrito(clave) {
+            if (!carritoPedido[clave]) return;
+            delete carritoPedido[clave];
+            guardarCarrito();
             marcarMasCarrito();
             pintarCarritoFlotante();
             if (entradasCarrito().length) abrirCarrito();
@@ -2411,19 +2441,38 @@ const $ = id => document.getElementById(id);
         }
 
         function abrirWhatsappPedido(ev) {
-            if (ev) ev.stopPropagation();
+            if (ev) {
+                ev.preventDefault();
+                ev.stopPropagation();
+            }
             const texto = mensajeDelCarrito();
             if (!texto || texto === 'PEDIDO') return;
-            window.open('https://wa.me/?text=' + encodeURIComponent(texto), '_blank', 'noopener');
+            guardarCarrito();
+            cerrarFaltante();
+            const enlace = document.createElement('a');
+            enlace.href = 'https://wa.me/?text=' + encodeURIComponent(texto);
+            enlace.target = '_blank';
+            enlace.rel = 'noopener noreferrer';
+            document.body.appendChild(enlace);
+            enlace.click();
+            enlace.remove();
         }
 
         async function copiarPedidoCarrito(ev) {
             if (ev) ev.stopPropagation();
             const texto = mensajeDelCarrito();
             if (!texto || texto === 'PEDIDO') return;
-            await navigator.clipboard.writeText(texto);
-            if (typeof toast === 'function') toast('Pedido copiado');
+            guardarCarrito();
+            try {
+                await navigator.clipboard.writeText(texto);
+                if (typeof toast === 'function') toast('Pedido copiado');
+            } catch (e) {
+                if (typeof toast === 'function') toast('No se pudo copiar el pedido', true);
+            }
+            cerrarFaltante();
         }
+
+        restaurarCarrito();
 
         function abrirCarrito() {
             const entradas = entradasCarrito();
@@ -2443,6 +2492,7 @@ const $ = id => document.getElementById(id);
                         <button type="button" data-menos="${textoJefe(clave)}" aria-label="Restar">−</button>
                         <b>${cantidadJefe(entry.cantidad)}</b>
                         <button type="button" data-mas="${textoJefe(clave)}" aria-label="Sumar">+</button>
+                        <button type="button" class="carrito-quitar" data-quitar="${textoJefe(clave)}" aria-label="Quitar">×</button>
                     </div>
                 </div>`;
                 }).join('')}
@@ -2456,6 +2506,8 @@ const $ = id => document.getElementById(id);
                 const mas = ev.target.closest('[data-mas]');
                 if (menos) { ev.stopPropagation(); cambiarCarrito(menos.dataset.menos, -1); return; }
                 if (mas) { ev.stopPropagation(); cambiarCarrito(mas.dataset.mas, 1); return; }
+                const quitar = ev.target.closest('[data-quitar]');
+                if (quitar) { ev.stopPropagation(); quitarDelCarrito(quitar.dataset.quitar); return; }
                 if (ev.target.closest('[data-wasap]')) { abrirWhatsappPedido(ev); return; }
                 if (ev.target.closest('[data-copiar]')) { copiarPedidoCarrito(ev); return; }
                 if (ev.target === fondo || ev.target.closest('[data-cerrar]')) cerrarFaltante();
@@ -2493,9 +2545,10 @@ const $ = id => document.getElementById(id);
 
         function filtroVentasActivo() {
             const f = filtroVentas;
-            return !!(f.q || (f.pago && f.pago !== 'TODOS') || f.alcance === 'mes' || f.historico || f.caja
-                || f.franja
-                || (f.fecha && f.fecha !== hoyLocal()));
+            const hoy = hoyLocal();
+            const mesDistinto = f.alcance === 'mes' && f.fecha && f.fecha.slice(0, 7) !== hoy.slice(0, 7);
+            return !!(f.q || (f.pago && f.pago !== 'TODOS') || f.historico || f.caja || f.franja
+                || f.alcance !== 'mes' || mesDistinto);
         }
 
         function pintarTickets() {
@@ -3148,6 +3201,99 @@ const $ = id => document.getElementById(id);
             aplicarDatosJefe(panel, dato, false);
         }
 
+        function badgeDigital(estado) {
+            const texto = String(estado || '');
+            let fondo = '#e2e8f0';
+            let tinta = '#334155';
+            if (texto.includes('SIN TICKET')) { fondo = '#fee2e2'; tinta = '#b91c1c'; }
+            else if (texto.includes('SIN FIRMAR')) { fondo = '#fef3c7'; tinta = '#92400e'; }
+            else if (texto.includes('CANCEL')) { fondo = '#f1f5f9'; tinta = '#64748b'; }
+            else if (texto === 'FIRMADO' || texto === 'COBRADO') { fondo = '#dcfce7'; tinta = '#15803d'; }
+            else if (texto === 'EN TICKET') { fondo = '#dbeafe'; tinta = '#1d4ed8'; }
+            return `<span class="dig-estado" style="background:${fondo};color:${tinta};">${textoJefe(texto || '—')}</span>`;
+        }
+
+        function pintarLibroDigital() {
+            const cuerpo = $('contaCuerpo');
+            const dig = libroDigital || {};
+            if (!cuerpo) return;
+            const txs = dig.transacciones || [];
+            const periodos = ['Hoy', 'Semana', 'Mes', 'Año'];
+            const corta = (n) => {
+                const x = Number(n);
+                if (!Number.isFinite(x)) return '—';
+                const abs = Math.abs(x);
+                const signo = x < 0 ? '-' : '';
+                if (abs >= 1000000) return signo + '$' + (abs / 1000000).toLocaleString('es-AR', { maximumFractionDigits: 1 }) + 'M';
+                if (abs >= 1000) return signo + '$' + Math.round(abs).toLocaleString('es-AR');
+                return plataJefe(x);
+            };
+            const cards = [
+                ['Bruto', corta(dig.bruto_mp), 'cobros'],
+                ['Tickets', corta(dig.tickets_digitales), 'ventas'],
+                ['Cliente', corta(dig.cliente_cobros), 'abonos'],
+                ['Sin ticket', corta(dig.sin_ticket), 'sin venta']
+            ];
+            cuerpo.innerHTML = `<div class="pago-digital">
+                <div class="vitrina-periodos dig-periodos">${periodos.map((nombre) => `<button type="button" class="periodo-pill${nombre === periodoDigital ? ' active' : ''}" data-dig-periodo="${nombre}">${nombre}</button>`).join('')}</div>
+                <div class="dig-numeros">${cards.map(([titulo, valor, nota]) => `<div><small>${titulo}</small><b>${valor}</b><span>${nota}</span></div>`).join('')}</div>
+                <div class="table-wrap"><table class="data-table dig-tabla"><thead><tr><th>Fecha</th><th>ID de pago</th><th>Cuenta</th><th>Concepto</th><th>Monto</th><th>Estado</th><th>Ticket</th><th>Cobro</th></tr></thead><tbody>
+                ${txs.length ? txs.map((t) => `<tr>
+                    <td>${textoJefe((t.fecha || '').replace('T', ' ').slice(0, 16))}</td>
+                    <td>${textoJefe(t.id_pago || '—')}</td>
+                    <td>${textoJefe(t.cuenta || '—')}</td>
+                    <td>${textoJefe(t.concepto || '—')}</td>
+                    <td>${plataJefe(t.monto)}</td>
+                    <td>${badgeDigital(t.estado)}</td>
+                    <td>${textoJefe(t.ticket_venta || '—')}</td>
+                    <td>${textoJefe(t.ticket_cobro || '—')}</td>
+                </tr>`).join('') : `<tr><td colspan="8">Sin cobros digitales en este período.</td></tr>`}
+                </tbody></table></div>
+                ${dig.recorte ? '<p class="dig-nota">Se muestran los 400 cobros más nuevos.</p>' : ''}
+                <p class="dig-nota">${dig.fuente === 'libro' ? 'Sale del libro de cobros digitales.' : (dig.fuente === 'ticket' ? 'El libro de cobros todavía no llegó: esto sale de los tickets.' : 'Todavía no hay cobros digitales en la nube.')}</p>
+            </div>`;
+        }
+
+        async function cargarPagoDigital() {
+            const cuerpo = $('contaCuerpo');
+            if (cuerpo && !libroDigital) cuerpo.innerHTML = '<p>Cargando cobros digitales…</p>';
+            let url = '/api/pos/jefe?panel=digitales&periodo=' + encodeURIComponent(periodoDigital);
+            if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
+            }
+            try {
+                const res = await fetch(url);
+                if (!res.ok) throw new Error('digital');
+                const dato = await res.json();
+                libroDigital = dato.digitales || {};
+                if (dato.digitales && dato.digitales.periodo) periodoDigital = dato.digitales.periodo;
+            } catch (e) {
+                libroDigital = libroDigital || { fuente: 'vacio', transacciones: [] };
+            }
+            if (cajaPantalla === 'digital') {
+                pintarLibroDigital();
+                document.querySelectorAll('#herramientasLista .herramienta-btn').forEach((boton) => {
+                    boton.classList.toggle('active', boton.textContent.trim() === 'Pago digital');
+                });
+            }
+        }
+
+        function recargarVistaViva() {
+            const activa = document.querySelector('.view.active');
+            const name = activa ? activa.id.replace('view-', '') : '';
+            if (name === 'cartera' && window.CarteraLibro) {
+                void window.CarteraLibro.actualizar();
+                return;
+            }
+            if (name === 'contabilidad' && cajaPantalla === 'digital') {
+                void cargarPagoDigital();
+                return;
+            }
+            if (['reporte', 'digitales', 'contabilidad', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) {
+                void cargarJefe(name);
+            }
+        }
+
         function aplicarDatosJefe(panel, dato, enCurso) {
             const resumen = dato.resumen || {};
             const aviso = dato.libro
@@ -3156,6 +3302,7 @@ const $ = id => document.getElementById(id);
 
             // 1. CONTABILIDAD & CAJA
             if (panel === 'contabilidad' && $('contaCuerpo')) {
+                if (cajaPantalla === 'digital') return;
                 const c = dato.contabilidad || {};
                 if ($('contaDia')) $('contaDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
                 if (!dato.libro) {
@@ -3179,6 +3326,9 @@ const $ = id => document.getElementById(id);
 
                     $('contaCuerpo').innerHTML = html;
                 }
+                document.querySelectorAll('#herramientasLista .herramienta-btn').forEach((boton) => {
+                    boton.classList.toggle('active', boton.textContent.trim() === 'Arqueo por medio de pago');
+                });
             }
 
             // 2. JEFE / REPORTE & VITRINA
@@ -3559,6 +3709,7 @@ const $ = id => document.getElementById(id);
                 }
             }
             pintarCarritoFlotante();
+            if (name === 'cartera' && window.CarteraLibro && window.CarteraLibro.cromo) window.CarteraLibro.cromo();
         }
 
         let datosVista = 0;
@@ -3602,7 +3753,7 @@ const $ = id => document.getElementById(id);
                 activeRowIndex = -1;
             }
             if (!titles[name]) return;
-            document.querySelectorAll('.nav-item').forEach(n => n.classList.toggle('active', n.dataset.view === name));
+            document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === name));
             document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
             document.querySelectorAll('.pwa-nav-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.pwaView === name);
@@ -3620,6 +3771,13 @@ const $ = id => document.getElementById(id);
                 $('jefeBar').classList.toggle('field-hidden', !jefeVistas.includes(name));
             }
             cerrarFaltante();
+            if (name === 'reporte') window.vitrinaPeriodo = 'Hoy';
+            if (name === 'ticket') {
+                filtroVentas.alcance = 'mes';
+                filtroVentas.historico = false;
+                filtroVentas.fecha = '';
+            }
+            if (name === 'contabilidad') cajaPantalla = 'arqueo';
             programarDatos(name);
             if ($('cobranzasBar')) {
                 if (name === 'cobranzas') {
@@ -4919,11 +5077,8 @@ const $ = id => document.getElementById(id);
         window.addEventListener('online', () => {
             updateConnectionStatus();
             void sincronizarSolicitudesPendientes();
-            const activa = document.querySelector('.view.active');
-            const name = activa ? activa.id.replace('view-', '') : '';
-            if (['reporte', 'digitales', 'contabilidad', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) {
-                cargarJefe(name);
-            }
+            if (window.CrmLoader) CrmLoader.initSignalListener();
+            void despertarNube().catch(() => {}).finally(() => recargarVistaViva());
         });
         window.addEventListener('offline', updateConnectionStatus);
         
@@ -5119,6 +5274,25 @@ const $ = id => document.getElementById(id);
             CrmBus.on('loadSession', () => loadSession());
             CrmBus.on('hydrateSessionLocal', () => hydrateSessionLocal());
             CrmBus.on('switchView', (name) => switchView(name));
+            CrmBus.on('libroNuevo', () => recargarVistaViva());
+            CrmBus.on('pantallaModulo', (vista, id) => {
+                if (vista !== 'contabilidad') return;
+                cajaPantalla = id || 'arqueo';
+                if (cajaPantalla === 'digital') {
+                    periodoDigital = 'Semana';
+                    libroDigital = null;
+                    void cargarPagoDigital();
+                    return;
+                }
+                const vistaActiva = document.querySelector('.view.active');
+                if (vistaActiva && vistaActiva.id === 'view-contabilidad') void cargarJefe('contabilidad');
+            });
+            document.addEventListener('click', (ev) => {
+                const periodo = ev.target.closest('[data-dig-periodo]');
+                if (!periodo || cajaPantalla !== 'digital') return;
+                periodoDigital = periodo.dataset.digPeriodo;
+                void cargarPagoDigital();
+            });
             CrmBus.on('applyPwaDeepLink', () => applyPwaDeepLink());
             CrmBus.on('aplicarCambioOptimista', (url, method, body) => aplicarCambioOptimista(url, method, body));
             CrmBus.on('aplicarOperacionOptimista', (payload, uuid) => aplicarOperacionOptimista(payload, uuid));

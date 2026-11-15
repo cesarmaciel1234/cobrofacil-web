@@ -111,7 +111,7 @@ def test_api_panel_jefe_consolidado_y_filtrado(client):
 
 def test_api_panel_contabilidad(client):
     _cargar_datos_muestra()
-    r = client.get("/api/pos/jefe?panel=contabilidad")
+    r = client.get("/api/pos/jefe?panel=contabilidad&fecha=2026-11-13")
     assert r.status_code == 200
     d = r.get_json()
     assert d["ok"] is True
@@ -148,7 +148,7 @@ def test_api_panel_admin_cartera(client):
 
 def test_api_panel_digitales(client):
     _cargar_datos_muestra()
-    r = client.get("/api/pos/jefe?panel=digitales")
+    r = client.get("/api/pos/jefe?panel=digitales&periodo=Período&desde=2026-11-13&hasta=2026-11-13")
     assert r.status_code == 200
     d = r.get_json()
     assert d["ok"] is True
@@ -217,7 +217,7 @@ def test_panel_no_inventa_mora_ni_cuenta_y_el_ranking_es_del_dia(client):
     textos = " ".join(a["texto"] for a in jefe["pulso"]["alertas"])
     assert "cuentas" in textos
 
-    digitales = client.get("/api/pos/jefe?panel=digitales").get_json()["digitales"]
+    digitales = client.get("/api/pos/jefe?panel=digitales&periodo=Período&desde=2026-11-13&hasta=2026-11-13").get_json()["digitales"]
     assert digitales["fuente"] == "ticket"
     assert digitales["neto_estimado"] is True
     assert digitales["neto_mp"] == digitales["bruto_mp"]

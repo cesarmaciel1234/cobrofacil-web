@@ -108,7 +108,7 @@
 
     function marcarAtras(activo) {
         const boton = nodo('menuToggle');
-        if (boton && vistaActiva()) {
+        if (boton) {
             boton.classList.toggle('es-atras', activo);
             boton.setAttribute('aria-label', activo ? 'Volver' : 'Opciones del módulo');
             boton.title = activo ? 'Volver' : 'Opciones del módulo';
@@ -117,6 +117,15 @@
         const refresh = nodo('btnRefresh');
         if (perfil) perfil.hidden = !activo;
         if (refresh) refresh.hidden = !!activo;
+    }
+
+    function cromo() {
+        const ficha = nodo('ficha');
+        if (!fichaAbierta || !ficha || ficha.hidden || !vistaActiva()) return false;
+        const client = allClients.find(item => String(item.id) === fichaAbierta);
+        if (client) ponerMarca(client.nombre);
+        marcarAtras(true);
+        return true;
     }
 
     function mostrarLista() {
@@ -190,6 +199,8 @@
         if (!client) return;
         const misma = fichaAbierta === String(id) && nodo('ficha') && !nodo('ficha').hidden;
         fichaAbierta = String(id);
+        ponerMarca(client.nombre);
+        marcarAtras(true);
         if (!misma) pintarFichaBase(client, '<p class="ficha-nota">Cargando el libro…</p>');
         if (client.pos_id == null) {
             const cuerpo = nodo('fichaCuerpo');
@@ -491,6 +502,7 @@
     }
 
     async function loadClients() {
+        librosVistos.clear();
         const vacio = nodo('emptyState');
         if (!allClients.length && vacio) {
             vacio.hidden = false;
@@ -561,11 +573,9 @@
             else mostrarLista();
             return loadClients();
         },
+        cromo,
         salir() {
-            const perfil = nodo('btnPerfil');
-            const refresh = nodo('btnRefresh');
-            if (perfil) perfil.hidden = true;
-            if (refresh) refresh.hidden = false;
+            marcarAtras(false);
             ponerMarca(marcaEmpresa);
             cerrarMovimiento();
         },

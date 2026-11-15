@@ -7,6 +7,7 @@ window.BarraModulos.push({
     vista: 'contabilidad',
     pantalla: 'Arqueo por medio de pago',
     herramientas: [
-        { id: 'arqueo', titulo: 'Arqueo por medio de pago', tipo: 'pantalla' }
+        { id: 'arqueo', titulo: 'Arqueo por medio de pago', tipo: 'pantalla' },
+        { id: 'digital', titulo: 'Pago digital', tipo: 'pantalla' }
     ]
 });

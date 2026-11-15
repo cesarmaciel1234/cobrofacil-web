@@ -440,6 +440,7 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             "filtrado": 0.0,
             "tickets_ok": 0,
             "cajas": [],
+            "medios": [],
             "recorte": False,
         }
     idx = {str(col).lower(): i for i, col in enumerate(columnas)}
@@ -464,6 +465,7 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
                     nombres[vid] = (nombres.get(vid, "") + " " + nombre).strip()
     cajas = set()
     elegidas = []
+    medios: dict[str, dict] = {}
     suma = 0.0
     ok = 0
     for fila in filas:
@@ -502,6 +504,10 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
         suma += aporte
         if not str(venta["estado"] or "").upper().startswith("CANCELAD"):
             ok += 1
+            medio = str(venta["metodo_pago"] or "Efectivo").strip() or "Efectivo"
+            slot = medios.setdefault(medio, {"medio": medio, "monto": 0.0, "tickets": 0})
+            slot["monto"] += float(aporte or 0)
+            slot["tickets"] += 1
         elegidas.append(venta)
     elegidas.sort(key=lambda item: (item["fecha"], item["id"]), reverse=True)
     recorte = len(elegidas) > _TOPE_LISTA
@@ -523,5 +529,13 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
         "filtrado": round(suma, 2),
         "tickets_ok": ok,
         "cajas": sorted(cajas),
+        "medios": sorted(
+            (
+                {"medio": item["medio"], "monto": round(item["monto"], 2), "tickets": item["tickets"]}
+                for item in medios.values()
+            ),
+            key=lambda item: item["monto"],
+            reverse=True,
+        ),
         "recorte": recorte,
     }

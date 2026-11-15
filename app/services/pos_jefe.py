@@ -6,7 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.services.pos_base import filas_de, listar_sucursales, ultima_carga
-from app.services.pos_historial import historial_ventas
+from app.services.pos_historial import historial_ventas, rango_fechas
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 _cartera_lock = threading.Lock()
@@ -220,14 +220,21 @@ def _ranking_cortes(dia: str, sucursal_id: int | None, ventas: list[dict]) -> li
     return lista[:20]
 
 
-def _cobros_digitales(dia: str, sucursal_id: int | None = None) -> dict:
+def _en_dias(fecha, ini: str, fin: str) -> bool:
+    dia = _dia(fecha)
+    return bool(dia) and ini <= dia <= fin
+
+
+def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | None = None) -> dict:
+    ini = (dia or "")[:10]
+    fin = (hasta or dia or "")[:10]
     col_v, filas_v = filas_de("ventas", sucursal_id)
     idx_v = _indice(col_v)
     vivas = []
     cancelados = 0.0
     if col_v:
         for f in filas_v:
-            if _dia(_valor(f, idx_v, "fecha")) != dia:
+            if not _en_dias(_valor(f, idx_v, "fecha"), ini, fin):
                 continue
             pago = _valor(f, idx_v, "metodo_pago", "medio_pago")
             if not _es_digital(pago):
@@ -249,7 +256,7 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None) -> dict:
     cobros_dig = []
     if col_cc:
         for f in filas_cc:
-            if _dia(_valor(f, idx_cc, "fecha")) == dia and str(_valor(f, idx_cc, "tipo") or "").upper() == "ABONO":
+            if _en_dias(_valor(f, idx_cc, "fecha"), ini, fin) and str(_valor(f, idx_cc, "tipo") or "").upper() == "ABONO":
                 desc = str(_valor(f, idx_cc, "descripcion") or "")
                 if _es_digital(desc):
                     cobros_dig.append({
@@ -267,7 +274,7 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None) -> dict:
     if col_cd:
         fuente = "libro"
         for f in filas_cd:
-            if _dia(_valor(f, idx_cd, "fecha")) != dia:
+            if not _en_dias(_valor(f, idx_cd, "fecha"), ini, fin):
                 continue
             neto = _valor(f, idx_cd, "neto", "monto_neto", "liquido")
             if neto not in (None, ""):
@@ -337,7 +344,8 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None) -> dict:
         "sin_ticket": round(sin_ticket, 2),
         "cliente_cobros": round(sum(c["monto"] for c in cobros_dig), 2),
         "cancelados": round(cancelados, 2),
-        "transacciones": registros[:60],
+        "transacciones": sorted(registros, key=lambda fila: str(fila.get("fecha") or ""), reverse=True)[:400],
+        "recorte": len(registros) > 400,
     }
 
 
@@ -688,34 +696,34 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
     }
 
 
-def _filas_del_dia(tabla: str, dia: str, sucursal_id: int | None = None) -> tuple[dict[str, int], list[list]]:
+def _filas_en_rango(tabla: str, ini: str | None, fin: str | None, sucursal_id: int | None = None):
     columnas, filas = filas_de(tabla, sucursal_id)
     idx = _indice(columnas)
-    del_dia = [fila for fila in filas if _dia(_valor(fila, idx, "fecha")) == dia]
-    return idx, del_dia
+    if not ini and not fin:
+        return idx, list(filas)
+    desde = ini or ""
+    hasta = fin or ini or "9999-99-99"
+    return idx, [
+        fila for fila in filas
+        if (dia := _dia(_valor(fila, idx, "fecha"))) and desde <= dia <= hasta
+    ]
 
 
-def _contabilidad(dia: str, resumen: dict, ventas: list[dict], sucursal_id: int | None = None) -> dict:
-    del_dia = [v for v in ventas if v["dia"] == dia]
-    medios_dict: dict[str, dict] = {}
-    for v in del_dia:
-        medio = str(v.get("pago") or "Efectivo").strip() or "Efectivo"
-        monto = _numero(v.get("total"))
-        if medio not in medios_dict:
-            medios_dict[medio] = {"medio": medio, "monto": 0.0, "tickets": 0}
-        medios_dict[medio]["monto"] += monto
-        medios_dict[medio]["tickets"] += 1
+def _etiqueta_caja(pedido: dict, ini: str | None, fin: str | None, hoy: str) -> str:
+    if pedido.get("historico"):
+        return "Todas"
+    if str(pedido.get("alcance") or "dia").lower() == "mes":
+        return "Mes · " + (ini or hoy)[:7]
+    dia = ini or hoy
+    return ("Hoy · " if dia == hoy else "Día · ") + dia
 
-    medios_lista = sorted(
-        [
-            {"medio": m["medio"], "monto": round(m["monto"], 2), "tickets": m["tickets"]}
-            for m in medios_dict.values()
-        ],
-        key=lambda x: x["monto"],
-        reverse=True,
-    )
 
-    idx_cc, movimientos = _filas_del_dia("cuenta_corriente", dia, sucursal_id)
+def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, sucursal_id: int | None, etiqueta: str) -> dict:
+    medios_lista = medios_pago or []
+    total_medios = round(sum(_numero(m.get("monto")) for m in medios_lista), 2)
+    tickets = sum(int(m.get("tickets") or 0) for m in medios_lista)
+
+    idx_cc, movimientos = _filas_en_rango("cuenta_corriente", ini, fin, sucursal_id)
     cobros = 0.0
     detalle_cobros = []
     for fila in movimientos:
@@ -728,7 +736,7 @@ def _contabilidad(dia: str, resumen: dict, ventas: list[dict], sucursal_id: int 
                 "descripcion": str(_valor(fila, idx_cc, "descripcion") or "Cobro fiado"),
             })
 
-    idx_g, gastos = _filas_del_dia("gastos", dia, sucursal_id)
+    idx_g, gastos = _filas_en_rango("gastos", ini, fin, sucursal_id)
     lista_gastos = []
     total_gastos = 0.0
     for fila in gastos:
@@ -744,19 +752,20 @@ def _contabilidad(dia: str, resumen: dict, ventas: list[dict], sucursal_id: int 
                 "monto": round(monto, 2),
             }
         )
-    idx_caja, caja = _filas_del_dia("movimientos_caja", dia, sucursal_id)
+    idx_caja, caja = _filas_en_rango("movimientos_caja", ini, fin, sucursal_id)
     por_tipo: dict[str, float] = {}
     for fila in caja:
         tipo = str(_valor(fila, idx_caja, "tipo") or "Movimiento")
         por_tipo[tipo] = por_tipo.get(tipo, 0.0) + _numero(_valor(fila, idx_caja, "monto"))
     return {
-        "ventas": resumen["ventas"],
-        "tickets": resumen["tickets"],
+        "ventas": total_medios,
+        "tickets": tickets,
+        "etiqueta": etiqueta,
         "medios_pago": medios_lista,
         "cobros": round(cobros, 2),
         "detalle_cobros": detalle_cobros[:20],
         "gastos": round(total_gastos, 2),
-        "resultado": round(resumen["ventas"] + cobros - total_gastos, 2),
+        "resultado": round(total_medios + cobros - total_gastos, 2),
         "detalle_gastos": lista_gastos[:40],
         "caja": [{"tipo": tipo, "monto": round(monto, 2)} for tipo, monto in sorted(por_tipo.items())],
     }
@@ -892,7 +901,12 @@ def _armar_panel(
     desglose_suc = _desglose_sucursales(ventas, dia) if ventas else []
 
     if nombre in ("digitales", "cobros_digitales", "mercadopago", "mp"):
-        digitales = _cobros_digitales(dia, sucursal_id)
+        from app.services.pos_vitrina import resolver_rango
+        desde_iso, hasta_iso, nombre_periodo = resolver_rango(
+            periodo=periodo, desde_custom=desde, hasta_custom=hasta
+        )
+        digitales = _cobros_digitales(desde_iso[:10], sucursal_id, hasta_iso[:10])
+        digitales["periodo"] = nombre_periodo
         return {
             "ok": True,
             "libro": digitales.get("bruto_mp", 0) > 0 or len(digitales.get("transacciones", [])) > 0,
@@ -944,13 +958,30 @@ def _armar_panel(
             "sucursal_id": sucursal_id,
         }
     if nombre in ("contabilidad", "tesoreria"):
+        hoy = datetime.now(_ZONA).date().isoformat()
+        pedido = dict(filtro or {})
+        pedido.setdefault("alcance", "dia")
+        pedido.setdefault("metodo", "TODOS")
+        ini, fin = rango_fechas(
+            str(pedido.get("alcance") or "dia"),
+            str(pedido.get("fecha") or ""),
+            bool(pedido.get("historico")),
+            hoy,
+        )
+        libro = historial_ventas(sucursal_id, pedido, hoy)
         return {
             "ok": True,
             "libro": True,
             "panel": "contabilidad",
             "resumen": resumen,
             "cartera": _cartera_admin(sucursal_id),
-            "contabilidad": _contabilidad(dia, resumen, ventas, sucursal_id),
+            "contabilidad": _contabilidad(
+                libro.get("medios") or [],
+                ini,
+                fin,
+                sucursal_id,
+                _etiqueta_caja(pedido, ini, fin, hoy),
+            ),
             "desglose_sucursales": desglose_suc,
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,

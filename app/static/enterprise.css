@@ -919,7 +919,7 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
     #menuToggle .brand-mark { display: none !important; }
 
     /* Style topbar buttons as perfect 44px square touch targets */
-    #btnRefresh, #menuToggle {
+    #btnRefresh, #btnPerfil, #menuToggle {
         width: 44px !important;
         height: 44px !important;
         min-height: 44px !important;
@@ -931,6 +931,7 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
         border-radius: 10px !important;
         flex-shrink: 0 !important;
     }
+    #btnRefresh[hidden], #btnPerfil[hidden] { display: none !important; }
     #btnTogglePro {
         width: 44px !important;
         height: 44px !important;
@@ -1484,6 +1485,16 @@ body.sidebar-open .dashboard-bar,
     font-weight: 500;
     margin: 0;
 }
+.dig-periodos { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 12px; }
+.dig-numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2px; width: 100%; margin: 0 0 12px; padding: 12px 4px; border-radius: 18px; background: #0f172a; }
+.dig-numeros div { min-width: 0; padding: 4px 2px; text-align: center; }
+.dig-numeros small { display: block; color: #94a3b8; font-size: 9px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.dig-numeros b { display: block; margin-top: 3px; font-size: clamp(0.72rem, 3.4vw, 0.92rem); letter-spacing: -0.03em; color: #f8fafc; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dig-numeros span { display: block; margin-top: 2px; color: #64748b; font-size: 9px; font-weight: 650; }
+.dig-tabla { font-size: 13px; }
+.dig-tabla td, .dig-tabla th { white-space: nowrap; }
+.dig-estado { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
+.dig-nota { color: #64748b; font-size: 12px; margin: 8px 0 0; }
 .vitrina-periodos {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1944,6 +1955,7 @@ select.periodo-pill.active option { color: #0F172A; }
 .carrito-item span { display: block; color: #64748b; font-size: 12px; }
 .carrito-step { display: flex; align-items: center; gap: 8px; }
 .carrito-step button { width: 36px; min-width: 36px; height: 36px; min-height: 36px; padding: 0 !important; border: 0; border-radius: 10px; background: #e2e8f0; font-size: 20px; font-weight: 800; }
+.carrito-quitar { background: #fee2e2 !important; color: #b91c1c; font-size: 22px !important; line-height: 1; }
 .carrito-compartir, .carrito-copiar { margin-top: 8px; width: 100%; height: 46px; border: 0; border-radius: 14px; font-weight: 800; }
 .carrito-compartir { margin-top: 14px; background: #16a34a; color: #fff; }
 .carrito-copiar { background: #e2e8f0; color: #0f172a; }

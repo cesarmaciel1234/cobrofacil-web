@@ -241,19 +241,20 @@
         const deviceId = global.CrmSync?.deviceId || '';
         _signalSource = new EventSource('/api/stream');
 
+        function pedirLibro() {
+            if (_signalDebounceTimer) clearTimeout(_signalDebounceTimer);
+            _signalDebounceTimer = setTimeout(() => {
+                bus().emit('libroNuevo');
+            }, 1200);
+        }
+
+        _signalSource.onopen = pedirLibro;
         _signalSource.addEventListener('refrescar', (ev) => {
             try {
                 const payload = JSON.parse(ev.data || '{}');
                 if (payload.source_device_id && payload.source_device_id === deviceId) return;
             } catch (_) {}
-            if (_signalDebounceTimer) clearTimeout(_signalDebounceTimer);
-            _signalDebounceTimer = setTimeout(() => {
-                void loadAll({
-                    enSegundoPlano: true,
-                    bloquearUI: false,
-                    avisarSiVacio: false,
-                });
-            }, 300);
+            pedirLibro();
         });
 
         _signalSource.onerror = () => {
@@ -335,6 +336,8 @@
             bus().emit('switchView', window.__barraPedido);
         } else if (new URLSearchParams(window.location.search).get('view')) {
             bus().emit('applyPwaDeepLink');
+        } else if (/^#c=/.test(window.location.hash)) {
+            bus().emit('switchView', 'cartera');
         } else {
             bus().emit('switchView', 'reporte');
         }
