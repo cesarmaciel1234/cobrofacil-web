@@ -6,7 +6,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from app.services.pos_base import filas_de, listar_sucursales, ultima_carga
-from app.services.pos_historial import historial_ventas, rango_fechas
+from app.services.pos_historial import desglose_articulos, historial_ventas, rango_fechas
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 _cartera_lock = threading.Lock()
@@ -1003,6 +1003,32 @@ def _armar_panel(
             "panel": "digitales",
             "resumen": resumen,
             "digitales": digitales,
+            "sucursales": sucursales_disp,
+            "sucursal_id": sucursal_id,
+        }
+
+    if nombre == "desglose":
+        from app.services.pos_vitrina import resolver_rango
+        desde_iso, hasta_iso, nombre_periodo = resolver_rango(
+            str(periodo or "Hoy"),
+            desde_custom=desde or None,
+            hasta_custom=hasta or None,
+        )
+        ini = desde_iso[:10]
+        fin = hasta_iso[:10]
+        libro = desglose_articulos(sucursal_id, ini, fin)
+
+        def _corta(iso: str) -> str:
+            anio, mes, dia = iso[:10].split("-")
+            return f"{dia}/{mes}/{anio}"
+
+        etiqueta = _corta(ini) if ini == fin else (_corta(ini) + " → " + _corta(fin))
+        return {
+            "ok": True,
+            "libro": libro["libro"],
+            "panel": "desglose",
+            "resumen": resumen,
+            "desglose": {**libro, "etiqueta": etiqueta, "periodo": nombre_periodo},
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }

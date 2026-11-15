@@ -1,5 +1,5 @@
 """El filtro de ventas usa la misma regla que el historial de Cobro Fácil."""
-from app.services.pos_historial import evaluar_ticket, rango_fechas
+from app.services.pos_historial import desglose_articulos, evaluar_ticket, rango_fechas
 
 
 def _venta(**extra):
@@ -59,6 +59,48 @@ def test_redondeo_recargo_caja_hora_y_texto():
     assert evaluar_ticket(_venta(), hora_desde="22:00", hora_hasta="23:00")[0] is False
     assert evaluar_ticket(_venta(), texto="asado", nombres="asado de tira")[0] is True
     assert evaluar_ticket(_venta(), texto="1024")[0] is False
+
+
+def test_desglose_suma_el_dia_y_deja_afuera_la_cancelada(monkeypatch):
+    tablas = {
+        "ventas": (
+            ["id", "fecha", "estado", "total", "sucursal_id"],
+            [
+                ["1", "2026-11-14 10:00:00", "CERRADA", 130, "1"],
+                ["2", "2026-11-14 11:00:00", "CANCELADA", 50, "1"],
+                ["3", "2026-11-13 11:00:00", "CERRADA", 80, "1"],
+            ],
+        ),
+        "detalles_ventas": (
+            ["id_venta", "nombre_producto", "cantidad", "subtotal", "id_producto", "sucursal_id"],
+            [
+                ["1", "Suprema", 2.5, 100, "10", "1"],
+                ["2", "Suprema", 9, 50, "10", "1"],
+                ["1", "Huevo", 3, 30, "11", "1"],
+                ["3", "Asado", 1, 80, "12", "1"],
+            ],
+        ),
+        "productos": (
+            ["id", "nombre", "es_pesable", "unidad", "sucursal_id"],
+            [
+                ["10", "Suprema", 1, "kg", "1"],
+                ["11", "Huevo", 0, "un", "1"],
+            ],
+        ),
+    }
+
+    def falso(tabla, sucursal_id=None):
+        return tablas.get(tabla, ([], []))
+
+    monkeypatch.setattr("app.services.pos_historial.filas_de", falso)
+    dato = desglose_articulos(1, "2026-11-14", "2026-11-14")
+    assert [fila["nombre"] for fila in dato["filas"]] == ["Huevo", "Suprema"]
+    assert dato["filas"][0]["medida"] == "un"
+    assert dato["filas"][1]["medida"] == "kg"
+    assert dato["kilos"] == 2.5
+    assert dato["unidades"] == 3
+    assert dato["monto"] == 130
+    assert dato["tickets"] == 1
 
 
 def test_el_mes_cubre_el_calendario():

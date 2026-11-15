@@ -481,13 +481,11 @@
         const riesgo = base.filter(enRiesgo);
         const deuda = conDeuda.reduce((sum, c) => sum + deudaVisible(c), 0);
         const deudaRiesgo = riesgo.reduce((sum, c) => sum + Math.max(deudaVisible(c), 0), 0);
-        texto('barDeuda', formatCompact(libro.cartera_en_calle != null ? libro.cartera_en_calle : deuda));
+        texto('barDeuda', formatMoney(libro.cartera_en_calle != null ? libro.cartera_en_calle : deuda));
         texto('barDeudaSub', `${libro.cuentas_activas != null ? libro.cuentas_activas : conDeuda.length} activas`);
-        texto('barRiesgo', formatCompact(libro.cartera_en_riesgo != null ? libro.cartera_en_riesgo : deudaRiesgo));
+        texto('barRiesgo', formatMoney(libro.cartera_en_riesgo != null ? libro.cartera_en_riesgo : deudaRiesgo));
         texto('barRiesgoSub', `${libro.cuentas_en_riesgo != null ? libro.cuentas_en_riesgo : riesgo.length} cuentas`);
-        texto('barCobros', formatCompact(libro.cobros_del_mes != null ? libro.cobros_del_mes : cobrosMes));
-        texto('barClientes', String(libro.cuentas_activas != null ? libro.cuentas_activas : conDeuda.length));
-        texto('barClientesSub', 'con deuda');
+        texto('barCobros', formatMoney(libro.cobros_del_mes != null ? libro.cobros_del_mes : cobrosMes));
     }
 
     function aplicarLibro(dato) {
@@ -528,7 +526,7 @@
     caja.querySelector('.resumen').addEventListener('click', (event) => {
         const button = event.target.closest('button');
         if (!button || !button.dataset.filter) return;
-        setFilter(button.dataset.filter);
+        setFilter(button.dataset.filter === currentFilter ? 'all' : button.dataset.filter);
     });
     nodo('cards').addEventListener('click', (event) => {
         const card = event.target.closest('.debt-card');

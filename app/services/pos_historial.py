@@ -543,3 +543,120 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
         ),
         "recorte": recorte,
     }
+
+
+def _medida(es_pesable, unidad) -> str:
+    marca = str(es_pesable or "").strip().lower()
+    if marca in ("1", "true", "t", "si", "sí"):
+        return "kg"
+    texto = str(unidad or "").strip().lower()
+    if texto in ("kg", "kilo", "kilos"):
+        return "kg"
+    if texto in ("lt", "l", "litro", "litros"):
+        return "lt"
+    if texto in ("m", "metro", "metros"):
+        return "m"
+    if texto in ("g", "gramo", "gramos"):
+        return "g"
+    return "un"
+
+
+def desglose_articulos(sucursal_id: int | None, fecha_ini: str, fecha_fin: str) -> dict:
+    """Suma los cortes de las ventas cerradas del rango. La cancelada no entra."""
+    columnas, filas = filas_de("ventas", sucursal_id)
+    if not columnas:
+        return {"libro": False, "filas": [], "articulos": 0, "kilos": 0.0, "unidades": 0.0, "monto": 0.0, "tickets": 0}
+    idx = {str(col).lower(): i for i, col in enumerate(columnas)}
+    ini = str(fecha_ini or "")[:10]
+    fin = str(fecha_fin or ini)[:10]
+    if ini and fin and ini > fin:
+        ini, fin = fin, ini
+    vivas: set[str] = set()
+    for fila in filas:
+        estado = str(_tomar(fila, idx, "estado") or "").strip().upper()
+        if estado.startswith("CANCELAD"):
+            continue
+        dia = _dia_iso(_tomar(fila, idx, "fecha"))
+        if ini and (not dia or dia < ini or dia > fin):
+            continue
+        vid = _id_texto(_tomar(fila, idx, "id"))
+        if not vid:
+            continue
+        suc = _id_texto(_tomar(fila, idx, "sucursal_id"))
+        vivas.add(suc + ":" + vid)
+    if not vivas:
+        return {"libro": True, "filas": [], "articulos": 0, "kilos": 0.0, "unidades": 0.0, "monto": 0.0, "tickets": 0}
+
+    pcols, pfilas = filas_de("productos", sucursal_id)
+    if not pcols:
+        pcols, pfilas = filas_de("articulos", sucursal_id)
+    pidx = {str(col).lower(): i for i, col in enumerate(pcols)}
+    productos: dict[str, tuple] = {}
+    for fila in pfilas:
+        pid = _id_texto(_tomar(fila, pidx, "id"))
+        if not pid:
+            continue
+        suc = _id_texto(_tomar(fila, pidx, "sucursal_id"))
+        productos[suc + ":" + pid] = (
+            _tomar(fila, pidx, "es_pesable"),
+            _tomar(fila, pidx, "unidad", "unidad_medida"),
+        )
+
+    dcols, dfilas = filas_de("detalles_ventas", sucursal_id)
+    if not dcols:
+        dcols, dfilas = filas_de("detalle_ventas", sucursal_id)
+    didx = {str(col).lower(): i for i, col in enumerate(dcols)}
+    enlace = next((nombre for nombre in ("id_venta", "venta_id", "ticket_id", "venta") if nombre in didx), "")
+    grupos: dict[str, dict] = {}
+    for fila in dfilas:
+        if not enlace:
+            break
+        vid = _id_texto(_tomar(fila, didx, enlace))
+        suc = _id_texto(_tomar(fila, didx, "sucursal_id"))
+        if suc + ":" + vid not in vivas:
+            continue
+        nombre = str(_tomar(fila, didx, "nombre_producto", "nombre", "producto", "descripcion", "corte") or "").strip()
+        if not nombre:
+            continue
+        pid = _id_texto(_tomar(fila, didx, "id_producto", "producto_id"))
+        ficha = productos.get(suc + ":" + pid)
+        if ficha:
+            medida = _medida(ficha[0], ficha[1])
+        else:
+            medida = _medida(
+                _tomar(fila, didx, "es_pesable"),
+                _tomar(fila, didx, "unidad", "unidad_medida"),
+            )
+        slot = grupos.setdefault(nombre, {"nombre": nombre, "cantidad": 0.0, "monto": 0.0, "medida": medida})
+        if medida == "kg":
+            slot["medida"] = "kg"
+        slot["cantidad"] += _num(_tomar(fila, didx, "cantidad", "kilos", "peso", "cant"))
+        slot["monto"] += _num(_tomar(fila, didx, "subtotal", "total", "monto"))
+    filas_out = sorted(grupos.values(), key=lambda item: item["cantidad"], reverse=True)
+    kilos = 0.0
+    unidades = 0.0
+    monto = 0.0
+    salida = []
+    for item in filas_out:
+        cant = round(item["cantidad"], 3)
+        plata = round(item["monto"], 2)
+        monto += plata
+        if item["medida"] == "kg":
+            kilos += cant
+        else:
+            unidades += cant
+        salida.append({
+            "nombre": item["nombre"],
+            "cantidad": cant,
+            "monto": plata,
+            "medida": item["medida"],
+        })
+    return {
+        "libro": True,
+        "filas": salida,
+        "articulos": len(salida),
+        "kilos": round(kilos, 3),
+        "unidades": round(unidades, 3),
+        "monto": round(monto, 2),
+        "tickets": len(vivas),
+    }

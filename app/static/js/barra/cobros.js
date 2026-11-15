@@ -7,6 +7,7 @@ window.BarraModulos.push({
     vista: 'ticket',
     pantalla: 'Historial del día',
     herramientas: [
-        { id: 'historial', titulo: 'Historial del día', tipo: 'pantalla' }
+        { id: 'historial', titulo: 'Historial del día', tipo: 'pantalla' },
+        { id: 'desglose', titulo: 'Desglose de artículos', tipo: 'pantalla' }
     ]
 });

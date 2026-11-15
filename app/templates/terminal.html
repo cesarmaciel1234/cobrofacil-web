@@ -19,7 +19,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.32">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.35">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -104,9 +104,12 @@
                 <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">Cargando vitrina de tienda…</div>
             </div>
             <div class="view" id="view-ticket">
-                <div class="card">
+                <div class="card" id="ticketLista">
                     <p id="ticketFiltro" class="ticket-suma">Filtrado —</p>
                     <div class="table-wrap"><table class="data-table"><thead><tr><th>Hora</th><th>Ticket</th><th>Pago</th><th>Total</th></tr></thead><tbody id="ticketCuerpo"></tbody></table></div>
+                </div>
+                <div class="card" id="desgloseLista" hidden>
+                    <div id="desgloseCuerpo"></div>
                 </div>
             </div>
             <div class="view" id="view-contabilidad">
@@ -137,11 +140,6 @@
                             <small>COBROS</small>
                             <b id="barCobros">$0</b>
                             <span class="sub">del mes</span>
-                        </button>
-                        <button type="button" data-filter="all" id="goClientes">
-                            <small>ACTIVAS</small>
-                            <b id="barClientes">0</b>
-                            <span class="sub" id="barClientesSub">con deuda</span>
                         </button>
                     </nav>
                     <div class="cards" id="cards"></div>
@@ -195,14 +193,14 @@
     <script src="/static/js/crm-delete.js?v=3.7"></script>
     <script src="/static/js/crm-backup.js?v=3.7"></script>
     <script src="/static/js/barra/ventas.js?v=4"></script>
-    <script src="/static/js/barra/cobros.js?v=5"></script>
+    <script src="/static/js/barra/cobros.js?v=6"></script>
     <script src="/static/js/barra/caja.js?v=4"></script>
     <script src="/static/js/barra/cartera.js?v=2"></script>
     <script src="/static/js/barra/pedidos.js?v=1"></script>
     <script src="/static/js/barra/armar.js?v=2"></script>
     <script src="/static/js/barra/toque.js?v=2"></script>
     <script src="/static/js/modulo-panel.js?v=5"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=3"></script>
-    <script src="/static/js/app.js?v=4.51"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=5"></script>
+    <script src="/static/js/app.js?v=4.54"></script>
 </body>
 </html>

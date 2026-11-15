@@ -314,6 +314,10 @@ const $ = id => document.getElementById(id);
         let periodoCaja = 'Hoy';
         let periodoCajaDesde = '';
         let periodoCajaHasta = '';
+        let ventasPantalla = 'historial';
+        let periodoDesglose = 'Hoy';
+        let periodoDesgloseDesde = '';
+        let periodoDesgloseHasta = '';
         let libroDigital = null;
 
         const titles = {
@@ -2556,7 +2560,48 @@ const $ = id => document.getElementById(id);
                 || f.alcance !== 'mes' || mesDistinto);
         }
 
+        function mostrarPantallaVentas() {
+            const desglose = ventasPantalla === 'desglose';
+            const lista = $('ticketLista');
+            const otra = $('desgloseLista');
+            if (lista) lista.hidden = desglose;
+            if (otra) otra.hidden = !desglose;
+        }
+
+        function medidaJefe(cant, medida) {
+            const x = Number(cant);
+            if (!Number.isFinite(x)) return '—';
+            const texto = x.toLocaleString('es-AR', { maximumFractionDigits: 2 });
+            return texto + ' ' + (medida || 'un');
+        }
+
+        function pieDesglose(dato) {
+            const partes = [(dato.articulos || 0) + ' articulos'];
+            if (Number(dato.kilos) > 0) partes.push(medidaJefe(dato.kilos, 'kg'));
+            if (Number(dato.unidades) > 0) partes.push(medidaJefe(dato.unidades, 'un'));
+            return partes.join(' · ');
+        }
+
+        function pintarDesglose(dato) {
+            mostrarPantallaVentas();
+            const cuerpo = $('desgloseCuerpo');
+            if (!cuerpo) return;
+            const libro = (dato && dato.desglose) || { filas: [], articulos: 0, kilos: 0, unidades: 0, monto: 0, etiqueta: '' };
+            const filas = libro.filas || [];
+            if (!dato || dato.libro === false) {
+                cuerpo.innerHTML = '<p class="caja-vacio" style="padding:14px;">El libro todavía no llegó.</p>';
+                return;
+            }
+            if (!filas.length) {
+                cuerpo.innerHTML = `<p class="desglose-fecha">${textoJefe(libro.etiqueta || '')}</p><p class="caja-vacio" style="padding:14px;">Sin artículos en este período.</p>`;
+                return;
+            }
+            const lista = filas.map((fila, i) => `<div class="desglose-fila"><span class="nro">${i + 1}</span><b>${textoJefe(fila.nombre)}</b><span class="cant">${textoJefe(medidaJefe(fila.cantidad, fila.medida))}</span><strong>${plataJefe(fila.monto)}</strong></div>`).join('');
+            cuerpo.innerHTML = `<p class="desglose-fecha">${textoJefe(libro.etiqueta || '')}</p><div class="desglose-lista">${lista}</div><div class="desglose-pie"><span>${textoJefe(pieDesglose(libro))}</span><b>${plataJefe(libro.monto)}</b></div>`;
+        }
+
         function pintarTickets() {
+            mostrarPantallaVentas();
             const cuerpo = $('ticketCuerpo');
             const suma = $('ticketFiltro');
             if (!cuerpo) return;
@@ -3025,7 +3070,11 @@ const $ = id => document.getElementById(id);
             const suc = activeSucursalId == null ? 'todas' : String(activeSucursalId);
             const per = (panel === 'reporte' && window.vitrinaPeriodo)
                 ? (':' + window.vitrinaPeriodo + (window.vitrinaPeriodo === 'Período' ? (':' + (window.vitrinaDesde || '') + ':' + (window.vitrinaHasta || '')) : ''))
-                : (panel === 'contabilidad' ? (':' + periodoCaja + (periodoCaja === 'Período' ? (':' + periodoCajaDesde + ':' + periodoCajaHasta) : '')) : '');
+                : (panel === 'contabilidad'
+                    ? (':' + periodoCaja + (periodoCaja === 'Período' ? (':' + periodoCajaDesde + ':' + periodoCajaHasta) : ''))
+                    : (panel === 'desglose'
+                        ? (':' + periodoDesglose + (periodoDesglose === 'Período' ? (':' + periodoDesgloseDesde + ':' + periodoDesgloseHasta) : ''))
+                        : ''));
             const filtro = panel === 'ticket' ? (':' + claveFiltroVentas()) : '';
             return 'crm-jefe:' + usuario + ':' + empresa + ':' + panel + per + filtro + ':' + suc;
         }
@@ -3203,7 +3252,7 @@ const $ = id => document.getElementById(id);
                 const aviso = document.querySelector('.vitrina-banner');
                 const hayQueRedibujar = (dato && dato.cantidad) || (aviso && aviso.textContent.includes('Motor desacoplado'));
                 if (hayQueRedibujar && ['reporte', 'digitales', 'contabilidad', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(nombre)) {
-                    cargarJefe(nombre);
+                    cargarJefe(nombre === 'ticket' && ventasPantalla === 'desglose' ? 'desglose' : nombre);
                 }
             } catch (e) {
                 avisarDesacoplado();
@@ -3248,6 +3297,11 @@ const $ = id => document.getElementById(id);
                     if (periodoCaja === 'Período' && periodoCajaHasta) url += '&hasta=' + encodeURIComponent(periodoCajaHasta);
                 }
                 if (panel === 'ticket') url += queryFiltroVentas();
+                if (panel === 'desglose') {
+                    url += '&periodo=' + encodeURIComponent(periodoDesglose || 'Hoy');
+                    if (periodoDesglose === 'Período' && periodoDesgloseDesde) url += '&desde=' + encodeURIComponent(periodoDesgloseDesde);
+                    if (periodoDesglose === 'Período' && periodoDesgloseHasta) url += '&hasta=' + encodeURIComponent(periodoDesgloseHasta);
+                }
                 if (activeSucursalId !== null && activeSucursalId !== undefined) {
                     url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
                 }
@@ -3435,6 +3489,41 @@ const $ = id => document.getElementById(id);
         }
 
         let digitalCarga = 0;
+        let libroEnCurso = false;
+
+        function isoDia(fecha) {
+            const d = fecha instanceof Date ? fecha : new Date(fecha);
+            const mes = String(d.getMonth() + 1).padStart(2, '0');
+            const dia = String(d.getDate()).padStart(2, '0');
+            return d.getFullYear() + '-' + mes + '-' + dia;
+        }
+
+        function sumarDias(iso, cantidad) {
+            const d = new Date(iso + 'T12:00:00');
+            d.setDate(d.getDate() + cantidad);
+            return isoDia(d);
+        }
+
+        function lunesDe(iso) {
+            const d = new Date(iso + 'T12:00:00');
+            d.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+            return isoDia(d);
+        }
+
+        function claveFilaDigital(fila) {
+            const pago = String(fila.id_pago || '').replace(/—/g, '').trim();
+            if (pago) return 'p:' + pago;
+            const ticket = String(fila.ticket_venta || '').replace(/—/g, '').trim();
+            if (ticket && fila.origen !== 'cobro') return 't:' + (fila.sucursal || '') + ':' + ticket;
+            return 'f:' + [fila.sucursal || '', fila.origen || '', fila.id || '', fila.fecha || '', fila.monto || ''].join(':');
+        }
+
+        function mezclarDigital(base, nuevas) {
+            const mapa = new Map();
+            (base || []).forEach((fila) => mapa.set(claveFilaDigital(fila), fila));
+            (nuevas || []).forEach((fila) => mapa.set(claveFilaDigital(fila), fila));
+            return [...mapa.values()].sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')));
+        }
 
         function leerDigitalRapido(clave) {
             try {
@@ -3451,6 +3540,187 @@ const $ = id => document.getElementById(id);
             } catch (e) {}
         }
 
+        async function pedirDigitalRango(desde, hasta) {
+            let url = '/api/pos/jefe?panel=digitales&periodo=' + encodeURIComponent('Período')
+                + '&desde=' + encodeURIComponent(desde)
+                + '&hasta=' + encodeURIComponent(hasta);
+            if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
+            }
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('digital');
+            const dato = await res.json();
+            return {
+                filas: (dato.digitales && dato.digitales.transacciones) || [],
+                fuente: (dato.digitales && dato.digitales.fuente) || 'vacio'
+            };
+        }
+
+        async function guardarLibroDigital(libro) {
+            libro.clave = claveJefe('digitales');
+            libroDigital = libro;
+            guardarDigitalRapido(libro.clave, libro);
+            await guardarLibroLocal(libro.clave, libro);
+        }
+
+        function pintarSiDigital() {
+            if (cajaPantalla !== 'digital') return;
+            pintarLibroDigital();
+            document.querySelectorAll('#herramientasLista .herramienta-btn').forEach((boton) => {
+                boton.classList.toggle('active', boton.textContent.trim() === 'Pago digital');
+            });
+        }
+
+        async function asegurarSemana() {
+            const clave = claveJefe('digitales');
+            const hoy = hoyLocal();
+            const desdeSemana = lunesDe(hoy);
+            const semana = await pedirDigitalRango(desdeSemana, hoy);
+            const previas = (libroDigital && libroDigital.clave === clave && libroDigital.transacciones) || [];
+            const fechas = previas.map((fila) => String(fila.fecha || '').slice(0, 10)).filter((dia) => /^\d{4}-\d{2}-\d{2}$/.test(dia)).sort();
+            const cubierto = libroDigital && libroDigital.cubiertoDesde;
+            const piso = fechas.length ? fechas[0] : desdeSemana;
+            await guardarLibroDigital({
+                clave: clave,
+                fuente: semana.fuente || (libroDigital && libroDigital.fuente) || 'ticket',
+                transacciones: mezclarDigital(previas, semana.filas),
+                cubiertoDesde: [cubierto, piso, desdeSemana].filter(Boolean).sort()[0],
+                completo: !!(libroDigital && libroDigital.completo)
+            });
+        }
+
+        async function completarLibro() {
+            if (libroEnCurso) return;
+            libroEnCurso = true;
+            try {
+                const clave = claveJefe('digitales');
+                if (!libroDigital || libroDigital.clave !== clave || !libroDigital.cubiertoDesde) {
+                    await asegurarSemana();
+                }
+                let libro = libroDigital;
+                if (!libro || libro.completo) return;
+                let cursor = libro.cubiertoDesde;
+                let vacios = 0;
+                for (let i = 0; i < 160 && vacios < 8; i++) {
+                    const hasta = sumarDias(cursor, -1);
+                    const desde = sumarDias(hasta, -6);
+                    let tanda = { filas: [], fuente: libro.fuente };
+                    try {
+                        tanda = await pedirDigitalRango(desde, hasta);
+                    } catch (e) {
+                        break;
+                    }
+                    const antes = (libro.transacciones || []).length;
+                    const transacciones = mezclarDigital(libro.transacciones, tanda.filas);
+                    if (!tanda.filas.length) vacios += 1;
+                    else vacios = 0;
+                    libro = {
+                        clave: clave,
+                        fuente: tanda.fuente || libro.fuente,
+                        transacciones: transacciones,
+                        cubiertoDesde: desde,
+                        completo: vacios >= 8
+                    };
+                    await guardarLibroDigital(libro);
+                    cursor = desde;
+                    if (tanda.filas.some((fila) => fechaEnPeriodoDigital(fila.fecha))) pintarSiDigital();
+                    if (libro.completo) break;
+                    await new Promise((resolver) => setTimeout(resolver, 500));
+                }
+            } finally {
+                libroEnCurso = false;
+            }
+        }
+
+        function clavePeriodo(panel, periodo) {
+            const reporte = window.vitrinaPeriodo;
+            const desde = window.vitrinaDesde;
+            const hasta = window.vitrinaHasta;
+            const caja = periodoCaja;
+            const cajaDesde = periodoCajaDesde;
+            const cajaHasta = periodoCajaHasta;
+            const des = periodoDesglose;
+            const desDesde = periodoDesgloseDesde;
+            const desHasta = periodoDesgloseHasta;
+            if (panel === 'reporte') {
+                window.vitrinaPeriodo = periodo;
+                window.vitrinaDesde = '';
+                window.vitrinaHasta = '';
+            }
+            if (panel === 'contabilidad') {
+                periodoCaja = periodo;
+                periodoCajaDesde = '';
+                periodoCajaHasta = '';
+            }
+            if (panel === 'desglose') {
+                periodoDesglose = periodo;
+                periodoDesgloseDesde = '';
+                periodoDesgloseHasta = '';
+            }
+            const clave = claveJefe(panel);
+            window.vitrinaPeriodo = reporte;
+            window.vitrinaDesde = desde;
+            window.vitrinaHasta = hasta;
+            periodoCaja = caja;
+            periodoCajaDesde = cajaDesde;
+            periodoCajaHasta = cajaHasta;
+            periodoDesglose = des;
+            periodoDesgloseDesde = desDesde;
+            periodoDesgloseHasta = desHasta;
+            return clave;
+        }
+
+        let desgloseCaliente = false;
+
+        async function precalentarDesglose() {
+            if (desgloseCaliente) return;
+            desgloseCaliente = true;
+            for (const periodo of ['Semana', 'Mes', 'Año']) {
+                const clave = clavePeriodo('desglose', periodo);
+                if (leerPanelJefe(clave)) continue;
+                try {
+                    let url = '/api/pos/jefe?panel=desglose&periodo=' + encodeURIComponent(periodo);
+                    if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                        url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
+                    }
+                    const res = await fetch(url);
+                    if (!res.ok) continue;
+                    guardarPanelJefe(clave, await res.json());
+                } catch (e) {}
+                await new Promise((resolver) => setTimeout(resolver, 400));
+            }
+        }
+
+        async function precalentarFiltros() {
+            const pedidos = [
+                ['reporte', 'Semana'],
+                ['contabilidad', 'Semana'],
+                ['reporte', 'Mes'],
+                ['contabilidad', 'Mes'],
+                ['reporte', 'Año'],
+                ['contabilidad', 'Año']
+            ];
+            for (const [panel, periodo] of pedidos) {
+                const clave = clavePeriodo(panel, periodo);
+                if (leerPanelJefe(clave)) continue;
+                try {
+                    let url = '/api/pos/jefe?panel=' + encodeURIComponent(panel) + '&periodo=' + encodeURIComponent(periodo);
+                    if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                        url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
+                    }
+                    const res = await fetch(url);
+                    if (!res.ok) continue;
+                    guardarPanelJefe(clave, await res.json());
+                } catch (e) {}
+                await new Promise((resolver) => setTimeout(resolver, 400));
+            }
+        }
+
+        function arrancarLibroOffline() {
+            void completarLibro();
+            void precalentarFiltros();
+        }
+
         async function cargarPagoDigital() {
             const token = ++digitalCarga;
             const clave = claveJefe('digitales');
@@ -3459,13 +3729,11 @@ const $ = id => document.getElementById(id);
                 const rapido = leerDigitalRapido(clave);
                 if (rapido && rapido.transacciones) libroDigital = rapido;
             }
-            if (libroDigital && libroDigital.clave === clave && cajaPantalla === 'digital') {
-                pintarLibroDigital();
-            }
-            if (!libroDigital || libroDigital.clave !== clave) {
+            if (libroDigital && libroDigital.clave === clave && cajaPantalla === 'digital') pintarLibroDigital();
+            if (!libroDigital || libroDigital.clave !== clave || ((libroDigital.transacciones || []).length < ((await leerLibroLocal(clave)) || {}).transacciones?.length)) {
                 const guardado = await leerLibroLocal(clave);
                 if (token !== digitalCarga) return;
-                if (guardado && guardado.transacciones) {
+                if (guardado && guardado.transacciones && (!libroDigital || guardado.transacciones.length >= (libroDigital.transacciones || []).length)) {
                     libroDigital = guardado;
                     if (cajaPantalla === 'digital') pintarLibroDigital();
                 }
@@ -3473,32 +3741,16 @@ const $ = id => document.getElementById(id);
             if (cuerpo && cajaPantalla === 'digital' && (!libroDigital || libroDigital.clave !== clave) && !cuerpo.querySelector('.dig-lista')) {
                 cuerpo.innerHTML = '<p>Cargando cobros digitales…</p>';
             }
-            let url = '/api/pos/jefe?panel=digitales&periodo=Todo';
-            if (activeSucursalId !== null && activeSucursalId !== undefined) {
-                url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
-            }
             try {
-                const res = await fetch(url);
-                if (!res.ok) throw new Error('digital');
-                const dato = await res.json();
-                if (token !== digitalCarga) return;
-                const libro = dato.digitales || { fuente: 'vacio', transacciones: [] };
-                libro.clave = clave;
-                libroDigital = libro;
-                guardarDigitalRapido(clave, libro);
-                void guardarLibroLocal(clave, libro);
+                await asegurarSemana();
             } catch (e) {
                 if (!libroDigital || libroDigital.clave !== clave) {
-                    libroDigital = { clave: clave, fuente: 'vacio', transacciones: [] };
+                    libroDigital = { clave: clave, fuente: 'vacio', transacciones: [], cubiertoDesde: lunesDe(hoyLocal()), completo: false };
                 }
             }
             if (token !== digitalCarga) return;
-            if (cajaPantalla === 'digital') {
-                pintarLibroDigital();
-                document.querySelectorAll('#herramientasLista .herramienta-btn').forEach((boton) => {
-                    boton.classList.toggle('active', boton.textContent.trim() === 'Pago digital');
-                });
-            }
+            pintarSiDigital();
+            void completarLibro();
         }
 
         function recargarVistaViva() {
@@ -3510,6 +3762,10 @@ const $ = id => document.getElementById(id);
             }
             if (name === 'contabilidad' && cajaPantalla === 'digital') {
                 void cargarPagoDigital();
+                return;
+            }
+            if (name === 'ticket' && ventasPantalla === 'desglose') {
+                void cargarJefe('desglose');
                 return;
             }
             if (['reporte', 'digitales', 'contabilidad', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) {
@@ -3868,8 +4124,13 @@ const $ = id => document.getElementById(id);
                     : `<p>${aviso}</p>`;
             }
 
+            if (panel === 'desglose') {
+                pintarDesglose(dato);
+                if (!enCurso) void precalentarDesglose();
+            }
+
             // 6. TICKET
-            if (panel === 'ticket' && $('ticketCuerpo')) {
+            if (panel === 'ticket' && $('ticketCuerpo') && ventasPantalla !== 'desglose') {
                 ticketsEnPantalla = dato.tickets || [];
                 cajasVentas = dato.cajas || [];
                 ticketsResumen = {
@@ -3905,15 +4166,17 @@ const $ = id => document.getElementById(id);
             if (refresh) {
                 const caja = name === 'contabilidad';
                 const digital = caja && cajaPantalla === 'digital';
+                const desglose = name === 'ticket' && ventasPantalla === 'desglose';
                 const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja;
                 refresh.classList.toggle('es-filtro', filtrar);
-                if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
+                if (desglose) refresh.classList.toggle('filtrando', (periodoDesglose || 'Hoy') !== 'Hoy');
+                else if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
                 else if (name === 'pedidos') refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
                 else if (name === 'reporte') refresh.classList.toggle('filtrando', (window.vitrinaPeriodo || 'Hoy') !== 'Hoy');
                 else if (digital) refresh.classList.toggle('filtrando', periodoDigital !== 'Semana');
                 else if (caja) refresh.classList.toggle('filtrando', (periodoCaja || 'Hoy') !== 'Hoy');
                 else refresh.classList.remove('filtrando');
-                const etiqueta = name === 'pedidos' ? 'Filtrar proveedor' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar'));
+                const etiqueta = name === 'pedidos' ? 'Filtrar proveedor' : ((name === 'ticket' && ventasPantalla === 'desglose') ? 'Filtrar período' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar')));
                 refresh.setAttribute('aria-label', etiqueta);
                 refresh.title = etiqueta;
                 const icono = refresh.querySelector('svg');
@@ -3991,6 +4254,7 @@ const $ = id => document.getElementById(id);
                 window.vitrinaHasta = '';
             }
             if (name === 'ticket') {
+                ventasPantalla = 'historial';
                 filtroVentas.alcance = 'mes';
                 filtroVentas.historico = false;
                 filtroVentas.fecha = '';
@@ -4071,7 +4335,19 @@ const $ = id => document.getElementById(id);
             if (btn.classList.contains('es-filtro')) {
                 const vista = document.querySelector('.view.active');
                 const nombre = vista && vista.id.startsWith('view-') ? vista.id.slice(5) : '';
-                if (nombre === 'ticket') abrirFiltroVentas();
+                if (nombre === 'ticket' && ventasPantalla === 'desglose') abrirFiltroPeriodo({
+                    actual: periodoDesglose || 'Hoy',
+                    desde: periodoDesgloseDesde,
+                    hasta: periodoDesgloseHasta,
+                    alAplicar: (elegido, desde, hasta) => {
+                        periodoDesglose = elegido;
+                        periodoDesgloseDesde = elegido === 'Período' ? desde : '';
+                        periodoDesgloseHasta = elegido === 'Período' ? hasta : '';
+                        marcarEntrada('ticket');
+                        void cargarJefe('desglose');
+                    }
+                });
+                else if (nombre === 'ticket') abrirFiltroVentas();
                 else if (nombre === 'reporte') abrirFiltroPeriodo({
                     actual: window.vitrinaPeriodo || 'Hoy',
                     desde: window.vitrinaDesde,
@@ -5534,6 +5810,20 @@ const $ = id => document.getElementById(id);
             CrmBus.on('switchView', (name) => switchView(name));
             CrmBus.on('libroNuevo', () => recargarVistaViva());
             CrmBus.on('pantallaModulo', (vista, id) => {
+                if (vista === 'ticket') {
+                    ventasPantalla = id || 'historial';
+                    if (ventasPantalla === 'desglose') {
+                        periodoDesglose = 'Hoy';
+                        periodoDesgloseDesde = '';
+                        periodoDesgloseHasta = '';
+                    }
+                    marcarEntrada('ticket');
+                    const abierta = document.querySelector('.view.active');
+                    if (abierta && abierta.id === 'view-ticket') {
+                        void cargarJefe(ventasPantalla === 'desglose' ? 'desglose' : 'ticket');
+                    }
+                    return;
+                }
                 if (vista !== 'contabilidad') return;
                 cajaPantalla = id || 'arqueo';
                 if (cajaPantalla === 'digital') {
@@ -5572,6 +5862,7 @@ const $ = id => document.getElementById(id);
                 cargarSucursalesSelector();
                 $('topbarIcon')?.addEventListener('click', () => abrirSelectorSucursal());
                 await CrmLoader.runBoot();
+                setTimeout(() => arrancarLibroOffline(), 1200);
             } catch (e) {
                 console.error('boot:', e);
                 setLoading(false);

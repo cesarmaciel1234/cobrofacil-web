@@ -451,7 +451,7 @@ def api_pos_jefe():
     if nombre not in (
         "reporte", "jefe", "vitrina", "contabilidad", "admin", "cartera", "clientes",
         "digitales", "cobros_digitales", "pedidos", "abastecimiento",
-        "proveedor", "promedio", "ticket"
+        "proveedor", "promedio", "ticket", "desglose"
     ):
         return jsonify({"error": "Panel desconocido"}), 400
     return jsonify(panel(nombre, sucursal_id=sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro))

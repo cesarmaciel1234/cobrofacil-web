@@ -2076,7 +2076,7 @@ html, body { max-width: 100%; overflow-x: clip; overflow-y: visible; }
 #view-cartera, #carteraLista, #view-cartera .cards, #view-cartera .debt-card { max-width: 100%; min-width: 0; }
 #view-cartera .resumen {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 2px;
     width: 100%;
     margin: 0 0 14px;
@@ -2104,11 +2104,9 @@ html, body { max-width: 100%; overflow-x: clip; overflow-y: visible; }
 #view-cartera .resumen b {
     display: block;
     margin-top: 3px;
-    font-size: clamp(0.72rem, 3.4vw, 0.92rem);
+    font-size: clamp(0.72rem, 3.1vw, 0.95rem);
     letter-spacing: -0.03em;
     color: #f8fafc;
-    overflow: hidden;
-    text-overflow: ellipsis;
     white-space: nowrap;
 }
 #view-cartera .resumen .sub {
@@ -2281,6 +2279,16 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
     font-weight: 700;
     cursor: pointer;
 }
+.desglose-fecha { margin: 0; padding: 14px 14px 8px; color: #64748b; font-size: 13px; font-weight: 700; }
+.desglose-lista { display: flex; flex-direction: column; }
+.desglose-fila { display: grid; grid-template-columns: 1.6rem minmax(0, 1fr) auto; column-gap: 8px; row-gap: 2px; align-items: center; padding: 12px 14px; border-top: 1px solid #f1f5f9; }
+.desglose-fila:first-child { border-top: 0; }
+.desglose-fila .nro { color: #94a3b8; font-size: 13px; font-weight: 700; }
+.desglose-fila b { min-width: 0; color: #0f172a; font-size: 15px; font-weight: 750; }
+.desglose-fila .cant { grid-column: 2; color: #64748b; font-size: 13px; font-weight: 650; }
+.desglose-fila strong { grid-column: 3; grid-row: 1 / span 2; align-self: center; color: #0f172a; font-size: 15px; white-space: nowrap; }
+.desglose-pie { display: flex; justify-content: space-between; gap: 12px; align-items: center; padding: 14px; border-top: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; font-size: 13px; font-weight: 700; }
+.desglose-pie b { color: #0f172a; font-size: 16px; white-space: nowrap; }
 
 
 
