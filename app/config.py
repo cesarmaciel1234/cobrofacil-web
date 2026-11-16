@@ -38,7 +38,7 @@ class Config:
         and os.environ.get("RENDER") == "true"
     )
     PERMANENT_SESSION_LIFETIME = 86400 * 400  # tope del navegador; cada visita lo renueva
-    APP_VERSION = os.environ.get("APP_VERSION", "3.9")
+    APP_VERSION = os.environ.get("APP_VERSION", "3.10")
     INSTALADOR_URL = os.environ.get(
         "INSTALADOR_URL",
         "https://github.com/cesarmaciel1234/cobrofacil_instalador/releases/latest/download/Setup_CobroFacil_Web.exe",

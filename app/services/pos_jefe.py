@@ -1,22 +1,41 @@
 """Cara del panel del jefe, contabilidad y admin. Los números salen del libro de Cobro Fácil guardado en la nube."""
 from __future__ import annotations
 
+import json
 import threading
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app.services.pos_base import filas_de, listar_sucursales, ultima_carga, unir_clientes
+from app.services.pos_base import _ambito_cache, filas_de, listar_sucursales, sellos_de, ultima_carga, unir_clientes
 from app.services.pos_historial import desglose_articulos, historial_ventas, rango_fechas
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 _cartera_lock = threading.Lock()
 _cartera_cache: dict[tuple, tuple[tuple, dict]] = {}
+_panel_lock = threading.Lock()
+_panel_cache: dict[tuple, tuple[tuple, dict]] = {}
+_TABLAS_SELLO = (
+    "ventas",
+    "detalles_ventas",
+    "detalle_ventas",
+    "ventas_items",
+    "productos",
+    "articulos",
+    "clientes",
+    "cuenta_corriente",
+    "cobros_digitales",
+    "mp_pagos",
+    "proveedores",
+    "configuracion",
+)
 
 
 def olvidar_cartera() -> None:
-    """El libro cambió: la cartera armada deja de servir."""
+    """El libro cambió: la cartera armada y los paneles dejan de servir."""
     with _cartera_lock:
         _cartera_cache.clear()
+    with _panel_lock:
+        _panel_cache.clear()
 
 
 def _indice(columnas: list) -> dict[str, int]:
@@ -956,6 +975,21 @@ def _pulso(resumen: dict, desglose: list[dict], digitales: dict, cartera: dict, 
     return {"alertas": alertas}
 
 
+def _clave_panel(nombre: str, sid: int | None, periodo: str, desde: str | None, hasta: str | None, filtro: dict | None) -> tuple:
+    filtro_txt = json.dumps(filtro or {}, sort_keys=True, default=str, ensure_ascii=False)
+    hoy = datetime.now(_ZONA).date().isoformat()
+    return (
+        _ambito_cache(),
+        hoy,
+        nombre,
+        sid,
+        str(periodo or ""),
+        desde or "",
+        hasta or "",
+        filtro_txt,
+    )
+
+
 def panel(
     nombre: str,
     sucursal_id: int | None = None,
@@ -964,6 +998,13 @@ def panel(
     hasta: str | None = None,
     filtro: dict | None = None,
 ) -> dict:
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    clave = _clave_panel(nombre, sid, periodo, desde, hasta, filtro)
+    sellos = sellos_de(_TABLAS_SELLO, sid)
+    with _panel_lock:
+        guardado = _panel_cache.get(clave)
+        if guardado and guardado[0] == sellos:
+            return guardado[1]
     dato = _armar_panel(
         nombre,
         sucursal_id,
@@ -973,6 +1014,8 @@ def panel(
         filtro=filtro,
     )
     dato["actualizado_en"] = ultima_carga(sucursal_id)
+    with _panel_lock:
+        _panel_cache[clave] = (sellos, dato)
     return dato
 
 

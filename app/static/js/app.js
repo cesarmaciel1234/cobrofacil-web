@@ -3102,6 +3102,7 @@ const $ = id => document.getElementById(id);
 
         let jefeCargaToken = 0;
         let pinturaCartera = 0;
+        const panelesListos = new Map();
 
         function claveJefe(panel) {
             let empresa = '';
@@ -3325,12 +3326,18 @@ const $ = id => document.getElementById(id);
             const ctrl = new AbortController();
             jefeAbort = ctrl;
             const clave = claveJefe(panel);
+            const listo = panelesListos.get(clave);
             let habiaLocal = false;
             try {
-                const crudo = leerPanelJefe(clave);
-                if (crudo) {
+                if (listo) {
                     habiaLocal = true;
-                    aplicarDatosJefe(panel, JSON.parse(crudo), true);
+                    aplicarDatosJefe(panel, listo.dato, false);
+                } else {
+                    const crudo = leerPanelJefe(clave);
+                    if (crudo) {
+                        habiaLocal = true;
+                        aplicarDatosJefe(panel, JSON.parse(crudo), true);
+                    }
                 }
             } catch (e) {}
             if (!navigator.onLine) {
@@ -3375,7 +3382,10 @@ const $ = id => document.getElementById(id);
                 if (!habiaLocal) aplicarDatosJefe(panel, { libro: false }, false);
                 return;
             }
+            const mismoLibro = listo && dato.actualizado_en && dato.actualizado_en === listo.marca;
+            panelesListos.set(clave, { marca: dato.actualizado_en || '', dato: dato });
             guardarPanelJefe(clave, dato);
+            if (mismoLibro) return;
             aplicarDatosJefe(panel, dato, false);
         }
 

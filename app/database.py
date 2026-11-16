@@ -196,8 +196,11 @@ def get_db(empresa_id=None):
             for _ in range(2):
                 try:
                     conn = pool.getconn()
-                    # Verificar si la conexión de Neon sigue viva
                     if conn.closed:
+                        try:
+                            pool.putconn(conn, close=True)
+                        except Exception:
+                            pass
                         conn = pool.getconn()
                     es_del_pool = True
                     break
@@ -324,6 +327,15 @@ def get_db(empresa_id=None):
             conn.close()
 
 def init_db():
+    try:
+        _abrir_base()
+    except Exception:
+        if Config.TESTING or not is_postgres():
+            raise
+        print("Base no disponible en el arranque. Se reintenta cuando haya conexión.")
+
+
+def _abrir_base():
     # If in test mode, load the full schema directly on Config.DB_PATH
     if Config.TESTING:
         if is_postgres():
@@ -901,6 +913,8 @@ def _run_migrations(conn):
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
             ON pos_base(COALESCE(sucursal_id, 0), tabla, parte);
+        CREATE INDEX IF NOT EXISTS idx_pos_base_tabla
+            ON pos_base(tabla, sucursal_id);
         CREATE TABLE IF NOT EXISTS pos_novedad (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sucursal_id INTEGER,

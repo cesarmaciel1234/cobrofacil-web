@@ -763,43 +763,127 @@ def _armar_filas(partes) -> tuple[list[str], list[list]]:
     return columnas, filas
 
 
+def _sello_partes(partes) -> tuple:
+    marca = None
+    cantidad = 0
+    for parte in partes:
+        cantidad += int(parte["cantidad"] or 0)
+        acto = parte["actualizado_en"]
+        if acto and (marca is None or str(acto) > str(marca)):
+            marca = acto
+    return (marca, cantidad)
+
+
+def _sello_combinado(por_sid: dict) -> tuple:
+    marca = None
+    cantidad = 0
+    for sello in por_sid.values():
+        cantidad += int(sello[1] or 0)
+        acto = sello[0]
+        if acto and (marca is None or str(acto) > str(marca)):
+            marca = acto
+    return (marca, cantidad)
+
+
+def _sellos_tablas(conn, tablas: list[str]) -> dict[str, dict]:
+    marcas = ", ".join("?" for _ in tablas)
+    rows = conn.execute(
+        f"SELECT tabla, sucursal_id, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n "
+        f"FROM pos_base WHERE tabla IN ({marcas}) GROUP BY tabla, sucursal_id",
+        tuple(tablas),
+    ).fetchall()
+    salida: dict[str, dict] = {tabla: {} for tabla in tablas}
+    for row in rows:
+        sid = row["sucursal_id"]
+        clave_sid = int(sid) if sid is not None else None
+        salida.setdefault(row["tabla"], {})[clave_sid] = (row["marca"], int(row["n"] or 0))
+    return salida
+
+
+def _libro_fresco(ambito: str, tabla: str, sid: int | None, ahora: float) -> bool:
+    with _cache_lock:
+        hit = _cache.get((ambito, tabla, sid))
+        if hit and ahora - hit[0] < _CACHE_TTL:
+            return True
+        base = _cache.get((ambito, tabla, None))
+        return bool(sid is not None and not hit and base and ahora - base[0] < _CACHE_TTL)
+
+
+def _tabla_vigente(ambito: str, tabla: str, por_sid: dict, ahora: float) -> bool:
+    """El sello no cambió: se renueva la memoria y no se vuelven a leer las filas."""
+    esperado = _sello_combinado(por_sid)
+    with _cache_lock:
+        base = _cache.get((ambito, tabla, None))
+        if not base or base[1] != esperado:
+            return False
+        vivos = set()
+        for sid, sello in por_sid.items():
+            if sid is None:
+                continue
+            hit = _cache.get((ambito, tabla, int(sid)))
+            if not hit or hit[1] != sello:
+                return False
+            vivos.add(int(sid))
+        for clave in _cache:
+            if clave[0] == ambito and clave[1] == tabla and clave[2] is not None and clave[2] not in vivos:
+                return False
+        for clave in list(_cache):
+            if clave[0] == ambito and clave[1] == tabla:
+                previo = _cache[clave]
+                _cache[clave] = (ahora, previo[1], previo[2], previo[3])
+        return True
+
+
+def _publicar_tabla(ambito: str, tabla: str, partes: list, ahora: float, sellos: dict | None = None) -> None:
+    """Una lectura llena Todas y cada sucursal. El sello queda igual al de la base."""
+    grupos: dict = {}
+    for parte in partes:
+        grupos.setdefault(parte["sucursal_id"], []).append(parte)
+    ramas = {}
+    for sid, grupo in grupos.items():
+        if sid is None:
+            continue
+        columnas, filas = _armar_filas(grupo)
+        sello = (sellos or {}).get(int(sid)) or _sello_partes(grupo)
+        ramas[int(sid)] = (sello, columnas, filas)
+    columnas, filas = _armar_filas(partes)
+    filas = _sin_copias(tabla, columnas, filas)
+    consolidado = (_sello_combinado(sellos or {}), columnas, filas) if sellos is not None else (_sello_partes(partes), columnas, filas)
+    with _cache_lock:
+        for clave in list(_cache):
+            if clave[0] == ambito and clave[1] == tabla:
+                _cache.pop(clave, None)
+        for sid, (stamp, cols, rows) in ramas.items():
+            _cache[(ambito, tabla, sid)] = (ahora, stamp, cols, rows)
+        _cache[(ambito, tabla, None)] = (ahora, consolidado[0], consolidado[1], consolidado[2])
+
+
 def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], list[list]]:
     if not _TABLA.match(tabla or ""):
         return [], []
     sid = int(sucursal_id) if sucursal_id is not None else None
-    clave = (_ambito_cache(), tabla, sid)
+    ambito = _ambito_cache()
     ahora = time.monotonic()
     with _cache_lock:
-        hit = _cache.get(clave)
+        hit = _cache.get((ambito, tabla, sid))
         if hit and ahora - hit[0] < _CACHE_TTL:
             return hit[2], hit[3]
-    with get_db() as conn:
-        stamp = _sello(conn, tabla, sid)
-        with _cache_lock:
-            hit = _cache.get(clave)
-            if hit and hit[1] == stamp:
-                _cache[clave] = (time.monotonic(), stamp, hit[2], hit[3])
-                return hit[2], hit[3]
-        if sid is not None:
-            partes = conn.execute(
-                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id = ? ORDER BY parte",
-                (tabla, sid),
-            ).fetchall()
-        else:
-            partes = conn.execute(
-                "SELECT sucursal_id, sucursal_nombre, columnas, filas FROM pos_base WHERE tabla = ? ORDER BY sucursal_id, parte",
-                (tabla,),
-            ).fetchall()
-    columnas, filas = _armar_filas(partes)
-    if sid is None:
-        filas = _sin_copias(tabla, columnas, filas)
+        base = _cache.get((ambito, tabla, None))
+        if sid is not None and not hit and base and ahora - base[0] < _CACHE_TTL:
+            return [], []
+    precargar_tablas((tabla,), sucursal_id=sid)
     with _cache_lock:
-        _cache[clave] = (time.monotonic(), stamp, columnas, filas)
-    return columnas, filas
+        hit = _cache.get((ambito, tabla, sid))
+        if hit:
+            return hit[2], hit[3]
+    return [], []
 
 
 def precargar_tablas(tablas: tuple[str, ...] | list[str], sucursal_id: int | None = None) -> None:
-    """Carga múltiples tablas en un solo query contra Neon, poblando la caché en memoria."""
+    """Una lectura del libro alcanza para Todas y para cada sucursal.
+
+    Si el sello no cambió, no se vuelven a bajar las filas.
+    """
     pedidas = [t for t in tablas if _TABLA.match(t or "")]
     if not pedidas:
         return
@@ -807,43 +891,26 @@ def precargar_tablas(tablas: tuple[str, ...] | list[str], sucursal_id: int | Non
     ambito = _ambito_cache()
     ahora = time.monotonic()
 
-    faltantes = []
-    with _cache_lock:
-        for t in pedidas:
-            hit = _cache.get((ambito, t, sid))
-            if not (hit and ahora - hit[0] < _CACHE_TTL):
-                faltantes.append(t)
+    faltantes = [tabla for tabla in pedidas if not _libro_fresco(ambito, tabla, sid, ahora)]
     if not faltantes:
         return
 
-    placeholders = ", ".join("?" for _ in faltantes)
     with get_db() as conn:
-        if sid is not None:
+        sellos = _sellos_tablas(conn, faltantes)
+        bajar = [tabla for tabla in faltantes if not _tabla_vigente(ambito, tabla, sellos.get(tabla, {}), ahora)]
+        partes = []
+        if bajar:
+            marcas = ", ".join("?" for _ in bajar)
             partes = conn.execute(
                 f"SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                f"FROM pos_base WHERE tabla IN ({placeholders}) AND sucursal_id = ? ORDER BY tabla, parte",
-                (*faltantes, sid),
-            ).fetchall()
-        else:
-            partes = conn.execute(
-                f"SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                f"FROM pos_base WHERE tabla IN ({placeholders}) ORDER BY tabla, sucursal_id, parte",
-                faltantes,
+                f"FROM pos_base WHERE tabla IN ({marcas}) ORDER BY tabla, sucursal_id, parte",
+                tuple(bajar),
             ).fetchall()
 
+    if not bajar:
+        return
     por_tabla: dict[str, list] = {}
-    for p in partes:
-        por_tabla.setdefault(p["tabla"], []).append(p)
-
-    with _cache_lock:
-        for t in faltantes:
-            t_partes = por_tabla.get(t, [])
-            columnas, filas = _armar_filas(t_partes)
-            if sid is None:
-                filas = _sin_copias(t, columnas, filas)
-            stamp = (
-                max((p["actualizado_en"] for p in t_partes if p["actualizado_en"]), default=None),
-                sum(int(p["cantidad"] or 0) for p in t_partes),
-            )
-            clave = (ambito, t, sid)
-            _cache[clave] = (ahora, stamp, columnas, filas)
+    for parte in partes:
+        por_tabla.setdefault(parte["tabla"], []).append(parte)
+    for tabla in bajar:
+        _publicar_tabla(ambito, tabla, por_tabla.get(tabla, []), ahora, sellos.get(tabla, {}))
