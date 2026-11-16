@@ -30,7 +30,7 @@ def _ventas(sid, columnas, filas):
 
 def test_el_dni_es_el_id_y_la_copia_no_suma_deuda(client):
     _clientes(1, [[5, "SILVIA", "27.201.11222", 100.0]])
-    _clientes(2, [[9, "SILVIA", "2720111222", 80.0], [10, "OTRO", "30111222", 40.0]])
+    _clientes(2, [[5, "SILVIA", "2720111222", 100.0], [10, "OTRO", "30111222", 40.0]])
 
     columnas, filas = filas_de("clientes")
     dni = columnas.index("dni")
@@ -42,6 +42,29 @@ def test_el_dni_es_el_id_y_la_copia_no_suma_deuda(client):
     assert por_nombre["SILVIA"]["id"] == "2720111222"
     assert por_nombre["SILVIA"]["deuda"] == 100.0
     assert cartera["deuda_total"] == 140.0
+
+
+def test_el_mismo_dni_en_otra_sucursal_junta_los_tickets(client):
+    _clientes(1, [[5, "SILVIA", "2720111222", 100.0]])
+    _clientes(2, [[9, "SILVIA GOMEZ", "2720111222", 40.0]])
+    _ventas(1, ["id", "fecha", "total", "cliente_nombre"], [[100, "2026-11-13 10:00:00", 10.0, "SILVIA"]])
+    _ventas(2, ["id", "fecha", "total", "cliente_nombre"], [
+        [100, "2026-11-13 10:00:00", 10.0, "SILVIA"],
+        [200, "2026-11-15 18:00:00", 25.0, "SILVIA GOMEZ"],
+    ])
+
+    _, filas = filas_de("ventas")
+    assert sorted(fila[0] for fila in filas) == [100, 200]
+
+    from app.services.pos_historial import movimientos_de
+
+    tickets = sorted(fila["ticket"] for fila in movimientos_de("2720111222"))
+    assert tickets == ["#100", "#200"]
+
+    cartera = _calcular_cartera()
+    silvia = next(fila for fila in cartera["clientes"] if fila["id"] == "2720111222")
+    assert silvia["deuda"] == 140.0
+    assert silvia["nombres"] == ["SILVIA", "SILVIA GOMEZ"]
 
 
 def test_el_mismo_ticket_se_omite_y_otro_dia_se_queda(client):

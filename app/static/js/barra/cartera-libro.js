@@ -4,7 +4,7 @@
     if (!caja) return;
 
     const API_BASE = '/api';
-    const CACHE_CARTERA = 'crm-cartera-app';
+    function claveCacheCartera() { return 'crm-cartera-app:' + (sucursalId || 'todas'); }
     const PERFILES_LOCAL = 'crm-perfiles-local';
     let allClients = [];
     let currentFilter = 'all';
@@ -169,8 +169,13 @@
         if (ficha) ficha.hidden = false;
         ponerMarca(client.nombre);
         marcarAtras(true);
+        const alias = (client.nombres || []).filter((nombre) => nombre && nombre !== client.nombre);
+        const notaNombres = alias.length
+            ? `<p class="ficha-nota">También figura como ${alias.map(esc).join(', ')}</p>`
+            : '';
         if (ficha) {
             ficha.innerHTML = `
+                ${notaNombres}
                 <div class="ficha-numeros">
                     <div><span>CAPITAL</span><strong>${formatCompact(saldo)}</strong></div>
                     <div><span>INTERÉS</span><strong>${interesTxt}</strong></div>
@@ -374,6 +379,7 @@
             id: cliente.id,
             pos_id: cliente.id,
             nombre: cliente.nombre,
+            nombres: cliente.nombres || [],
             cuit: cliente.dni,
             telefono: cliente.telefono,
             tipo_cliente: cliente.tipo,
@@ -512,7 +518,7 @@
             const response = await fetch(url);
             if (!response.ok) throw new Error('libro');
             const dato = await response.json();
-            try { localStorage.setItem(CACHE_CARTERA, JSON.stringify(dato)); } catch (e) {}
+            try { localStorage.setItem(claveCacheCartera(), JSON.stringify(dato)); } catch (e) {}
             aplicarLibro(dato);
         } catch (e) {
             if (!allClients.length && vacio) {
@@ -561,11 +567,15 @@
         filtrar(filtro) { setFilter(filtro || 'all'); },
         actualizar() { return loadClients(); },
         sucursal(id) {
-            sucursalId = id == null ? '' : String(id);
+            sucursalId = (id == null || id === '') ? '' : String(id);
+            try {
+                const previo = localStorage.getItem(claveCacheCartera());
+                if (previo) aplicarLibro(JSON.parse(previo));
+            } catch (_) {}
             return loadClients();
         },
         entrar(id) {
-            if (id != null && id !== '') sucursalId = String(id);
+            sucursalId = (id == null || id === '') ? '' : String(id);
             const abierto = clienteDelHash();
             if (abierto) pintarFicha(abierto);
             else mostrarLista();
@@ -587,7 +597,9 @@
     };
 
     try {
-        const previo = localStorage.getItem(CACHE_CARTERA) || sessionStorage.getItem(CACHE_CARTERA);
+        const idIni = localStorage.getItem('crm_active_sucursal_id') || '';
+        sucursalId = idIni;
+        const previo = localStorage.getItem(claveCacheCartera()) || sessionStorage.getItem(claveCacheCartera());
         if (previo) aplicarLibro(JSON.parse(previo));
     } catch (e) {}
 })();

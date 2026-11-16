@@ -53,20 +53,23 @@ def _digitos(valor: Any) -> str:
 
 
 def _clave_cliente(columnas: list, fila: list) -> str:
-    """El DNI es el id de la persona. Sin DNI, el id de la caja junto con el nombre."""
+    """Copia: mismo DNI y mismo id de caja. Otro id con el mismo DNI es la misma persona en otra sucursal y se queda."""
     dni_i = _columna(columnas, "dni", "cuit")
-    if dni_i is not None:
-        dni = _digitos(fila[dni_i] if dni_i < len(fila) else "")
-        if dni:
-            return "dni:" + dni
     id_i = _indice_id(columnas)
-    if id_i is None or id_i >= len(fila) or fila[id_i] in (None, ""):
+    caja = ""
+    if id_i is not None and id_i < len(fila) and fila[id_i] not in (None, ""):
+        caja = str(fila[id_i])
+    if dni_i is not None and dni_i < len(fila):
+        dni = _digitos(fila[dni_i])
+        if dni:
+            return "dni:" + dni + ":" + caja
+    if not caja:
         return ""
     nombre_i = _columna(columnas, "nombre")
     nombre = ""
     if nombre_i is not None and nombre_i < len(fila):
         nombre = str(fila[nombre_i] or "").strip().casefold()
-    return "id:" + str(fila[id_i]) + ":" + nombre
+    return "id:" + caja + ":" + nombre
 
 
 def _clave_venta(columnas: list, fila: list) -> tuple:
@@ -161,7 +164,6 @@ def _omitir_copias(conn, tabla: str, columnas: list, filas: list, sid: int | Non
     duenos: dict = {}
     if not (modo == "reemplazo" and parte == 1):
         propias, duenos = _claves_en(conn, tabla, sid, False)
-    id_i = _indice_id(columnas)
     salida = []
     vistas: set = set()
     for fila in filas:
@@ -173,32 +175,119 @@ def _omitir_copias(conn, tabla: str, columnas: list, filas: list, sid: int | Non
             continue
         if clave in propias and modo == "reemplazo":
             continue
-        if clave in propias and tabla == "clientes" and modo == "delta":
-            actual = str(fila[id_i]) if id_i is not None and id_i < len(fila) else ""
-            if duenos.get(clave) not in (None, actual):
-                continue
         vistas.add(clave)
         salida.append(fila)
     return salida
 
 
-def ids_de_persona(buscado: Any) -> set[str]:
-    """El id de la ficha puede ser el DNI. Devuelve los id de caja de esa persona."""
+def enlaces_de_persona(buscado: Any) -> dict[str, Any]:
+    """Un DNI junta los id de caja y los nombres con los que esa persona figura en cada sucursal."""
     texto = str(buscado or "")
-    ids = {texto} if texto else set()
     columnas, filas = filas_de("clientes")
     id_i = _indice_id(columnas)
     dni_i = _columna(columnas, "dni", "cuit")
+    nom_i = _columna(columnas, "nombre")
+    dni_objetivo = _digitos(texto)
+    if id_i is not None and dni_i is not None:
+        conocidos = {
+            _digitos(fila[dni_i])
+            for fila in filas
+            if dni_i < len(fila) and _digitos(fila[dni_i])
+        }
+        if dni_objetivo not in conocidos:
+            dni_objetivo = ""
+            for fila in filas:
+                if id_i < len(fila) and str(fila[id_i]) == texto and dni_i < len(fila):
+                    dni_objetivo = _digitos(fila[dni_i])
+                    break
+    ids = {texto} if texto else set()
+    nombres: set[str] = set()
     if id_i is None:
-        return ids
+        return {"dni": dni_objetivo, "ids": ids, "nombres": nombres}
     for fila in filas:
         if id_i >= len(fila):
             continue
         cid = str(fila[id_i])
         dni = _digitos(fila[dni_i]) if dni_i is not None and dni_i < len(fila) else ""
-        if cid == texto or (dni and dni == texto):
-            ids.add(cid)
-    return ids
+        nombre = str(fila[nom_i] or "").strip() if nom_i is not None and nom_i < len(fila) else ""
+        if (dni_objetivo and dni == dni_objetivo) or cid == texto:
+            if cid:
+                ids.add(cid)
+            if nombre:
+                nombres.add(nombre)
+    return {"dni": dni_objetivo, "ids": ids, "nombres": nombres}
+
+
+def ids_de_persona(buscado: Any) -> set[str]:
+    """El id de la ficha puede ser el DNI. Devuelve los id de caja de esa persona."""
+    return set(enlaces_de_persona(buscado)["ids"])
+
+
+def _monto(valor: Any) -> float:
+    try:
+        return round(float(valor or 0), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def unir_clientes(columnas: list, filas: list) -> tuple[list, list]:
+    """Un DNI, un cliente. La misma deuda copiada cuenta una vez. Deudas distintas de sucursales reales se suman."""
+    if not columnas or not filas:
+        return columnas, filas
+    dni_i = _columna(columnas, "dni", "cuit")
+    deu_i = _columna(columnas, "deuda_actual", "deuda")
+    nom_i = _columna(columnas, "nombre")
+    grupos: dict[str, list] = {}
+    orden: list[str] = []
+    for fila in filas:
+        dni = _digitos(fila[dni_i]) if dni_i is not None and dni_i < len(fila) else ""
+        clave = "dni:" + dni if dni else (_clave_cliente(columnas, fila) or str(id(fila)))
+        if clave not in grupos:
+            orden.append(clave)
+            grupos[clave] = []
+        grupos[clave].append(fila)
+    columnas_out = list(columnas)
+    if _columna(columnas_out, "nombres") is None:
+        columnas_out.append("nombres")
+    salida = []
+    for clave in orden:
+        grupo = grupos[clave]
+        base = list(grupo[0])
+        nombres: list[str] = []
+        montos: list[float] = []
+        for fila in grupo:
+            if nom_i is not None and nom_i < len(fila):
+                nombre = str(fila[nom_i] or "").strip()
+                if nombre and nombre not in nombres:
+                    nombres.append(nombre)
+            if deu_i is not None and deu_i < len(fila):
+                montos.append(_monto(fila[deu_i]))
+        if deu_i is not None and montos:
+            if all(monto == montos[0] for monto in montos):
+                base[deu_i] = montos[0]
+            else:
+                base[deu_i] = round(sum(montos), 2)
+        while len(base) < len(columnas):
+            base.append("")
+        base.append(" · ".join(nombres))
+        salida.append(base)
+    return columnas_out, salida
+
+
+def _sin_copias(tabla: str, columnas: list, filas: list) -> list:
+    """En el consolidado, el ticket que ya vino de otra PC no se cuenta otra vez."""
+    if tabla not in ("ventas", "detalles_ventas", "ventas_items", "cuenta_corriente"):
+        return filas
+    vistas: set = set()
+    salida = []
+    for fila in filas:
+        clave = _armar_clave(tabla, columnas, fila)
+        if clave:
+            if clave in vistas:
+                continue
+            vistas.add(clave)
+        salida.append(fila)
+    return salida
 
 
 def _leer_crudo(conn, tabla: str, sid: int | None) -> tuple[list, list]:
@@ -540,6 +629,23 @@ def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None) -> tuple:
     if not pedidas:
         return ()
     sid = int(sucursal_id) if sucursal_id is not None else None
+    ambito = _ambito_cache()
+    ahora = time.monotonic()
+
+    # Si ya están en caché en memoria dentro del TTL, devolver sus sellos sin consultar la DB
+    with _cache_lock:
+        sellos_mem = []
+        todos_en_mem = True
+        for t in pedidas:
+            hit = _cache.get((ambito, t, sid))
+            if hit and ahora - hit[0] < _CACHE_TTL:
+                sellos_mem.append(hit[1])
+            else:
+                todos_en_mem = False
+                break
+        if todos_en_mem:
+            return tuple(sellos_mem)
+
     marcas = ", ".join("?" for _ in pedidas)
     with get_db() as conn:
         if sid is not None:
@@ -624,6 +730,59 @@ def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], lis
                 (tabla,),
             ).fetchall()
     columnas, filas = _armar_filas(partes)
+    if sid is None:
+        filas = _sin_copias(tabla, columnas, filas)
     with _cache_lock:
         _cache[clave] = (time.monotonic(), stamp, columnas, filas)
     return columnas, filas
+
+
+def precargar_tablas(tablas: tuple[str, ...] | list[str], sucursal_id: int | None = None) -> None:
+    """Carga múltiples tablas en un solo query contra Neon, poblando la caché en memoria."""
+    pedidas = [t for t in tablas if _TABLA.match(t or "")]
+    if not pedidas:
+        return
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    ambito = _ambito_cache()
+    ahora = time.monotonic()
+
+    faltantes = []
+    with _cache_lock:
+        for t in pedidas:
+            hit = _cache.get((ambito, t, sid))
+            if not (hit and ahora - hit[0] < _CACHE_TTL):
+                faltantes.append(t)
+    if not faltantes:
+        return
+
+    placeholders = ", ".join("?" for _ in faltantes)
+    with get_db() as conn:
+        if sid is not None:
+            partes = conn.execute(
+                f"SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
+                f"FROM pos_base WHERE tabla IN ({placeholders}) AND sucursal_id = ? ORDER BY tabla, parte",
+                (*faltantes, sid),
+            ).fetchall()
+        else:
+            partes = conn.execute(
+                f"SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
+                f"FROM pos_base WHERE tabla IN ({placeholders}) ORDER BY tabla, sucursal_id, parte",
+                faltantes,
+            ).fetchall()
+
+    por_tabla: dict[str, list] = {}
+    for p in partes:
+        por_tabla.setdefault(p["tabla"], []).append(p)
+
+    with _cache_lock:
+        for t in faltantes:
+            t_partes = por_tabla.get(t, [])
+            columnas, filas = _armar_filas(t_partes)
+            if sid is None:
+                filas = _sin_copias(t, columnas, filas)
+            stamp = (
+                max((p["actualizado_en"] for p in t_partes if p["actualizado_en"]), default=None),
+                sum(int(p["cantidad"] or 0) for p in t_partes),
+            )
+            clave = (ambito, t, sid)
+            _cache[clave] = (ahora, stamp, columnas, filas)

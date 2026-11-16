@@ -2973,21 +2973,57 @@ const $ = id => document.getElementById(id);
         }
 
         let activeSucursalId = null;
+        try {
+            const guardado = localStorage.getItem('crm_active_sucursal_id');
+            if (guardado !== null && guardado !== '') activeSucursalId = parseInt(guardado, 10);
+        } catch (_) {}
         let sucursalesConocidas = [];
+        try {
+            sucursalesConocidas = JSON.parse(localStorage.getItem('crm_sucursales_cache') || '[]');
+        } catch (_) {}
+
+        function actualizarNombreEmpresaTopbar() {
+            const nomEl = $('empresaNombre');
+            if (!nomEl) return;
+            let baseEmpresa = '';
+            try {
+                baseEmpresa = (JSON.parse(localStorage.getItem('empresa_datos') || '{}').nombre) || '';
+            } catch (_) {}
+            if (!baseEmpresa && typeof sessionUser !== 'undefined' && sessionUser) {
+                baseEmpresa = sessionUser.empresa || sessionUser.empresa_nombre || sessionUser.username || '';
+            }
+            if (!baseEmpresa) baseEmpresa = 'MACIEL';
+            const elegida = sucursalesConocidas.find((s) => s.id === activeSucursalId);
+            if (elegida) {
+                nomEl.textContent = baseEmpresa.toUpperCase() + ' · ' + elegida.nombre.toUpperCase();
+            } else {
+                nomEl.textContent = baseEmpresa.toUpperCase();
+            }
+        }
+        actualizarNombreEmpresaTopbar();
 
         function aplicarSucursal(id) {
             activeSucursalId = id;
+            try {
+                if (id == null) localStorage.removeItem('crm_active_sucursal_id');
+                else localStorage.setItem('crm_active_sucursal_id', String(id));
+            } catch (_) {}
             const icono = $('topbarIcon');
+            const elegida = sucursalesConocidas.find((s) => s.id === id);
             if (icono) {
                 icono.classList.toggle('activa', id != null);
-                const elegida = sucursalesConocidas.find((s) => s.id === id);
                 icono.setAttribute('aria-label', elegida ? elegida.nombre : 'Todas las sucursales');
+            }
+            actualizarNombreEmpresaTopbar();
+            const grid = document.querySelector('.vitrina-grid');
+            if (grid) grid.style.opacity = '0.5';
+
+            if (window.CarteraLibro) {
+                void window.CarteraLibro.sucursal(id);
             }
             const activeView = document.querySelector('.view.active');
             const vName = activeView ? activeView.id.replace('view-', '') : 'reporte';
-            if (vName === 'cartera' && window.CarteraLibro) {
-                void window.CarteraLibro.sucursal(id);
-            } else if (['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket', 'dashboard'].includes(vName)) {
+            if (vName !== 'cartera' && ['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket', 'dashboard'].includes(vName)) {
                 cargarJefe(vName === 'dashboard' ? 'reporte' : vName);
             }
         }
@@ -3031,6 +3067,8 @@ const $ = id => document.getElementById(id);
                 const data = await res.json();
                 const sucursales = data.sucursales || [];
                 sucursalesConocidas = sucursales;
+                try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursales)); } catch (_) {}
+                actualizarNombreEmpresaTopbar();
                 const cont = $('sucursalPillsContainer');
                 if (!cont) return;
 
@@ -3774,6 +3812,8 @@ const $ = id => document.getElementById(id);
         }
 
         function aplicarDatosJefe(panel, dato, enCurso) {
+            const grid = document.querySelector('.vitrina-grid');
+            if (grid) grid.style.opacity = '1';
             const resumen = dato.resumen || {};
             const aviso = dato.libro
                 ? ''
@@ -4023,6 +4063,7 @@ const $ = id => document.getElementById(id);
                     }
 
                     $('reporteCuerpo').innerHTML = html;
+                    actualizarNombreEmpresaTopbar();
                 }
             }
 
@@ -5855,8 +5896,21 @@ const $ = id => document.getElementById(id);
             CrmBus.on('setSidebarOpen', (open) => setSidebarOpen(open));
         }
 
+        function marcarVersion() {
+            const marca = $('versionTag');
+            if (!marca) return;
+            fetch('/health', { cache: 'no-store' })
+                .then((respuesta) => respuesta.ok ? respuesta.json() : null)
+                .then((dato) => {
+                    const numero = dato && dato.app_version;
+                    if (numero) marca.textContent = 'v' + numero + ' PRO';
+                })
+                .catch(() => {});
+        }
+
         async function boot() {
             try {
+                marcarVersion();
                 wireCrmModules();
                 initBackupUi();
                 cargarSucursalesSelector();

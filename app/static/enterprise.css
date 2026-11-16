@@ -106,8 +106,9 @@ body::before {
     flex-direction: column;
     z-index: 100;
     backdrop-filter: blur(16px);
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
+    box-sizing: border-box;
+    padding-bottom: calc(60px + env(safe-area-inset-bottom, 0px));
 }
 
 .brand {
@@ -149,7 +150,13 @@ body::before {
     box-shadow: 0 0 8px var(--success);
 }
 
-.nav { flex: 0 0 auto; padding: 12px 10px; }
+.nav {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px 10px;
+}
 .nav-label {
     font-size: 10px; font-weight: 700; color: var(--text-tertiary);
     text-transform: uppercase; letter-spacing: 0.1em;
@@ -184,10 +191,13 @@ body::before {
 }
 
 .sidebar-foot {
+    margin-top: auto;
+    flex-shrink: 0;
     padding: 14px 20px;
     border-top: 1px solid var(--border-subtle);
     font-size: 10px; color: var(--text-tertiary);
     display: flex; justify-content: space-between; align-items: center;
+    background: var(--bg-elevated);
 }
 .version-tag {
     padding: 2px 7px;
@@ -896,7 +906,7 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
         transition: transform 0.28s var(--ease);
         box-shadow: var(--shadow-lg);
         z-index: 500;
-        width: min(88vw, 300px);
+        width: 50vw;
     }
     .nav-item svg {
         width: 20px !important;
@@ -1880,7 +1890,7 @@ select.periodo-pill.active option { color: #0F172A; }
 /* El menú lateral es el panel de herramientas. Se abre con Opciones, en cualquier ancho. */
 .sidebar {
     transform: translateX(-105%);
-    width: min(92vw, 380px);
+    width: 50vw;
 }
 .sidebar.open { transform: translateX(0); }
 .main { margin-left: 0 !important; }

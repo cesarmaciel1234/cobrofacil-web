@@ -164,25 +164,69 @@ def _proyeccion(movimientos: list[dict]) -> dict:
 _mov_armado: dict[tuple, list[dict]] = {}
 
 
-def movimientos_de(pos_id) -> list[dict]:
-    columnas, crudas = filas_de("cuenta_corriente")
+def _tickets_enlazados(persona: dict, ya: set) -> list[dict]:
+    """Tickets de venta de cualquier sucursal cuyo nombre o id pertenece a ese DNI."""
+    columnas, filas = filas_de("ventas")
     if not columnas:
         return []
-    from app.services.pos_base import ids_de_persona
+    idx = {str(col).lower(): i for i, col in enumerate(columnas)}
+    nombres = {nombre.casefold() for nombre in persona.get("nombres") or []}
+    ids = {str(valor) for valor in persona.get("ids") or []}
+    salida = []
+    for fila in filas:
+        vid = str(_tomar(fila, idx, "id") or "")
+        if not vid or vid in ya:
+            continue
+        cliente = str(_tomar(fila, idx, "cliente_nombre") or "").strip()
+        cid = str(_tomar(fila, idx, "cliente_id") or "")
+        if not ((cliente and cliente.casefold() in nombres) or (cid and cid in ids)):
+            continue
+        estado = str(_tomar(fila, idx, "estado") or "").upper()
+        sucursal = str(_tomar(fila, idx, "sucursal_nombre") or "").strip()
+        detalle = cliente or "Ticket"
+        if sucursal:
+            detalle = f"{detalle} · {sucursal}"
+        salida.append({
+            "id": vid,
+            "fecha": str(_tomar(fila, idx, "fecha") or "").split(".")[0],
+            "tipo": "CARGO",
+            "etiqueta": "TICKET",
+            "monto": _num(_tomar(fila, idx, "total")),
+            "saldo": None,
+            "ticket": f"#{vid}",
+            "detalle": detalle,
+            "dias": None,
+            "mantenimiento": None,
+            "es_interes": False,
+            "es_venta": True,
+            "es_cobro": False,
+            "borrado": False,
+            "cancelado": estado.startswith("CANCEL"),
+        })
+    return salida
+
+
+def movimientos_de(pos_id) -> list[dict]:
+    columnas, crudas = filas_de("cuenta_corriente")
+    from app.services.pos_base import enlaces_de_persona
 
     buscado = str(pos_id)
-    personas = ids_de_persona(buscado)
+    persona = enlaces_de_persona(buscado)
     clave = (id(crudas), buscado)
     guardado = _mov_armado.get(clave)
     if guardado is not None:
         return guardado
-    filas = [
-        fila for fila in _dicts(columnas, crudas)
-        if str(fila.get("cliente_id")) in personas
-        and "MANTENIMIENTO" not in str(fila.get("descripcion") or "").upper()
-    ]
+    filas = []
+    if columnas:
+        filas = [
+            fila for fila in _dicts(columnas, crudas)
+            if str(fila.get("cliente_id")) in persona["ids"]
+            and "MANTENIMIENTO" not in str(fila.get("descripcion") or "").upper()
+        ]
     tickets = _proyeccion(filas).get("tickets") or {}
     armadas = [_armar(fila, tickets) for fila in filas]
+    vistos = {str(fila.get("venta_id")) for fila in filas if fila.get("venta_id") not in (None, "", 0, "0")}
+    armadas.extend(_tickets_enlazados(persona, vistos))
     armadas.sort(key=lambda fila: (str(fila["fecha"]), int(fila["id"] or 0)), reverse=True)
     if len(_mov_armado) > 300:
         _mov_armado.clear()
@@ -212,7 +256,13 @@ def resumen_cliente(pos_id, deuda: float | None = None) -> dict:
         and not fila["borrado"] and not fila["cancelado"]
     )
     cobros = sum(fila["monto"] for fila in movs if fila["es_cobro"])
-    partes = [f"{len(movs)} movimiento(s)"]
+    from app.services.pos_base import enlaces_de_persona
+
+    nombres = sorted(enlaces_de_persona(pos_id)["nombres"])
+    partes = []
+    if len(nombres) > 1:
+        partes.append("También figura como " + ", ".join(nombres[1:]))
+    partes.append(f"{len(movs)} movimiento(s)")
     cargos = ventas + manuales
     if cargos:
         partes.append(f"Ventas: ${cargos:,.2f}")

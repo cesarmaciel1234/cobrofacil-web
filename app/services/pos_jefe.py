@@ -2,10 +2,10 @@
 from __future__ import annotations
 
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
-from app.services.pos_base import filas_de, listar_sucursales, ultima_carga
+from app.services.pos_base import filas_de, listar_sucursales, ultima_carga, unir_clientes
 from app.services.pos_historial import desglose_articulos, historial_ventas, rango_fechas
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
@@ -107,48 +107,58 @@ def _dia_libro(ventas: list[dict]) -> str:
     return max(dias) if dias else hoy
 
 
-def _resumen(ventas: list[dict], dia: str) -> dict:
-    del_dia = [v for v in ventas if v["dia"] == dia]
-    tickets = len(del_dia)
-    total = sum(v["total"] for v in del_dia)
+def _resumen(ventas: list[dict], dia: str, hasta: str | None = None) -> dict:
+    ini = (dia or "")[:10]
+    fin = (hasta or dia or "")[:10]
+    del_rango = [v for v in ventas if ini <= v["dia"] <= fin]
+    tickets = len(del_rango)
+    total = sum(v["total"] for v in del_rango)
     por_medio: dict[str, float] = {}
     digital = 0.0
-    for venta in del_dia:
+    for venta in del_rango:
         medio = venta["pago"] or "Efectivo"
         por_medio[medio] = por_medio.get(medio, 0.0) + venta["total"]
         if _es_digital(medio):
             digital += venta["total"]
     pago = max(por_medio, key=por_medio.get) if por_medio else ""
-    anteriores = sorted({v["dia"] for v in ventas if v["dia"] < dia})
-    dia_anterior = anteriores[-1] if anteriores else ""
+
+    d0 = datetime.fromisoformat(ini).date()
+    d1 = datetime.fromisoformat(fin).date()
+    duracion = (d1 - d0).days + 1
+    ant_fin = (d0 - timedelta(days=1)).isoformat()
+    ant_ini = (d0 - timedelta(days=duracion)).isoformat()
+    del_anterior = [v for v in ventas if ant_ini <= v["dia"] <= ant_fin]
     ventas_anterior = (
-        round(sum(v["total"] for v in ventas if v["dia"] == dia_anterior), 2)
-        if dia_anterior else None
+        round(sum(v["total"] for v in del_anterior), 2)
+        if del_anterior else None
     )
     variacion = None
-    if ventas_anterior:
+    if ventas_anterior and ventas_anterior > 0:
         variacion = round((total - ventas_anterior) / ventas_anterior * 100, 1)
+    hoy_iso = datetime.now(_ZONA).date().isoformat()
     return {
-        "dia": dia,
+        "dia": ini if ini == fin else f"{ini} → {fin}",
         "ventas": round(total, 2),
         "tickets": tickets,
         "promedio": round(total / tickets, 2) if tickets else 0.0,
         "pago": pago,
-        "es_hoy": dia == datetime.now(_ZONA).date().isoformat(),
-        "dia_anterior": dia_anterior,
+        "es_hoy": (ini == fin == hoy_iso),
+        "dia_anterior": ant_fin,
         "ventas_anterior": ventas_anterior,
         "variacion_pct": variacion,
         "mix_digital_pct": round(digital / total * 100, 1) if total else 0.0,
     }
 
 
-def _desglose_sucursales(ventas: list[dict], dia: str) -> list[dict]:
-    del_dia = [v for v in ventas if v["dia"] == dia]
+def _desglose_sucursales(ventas: list[dict], dia: str, hasta: str | None = None) -> list[dict]:
+    ini = (dia or "")[:10]
+    fin = (hasta or dia or "")[:10]
+    del_rango = [v for v in ventas if ini <= v["dia"] <= fin]
     sucursales = listar_sucursales()
     nombres_suc = {s["id"]: s["nombre"] for s in sucursales}
 
     agrupado: dict[int, dict] = {}
-    for v in del_dia:
+    for v in del_rango:
         sid = v.get("sucursal_id")
         sid_val = int(sid) if sid is not None else 1
         if sid_val not in agrupado:
@@ -176,14 +186,18 @@ def _desglose_sucursales(ventas: list[dict], dia: str) -> list[dict]:
     return lista
 
 
-def _ranking_cortes(dia: str, sucursal_id: int | None, ventas: list[dict]) -> list[dict]:
+def _ranking_cortes(dia: str, sucursal_id: int | None, ventas: list[dict], hasta: str | None = None) -> list[dict]:
     columnas, filas = filas_de("ventas_items", sucursal_id)
     if not columnas:
         columnas, filas = filas_de("detalle_ventas", sucursal_id)
     if not columnas:
+        columnas, filas = filas_de("detalles_ventas", sucursal_id)
+    if not columnas:
         return []
     idx = _indice(columnas)
-    ids_dia = {_clave(v["id"]) for v in ventas if v["dia"] == dia and _clave(v.get("id"))}
+    ini = (dia or "")[:10]
+    fin = (hasta or dia or "")[:10]
+    ids_dia = {_clave(v["id"]) for v in ventas if (ini <= v["dia"] <= fin) and _clave(v.get("id"))}
     enlace = next((nombre for nombre in ("venta_id", "id_venta", "ticket_id", "venta") if nombre in idx), "")
     cortes: dict[str, dict] = {}
     for fila in filas:
@@ -191,7 +205,7 @@ def _ranking_cortes(dia: str, sucursal_id: int | None, ventas: list[dict]) -> li
             continue
         if not enlace:
             fecha_item = _dia(_valor(fila, idx, "fecha"))
-            if fecha_item and fecha_item != dia:
+            if fecha_item and not (ini <= fecha_item <= fin):
                 continue
         nombre = str(_valor(fila, idx, "nombre", "producto", "descripcion") or "").strip()
         if not nombre:
@@ -242,7 +256,7 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | Non
         fin = ini
     pedido = _clave(sucursal_id) if sucursal_id is not None else ""
 
-    col_v, filas_v = filas_de("ventas", None)
+    col_v, filas_v = filas_de("ventas", sucursal_id)
     idx_v = _indice(col_v)
     vivas = []
     cancelados = 0.0
@@ -266,7 +280,7 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | Non
                 "id_pago": _ref(_valor(f, idx_v, "id_pago", "mp_id", "payment_id")),
             })
 
-    col_cc, filas_cc = filas_de("cuenta_corriente", None)
+    col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
     idx_cc = _indice(col_cc)
     abonos = []
     if col_cc:
@@ -286,7 +300,7 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | Non
                 "fecha": str(_valor(f, idx_cc, "fecha") or ""),
             })
 
-    col_cd, filas_cd = filas_de("cobros_digitales", None)
+    col_cd, filas_cd = filas_de("cobros_digitales", sucursal_id)
     idx_cd = _indice(col_cd)
     cobros = []
     if col_cd:
@@ -602,7 +616,7 @@ def _nombres_en_crm() -> dict[str, dict]:
 def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
     columnas, filas = filas_de("clientes", sucursal_id)
     if filas:
-        return columnas, filas
+        return unir_clientes(columnas, filas)
     col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
     if not col_cc:
         return [], []
@@ -740,9 +754,11 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
             al_dia += 1
 
         dni_principal = "".join(caracter for caracter in dni if caracter.isdigit())
+        nombres = [parte.strip() for parte in str(_valor(fila, idx, "nombres") or "").split("·") if parte.strip()]
         ficha = {
             "id": dni_principal or _valor(fila, idx, "id"),
             "nombre": nombre,
+            "nombres": nombres or ([nombre] if nombre else []),
             "telefono": tel,
             "dni": dni,
             "tipo": tipo,
@@ -939,6 +955,11 @@ def _armar_panel(
     filtro: dict | None = None,
 ) -> dict:
     sucursales_disp = listar_sucursales()
+    from app.services.pos_base import precargar_tablas
+    precargar_tablas(
+        ("ventas", "detalles_ventas", "detalle_ventas", "ventas_items", "productos", "articulos", "clientes", "cuenta_corriente", "cobros_digitales", "mp_pagos", "proveedores"),
+        sucursal_id=sucursal_id,
+    )
 
     if nombre in ("admin", "cartera", "clientes"):
         cartera = _cartera_admin(sucursal_id)
@@ -983,20 +1004,41 @@ def _armar_panel(
         }
 
     ventas, _idx = _ventas(sucursal_id)
-    dia = _dia_libro(ventas) if ventas else datetime.now(_ZONA).date().isoformat()
-    resumen = _resumen(ventas, dia) if ventas else {"dia": dia, "ventas": 0.0, "tickets": 0, "promedio": 0.0, "pago": "", "es_hoy": True}
-    desglose_suc = _desglose_sucursales(ventas, dia) if ventas else []
+
+    from app.services.pos_vitrina import resolver_rango
+    desde_iso, hasta_iso, nombre_periodo = resolver_rango(
+        str(periodo or "Hoy"),
+        desde_custom=desde or None,
+        hasta_custom=hasta or None,
+    )
+    ini = desde_iso[:10]
+    fin = hasta_iso[:10]
+
+    hoy_real = datetime.now(_ZONA).date().isoformat()
+    if nombre_periodo == "Hoy" and ventas:
+        dias_con_ventas = {v["dia"] for v in ventas if v.get("dia")}
+        if hoy_real not in dias_con_ventas and dias_con_ventas:
+            dia_activo = max(dias_con_ventas)
+            ini = dia_activo
+            fin = dia_activo
+            desde = ini
+            hasta = fin
+        else:
+            dia_activo = hoy_real
+    else:
+        dia_activo = ini
+
+    resumen = _resumen(ventas, ini, fin) if ventas else {
+        "dia": ini, "ventas": 0.0, "tickets": 0, "promedio": 0.0, "pago": "", "es_hoy": (ini == hoy_real)
+    }
+    desglose_suc = _desglose_sucursales(ventas, ini, fin) if ventas else []
 
     if nombre in ("digitales", "cobros_digitales", "mercadopago", "mp"):
-        from app.services.pos_vitrina import resolver_rango
-        desde_iso, hasta_iso, nombre_periodo = resolver_rango(
-            periodo=periodo, desde_custom=desde, hasta_custom=hasta
-        )
         if str(periodo or "").strip().lower() in ("todo", "todos", "historico", "histórico"):
             digitales = _cobros_digitales("", sucursal_id, "")
             nombre_periodo = "Todo"
         else:
-            digitales = _cobros_digitales(desde_iso[:10], sucursal_id, hasta_iso[:10])
+            digitales = _cobros_digitales(ini, sucursal_id, fin)
         digitales["periodo"] = nombre_periodo
         return {
             "ok": True,
@@ -1009,14 +1051,6 @@ def _armar_panel(
         }
 
     if nombre == "desglose":
-        from app.services.pos_vitrina import resolver_rango
-        desde_iso, hasta_iso, nombre_periodo = resolver_rango(
-            str(periodo or "Hoy"),
-            desde_custom=desde or None,
-            hasta_custom=hasta or None,
-        )
-        ini = desde_iso[:10]
-        fin = hasta_iso[:10]
         libro = desglose_articulos(sucursal_id, ini, fin)
 
         def _corta(iso: str) -> str:
@@ -1039,8 +1073,8 @@ def _armar_panel(
     vitrina = calcular_vitrina(
         periodo=periodo,
         sucursal_id=sucursal_id,
-        desde=desde,
-        hasta=hasta,
+        desde=ini,
+        hasta=fin,
     )
 
     col_c, filas_c = filas_de("clientes", sucursal_id)
@@ -1058,8 +1092,8 @@ def _armar_panel(
         }
 
     if nombre in ("jefe", "reporte", "vitrina"):
-        ranking = _ranking_cortes(dia, sucursal_id, ventas)
-        digitales = _cobros_digitales(dia, sucursal_id)
+        ranking = _ranking_cortes(ini, sucursal_id, ventas, hasta=fin)
+        digitales = _cobros_digitales(ini, sucursal_id, hasta=fin)
         cartera = _cartera_admin(sucursal_id)
         pedidos = _pedidos_abastecimiento(sucursal_id)
         return {

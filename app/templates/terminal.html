@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Cobro Fácil</title>
-
+    
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#2563eb">
     <meta name="mobile-web-app-capable" content="yes">
@@ -19,7 +19,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.35">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.37">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -56,7 +56,7 @@
         <div class="sidebar-foot" style="flex-direction: column; align-items: stretch; gap: 8px;">
             <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
                 <span>Casa central</span>
-                <span class="version-tag">v{{ app_version }} PRO</span>
+                <span class="version-tag" id="versionTag">v{{ app_version }} PRO</span>
             </div>
             <button type="button" class="btn btn-ghost btn-sm" id="btnLogoutSidebar" style="width:100%;">Cerrar sesión</button>
         </div>
@@ -79,7 +79,7 @@
             </div>
 
             <div class="topbar-mobile-title" style="display: none; font-size: 16px; font-weight: 800; color: var(--text-primary); text-align: center; flex: 1; letter-spacing: -0.02em;">Cobro Fácil</div>
-
+            
             <div style="display: flex; align-items: center; gap: 8px; justify-content: center; flex: 1;" class="topbar-greeting-block">
                 <div id="topbarNormalMode" style="display: flex; align-items: center; gap: 8px;">
                     <button type="button" id="topbarIcon" class="topbar-empresa" aria-label="Sucursales">
@@ -102,7 +102,7 @@
             <div class="view active" id="view-reporte">
                 <span id="reporteDia" style="display:none;">Cerebro Jefe</span>
                 <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">Cargando vitrina de tienda…</div>
-            </div>
+                </div>
             <div class="view" id="view-ticket">
                 <div class="card" id="ticketLista">
                     <p id="ticketFiltro" class="ticket-suma">Filtrado —</p>
@@ -200,7 +200,7 @@
     <script src="/static/js/barra/armar.js?v=2"></script>
     <script src="/static/js/barra/toque.js?v=2"></script>
     <script src="/static/js/modulo-panel.js?v=5"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=5"></script>
-    <script src="/static/js/app.js?v=4.55"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=6"></script>
+    <script src="/static/js/app.js?v=4.56"></script>
 </body>
 </html>

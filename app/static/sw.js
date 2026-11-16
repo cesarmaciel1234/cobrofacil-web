@@ -1,5 +1,5 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.14';
+const CACHE_VERSION = 'crm-frigorifico-v4.16';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',
@@ -85,7 +85,7 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   // API y auth: siempre red (nunca cachear — cada usuario/empresa tiene datos distintos)
-  if (isApiRequest(url.pathname)) {
+  if (isApiRequest(url.pathname) || url.pathname === '/health' || url.pathname === '/health/ready') {
     event.respondWith(
       fetch(event.request).catch(() => new Response(
         JSON.stringify({ error: 'Sin conexión', offline: true }),

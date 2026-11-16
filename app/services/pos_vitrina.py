@@ -10,7 +10,7 @@ from datetime import date, datetime, timedelta
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
-from app.services.pos_base import filas_de, ultima_carga
+from app.services.pos_base import filas_de, ultima_carga, unir_clientes
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 _MARCAS_DIGITAL = ("QR", "MERCADOPAGO", "MP", "TARJETA", "POINT", "TRANSFERENCIA", "DIGITAL", "MIXTO")
@@ -138,6 +138,12 @@ def calcular_vitrina(
     es_hoy = nombre_periodo == "Hoy"
     sufijo_periodo = "del día" if es_hoy else "del período"
 
+    from app.services.pos_base import precargar_tablas
+    precargar_tablas(
+        ("ventas", "detalles_ventas", "detalle_ventas", "ventas_items", "productos", "articulos", "clientes", "cuenta_corriente", "cobros_digitales", "mp_pagos"),
+        sucursal_id=sucursal_id,
+    )
+
     # 1. Ventas en el rango
     col_v, filas_v = filas_de("ventas", sucursal_id)
     idx_v = _indice(col_v)
@@ -246,12 +252,10 @@ def calcular_vitrina(
     redondeo_val = round(max(0.0, descuento_total - ofertas_total), 2)
     descuento_val = round(ofertas_total, 2)
 
-    # 3. Deuda clientes
-    col_c, filas_c = filas_de("clientes", sucursal_id)
-    idx_c = _indice(col_c)
-    deuda_clientes_total = 0.0
-    for fila in filas_c:
-        deuda_clientes_total += _numero(_valor(fila, idx_c, "deuda_actual", "deuda", "saldo"))
+    # 3. Deuda clientes (alineada con Cartera oficial)
+    from app.services.pos_jefe import _cartera_admin
+    cartera_oficial = _cartera_admin(sucursal_id)
+    deuda_clientes_total = float(cartera_oficial.get("deuda_total") or 0.0)
 
     # 4. Pagos clientes (cuenta_corriente tipo ABONO) y cobranzas digitales
     col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
