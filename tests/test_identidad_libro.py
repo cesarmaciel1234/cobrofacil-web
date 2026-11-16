@@ -137,3 +137,27 @@ def test_la_misma_pc_puede_actualizar(client):
     _, filas = filas_de("clientes")
     assert len(filas) == 1
     assert filas[0][3] == 50.0
+
+
+def test_el_mismo_nombre_sin_dni_en_otra_sucursal_se_junta(client):
+    _clientes(1, [[21, "silvio falcon", "", 10000.0]])
+    _clientes(2, [[170, "silvio falcon", "", 29272.5]])
+    _ventas(1, ["id", "fecha", "total", "cliente_nombre", "cliente_id"], [[1, "2026-11-10 12:00:00", 10.0, "silvio falcon", 21]])
+    _ventas(2, ["id", "fecha", "total", "cliente_nombre", "cliente_id"], [[2, "2026-11-12 12:00:00", 20.0, "silvio falcon", 170]])
+
+    cartera = _calcular_cartera()
+    silvios = [fila for fila in cartera["clientes"] if fila["nombre"] == "silvio falcon"]
+    assert len(silvios) == 1
+    assert silvios[0]["deuda"] == 39272.5
+    assert set(silvios[0]["sucursales"]) == {"PC 1", "PC 2"}
+
+    tickets = sorted(fila["ticket"] for fila in movimientos_de(silvios[0]["id"]))
+    assert tickets == ["#1", "#2"]
+
+
+def test_el_mismo_nombre_en_la_misma_sucursal_sigue_siendo_dos(client):
+    _clientes(1, [[21, "silvio falcon", "", 10000.0], [22, "silvio falcon", "", 50.0]])
+    cartera = _calcular_cartera()
+    silvios = [fila for fila in cartera["clientes"] if fila["nombre"] == "silvio falcon"]
+    assert len(silvios) == 2
+    assert sorted(fila["deuda"] for fila in silvios) == [50.0, 10000.0]

@@ -1983,7 +1983,8 @@ select.periodo-pill.active option { color: #0F172A; }
 .carrito-copiar { background: #e2e8f0; color: #0f172a; }
 .pedido-opcion { display: block; width: 100%; min-height: 48px; margin-top: 8px; border: 1px solid #e2e8f0; border-radius: 12px; background: #fff; font-weight: 800; text-align: left; padding: 0 14px; }
 .pedido-opcion.active { background: #0f172a; color: #fff; border-color: #0f172a; }
-.pedido-nombre { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 800; color: #0f172a; font-size: 16px; }
+.caja-periodo { margin: 0 0 8px; font-size: 12px; font-weight: 700; color: var(--text-secondary, #64748b); }
+.pedido-sucursal { display: block; font-size: 11px; font-weight: 600; color: #64748b; }
 .pedido-meta { display: flex; align-items: baseline; gap: 8px; min-width: 0; max-width: 100%; }
 .pedido-stock { color: #b91c1c; font-size: 13px; font-weight: 800; }
 .pedido-pedir { color: #64748b; font-size: 12px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

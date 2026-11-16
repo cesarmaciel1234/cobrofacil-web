@@ -13,7 +13,7 @@ from app.database import ensure_tenant_migrations, get_db
 _TABLA = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SECRETOS = ("password", "passwd", "token", "secret", "api_key", "access_token", "refresh_token")
 # El libro ya leído se reusa unos segundos. Cambiar de ventana no vuelve a bajar Neon.
-_CACHE_TTL = 45.0
+_CACHE_TTL = 5.0
 _cache_lock = threading.Lock()
 _cache: dict[tuple, tuple[float, tuple, list, list]] = {}
 
@@ -181,12 +181,13 @@ def _omitir_copias(conn, tabla: str, columnas: list, filas: list, sid: int | Non
 
 
 def enlaces_de_persona(buscado: Any) -> dict[str, Any]:
-    """Un DNI junta los id de caja y los nombres con los que esa persona figura en cada sucursal."""
+    """Un DNI junta los id de caja. Sin DNI, el mismo nombre en otra sucursal también es la misma persona."""
     texto = str(buscado or "")
     columnas, filas = filas_de("clientes")
     id_i = _indice_id(columnas)
     dni_i = _columna(columnas, "dni", "cuit")
     nom_i = _columna(columnas, "nombre")
+    suc_i = _columna(columnas, "sucursal_id")
     dni_objetivo = _digitos(texto)
     if id_i is not None and dni_i is not None:
         conocidos = {
@@ -204,17 +205,51 @@ def enlaces_de_persona(buscado: Any) -> dict[str, Any]:
     nombres: set[str] = set()
     if id_i is None:
         return {"dni": dni_objetivo, "ids": ids, "nombres": nombres}
+
+    def _nombre(fila: list) -> str:
+        if nom_i is None or nom_i >= len(fila):
+            return ""
+        return str(fila[nom_i] or "").strip()
+
+    def _dni(fila: list) -> str:
+        if dni_i is None or dni_i >= len(fila):
+            return ""
+        return _digitos(fila[dni_i])
+
+    def _sucursal(fila: list) -> str:
+        if suc_i is None or suc_i >= len(fila) or fila[suc_i] in (None, ""):
+            return ""
+        return str(fila[suc_i])
+
+    nombre_buscado = ""
     for fila in filas:
         if id_i >= len(fila):
             continue
         cid = str(fila[id_i])
-        dni = _digitos(fila[dni_i]) if dni_i is not None and dni_i < len(fila) else ""
-        nombre = str(fila[nom_i] or "").strip() if nom_i is not None and nom_i < len(fila) else ""
-        if (dni_objetivo and dni == dni_objetivo) or cid == texto:
+        if cid == texto or (dni_objetivo and _dni(fila) == dni_objetivo):
             if cid:
                 ids.add(cid)
+            nombre = _nombre(fila)
             if nombre:
                 nombres.add(nombre)
+                if not _dni(fila):
+                    nombre_buscado = nombre.casefold()
+    if nombre_buscado and not dni_objetivo:
+        sucursales = {
+            _sucursal(fila)
+            for fila in filas
+            if _nombre(fila).casefold() == nombre_buscado and not _dni(fila)
+        }
+        if len(sucursales) > 1:
+            for fila in filas:
+                if id_i >= len(fila):
+                    continue
+                if _nombre(fila).casefold() != nombre_buscado or _dni(fila):
+                    continue
+                cid = str(fila[id_i])
+                if cid:
+                    ids.add(cid)
+                nombres.add(_nombre(fila))
     return {"dni": dni_objetivo, "ids": ids, "nombres": nombres}
 
 
@@ -231,17 +266,34 @@ def _monto(valor: Any) -> float:
 
 
 def unir_clientes(columnas: list, filas: list) -> tuple[list, list]:
-    """Un DNI, un cliente. La misma deuda copiada cuenta una vez. Deudas distintas de sucursales reales se suman."""
+    """Un DNI, un cliente. Sin DNI, el mismo nombre en otra sucursal también. La deuda copiada cuenta una vez."""
     if not columnas or not filas:
         return columnas, filas
     dni_i = _columna(columnas, "dni", "cuit")
     deu_i = _columna(columnas, "deuda_actual", "deuda")
     nom_i = _columna(columnas, "nombre")
+    suc_i = _columna(columnas, "sucursal_id")
+    sucnom_i = _columna(columnas, "sucursal_nombre")
+    nombres_por_sucursal: dict[str, set] = {}
+    for fila in filas:
+        dni = _digitos(fila[dni_i]) if dni_i is not None and dni_i < len(fila) else ""
+        if dni or nom_i is None or nom_i >= len(fila):
+            continue
+        nombre = str(fila[nom_i] or "").strip().casefold()
+        sucursal = str(fila[suc_i]) if suc_i is not None and suc_i < len(fila) and fila[suc_i] not in (None, "") else ""
+        if nombre:
+            nombres_por_sucursal.setdefault(nombre, set()).add(sucursal)
     grupos: dict[str, list] = {}
     orden: list[str] = []
     for fila in filas:
         dni = _digitos(fila[dni_i]) if dni_i is not None and dni_i < len(fila) else ""
-        clave = "dni:" + dni if dni else (_clave_cliente(columnas, fila) or str(id(fila)))
+        nombre = str(fila[nom_i] or "").strip().casefold() if nom_i is not None and nom_i < len(fila) else ""
+        if dni:
+            clave = "dni:" + dni
+        elif nombre and len(nombres_por_sucursal.get(nombre, ())) > 1:
+            clave = "nombre:" + nombre
+        else:
+            clave = _clave_cliente(columnas, fila) or str(id(fila))
         if clave not in grupos:
             orden.append(clave)
             grupos[clave] = []
@@ -249,27 +301,36 @@ def unir_clientes(columnas: list, filas: list) -> tuple[list, list]:
     columnas_out = list(columnas)
     if _columna(columnas_out, "nombres") is None:
         columnas_out.append("nombres")
+    if _columna(columnas_out, "sucursales") is None:
+        columnas_out.append("sucursales")
     salida = []
     for clave in orden:
         grupo = grupos[clave]
         base = list(grupo[0])
         nombres: list[str] = []
+        sucursales: list[str] = []
         montos: list[float] = []
         for fila in grupo:
             if nom_i is not None and nom_i < len(fila):
                 nombre = str(fila[nom_i] or "").strip()
                 if nombre and nombre not in nombres:
                     nombres.append(nombre)
+            if sucnom_i is not None and sucnom_i < len(fila):
+                sucursal = str(fila[sucnom_i] or "").strip()
+                if sucursal and sucursal not in sucursales:
+                    sucursales.append(sucursal)
             if deu_i is not None and deu_i < len(fila):
                 montos.append(_monto(fila[deu_i]))
         if deu_i is not None and montos:
-            if all(monto == montos[0] for monto in montos):
-                base[deu_i] = montos[0]
-            else:
-                base[deu_i] = round(sum(montos), 2)
+            distintos = []
+            for monto in montos:
+                if monto not in distintos:
+                    distintos.append(monto)
+            base[deu_i] = distintos[0] if len(distintos) == 1 else round(sum(distintos), 2)
         while len(base) < len(columnas):
             base.append("")
         base.append(" · ".join(nombres))
+        base.append(" · ".join(sucursales))
         salida.append(base)
     return columnas_out, salida
 

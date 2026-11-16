@@ -449,6 +449,29 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | Non
     }
 
 
+def _unir_faltantes(faltantes: list) -> list:
+    """El mismo producto con el mismo stock es una copia. Si el stock cambia, queda la línea y dice la sucursal."""
+    grupos: dict[tuple, dict] = {}
+    orden: list[tuple] = []
+    for item in faltantes:
+        clave = (item["producto"].casefold(), round(float(item["stock_actual"]), 1), item["unidad"])
+        if clave not in grupos:
+            orden.append(clave)
+            copia = dict(item)
+            copia["sucursales"] = [item["sucursal"]] if item.get("sucursal") else []
+            grupos[clave] = copia
+            continue
+        sucursal = item.get("sucursal") or ""
+        if sucursal and sucursal not in grupos[clave]["sucursales"]:
+            grupos[clave]["sucursales"].append(sucursal)
+    salida = []
+    for clave in orden:
+        item = grupos[clave]
+        item["sucursal"] = " · ".join(nombre for nombre in item.pop("sucursales") if nombre)
+        salida.append(item)
+    return salida
+
+
 def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
     col_p, filas_p = filas_de("productos", sucursal_id)
     if not col_p:
@@ -480,6 +503,7 @@ def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
                 subtotal = round(a_pedir * costo, 2)
                 inversion_estimada += subtotal
                 proveedores_set.add(prov)
+                sucursal = str(_valor(f, idx_p, "sucursal_nombre") or "").strip()
                 faltantes.append({
                     "codigo": codigo,
                     "producto": nombre,
@@ -493,9 +517,13 @@ def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
                     "pesable": pesable,
                     "subtotal": subtotal,
                     "proveedor": prov,
+                    "sucursal": sucursal,
                 })
 
+    faltantes = _unir_faltantes(faltantes)
     faltantes.sort(key=lambda x: x["subtotal"], reverse=True)
+    inversion_estimada = round(sum(item["subtotal"] for item in faltantes), 2)
+    proveedores_set = {item["proveedor"] for item in faltantes if item.get("proveedor")}
 
     sucursales = listar_sucursales()
     comercio = _comercio(sucursal_id, sucursales)
@@ -512,7 +540,7 @@ def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
     for proveedor, items in por_proveedor.items():
         lineas_wsp.append(proveedor)
         for item in items:
-            lineas_wsp.append(f"- {int(item['a_pedir'])}x {item['producto']}")
+            lineas_wsp.append(f"- {int(item['a_pedir'])}x {item['producto']}" + (f" ({item['sucursal']})" if item.get("sucursal") else ""))
     lineas_wsp.append("Favor confirmar recepcion y fecha estimada de entrega. Muchas gracias!")
     mensaje_wsp = "\n".join(lineas_wsp)
 
@@ -755,10 +783,12 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
 
         dni_principal = "".join(caracter for caracter in dni if caracter.isdigit())
         nombres = [parte.strip() for parte in str(_valor(fila, idx, "nombres") or "").split("·") if parte.strip()]
+        sucursales = [parte.strip() for parte in str(_valor(fila, idx, "sucursales") or "").split("·") if parte.strip()]
         ficha = {
             "id": dni_principal or _valor(fila, idx, "id"),
             "nombre": nombre,
             "nombres": nombres or ([nombre] if nombre else []),
+            "sucursales": sucursales,
             "telefono": tel,
             "dni": dni,
             "tipo": tipo,

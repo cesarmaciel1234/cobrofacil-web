@@ -112,7 +112,7 @@ def _apply_operacion_lww(conn, entity_uuid: str, action: str, payload: dict, ts:
         return False
 
     merged = {**payload, "uuid": entity_uuid}
-    parsed = parse_operacion_payload(merged)
+    parsed = parse_operacion_payload(merged, sync_mode=True)
 
     fields = {
         "alias": parsed["alias"],

@@ -130,7 +130,7 @@ def _parse_fecha(val, field: str) -> str:
         raise ValueError(f"{field} debe ser AAAA-MM-DD")
     return fecha
 
-def parse_operacion_payload(d: dict) -> dict[str, Any]:
+def parse_operacion_payload(d: dict, sync_mode: bool = False) -> dict[str, Any]:
     alias = str(d.get("alias", "")).strip()
     if not alias:
         raise ValueError("alias obligatorio")
@@ -153,18 +153,34 @@ def parse_operacion_payload(d: dict) -> dict[str, Any]:
         recibido = monto
         pagar = round(monto + impuesto, 2)
         impuesto_cheque = impuesto if impuesto > 0 else None
-        fecha_vencimiento = _parse_fecha(d.get("fecha_vencimiento"), "fecha de vencimiento")
+        if d.get("fecha_vencimiento"):
+            fecha_vencimiento = _parse_fecha(d.get("fecha_vencimiento"), "fecha de vencimiento")
+        elif not sync_mode:
+            raise ValueError("fecha de vencimiento es obligatoria")
         meses = 1
     elif tipo_l == "tarjeta":
         recibido = _f(d.get("recibido"), "recibido")
         pagar = _f(d.get("pagar"), "pagar")
         if pagar <= recibido:
             raise ValueError("pagar debe superar recibido")
-        fecha_cierre = _parse_fecha(d.get("fecha_cierre"), "fecha de cierre")
-        fecha_vencimiento = _parse_fecha(d.get("fecha_vencimiento"), "fecha de vencimiento")
-        cuotas = _i(d.get("cuotas"), "cuotas")
+        if d.get("fecha_cierre"):
+            fecha_cierre = _parse_fecha(d.get("fecha_cierre"), "fecha de cierre")
+        elif not sync_mode:
+            raise ValueError("fecha de cierre es obligatoria")
+
+        if d.get("fecha_vencimiento"):
+            fecha_vencimiento = _parse_fecha(d.get("fecha_vencimiento"), "fecha de vencimiento")
+        elif not sync_mode:
+            raise ValueError("fecha de vencimiento es obligatoria")
+
+        if d.get("cuotas") not in (None, ""):
+            cuotas = _i(d.get("cuotas"), "cuotas")
+        elif sync_mode:
+            cuotas = _i(d.get("meses") or 1, "meses")
+        else:
+            cuotas = _i(d.get("cuotas"), "cuotas")
         meses = cuotas
-        if fecha_vencimiento < fecha_cierre:
+        if fecha_vencimiento and fecha_cierre and fecha_vencimiento < fecha_cierre:
             raise ValueError("vencimiento no puede ser anterior al cierre")
     elif tipo_l == "proveedor":
         kg = _f(d.get("kg"), "kg")

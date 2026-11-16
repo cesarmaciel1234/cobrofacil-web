@@ -2036,8 +2036,12 @@ const $ = id => document.getElementById(id);
             if (!nameEl) return;
             nameEl.title = 'Cuenta: ' + sessionUser.username + ' (empresa #' + sessionUser.empresa_id + ')';
             if (window.CarteraLibro && window.CarteraLibro.cromo && window.CarteraLibro.cromo()) return;
-            const etiqueta = (sessionUser.empresa_nombre || sessionUser.username || '').toUpperCase();
-            if (etiqueta && nameEl.textContent !== etiqueta) nameEl.textContent = etiqueta;
+            if (typeof actualizarNombreEmpresaTopbar === 'function') {
+                actualizarNombreEmpresaTopbar();
+            } else {
+                const etiqueta = (sessionUser.empresa_nombre || sessionUser.username || '').toUpperCase();
+                if (etiqueta && nameEl.textContent !== etiqueta) nameEl.textContent = etiqueta;
+            }
         }
 
         function hydrateSessionLocal() {
@@ -2813,6 +2817,7 @@ const $ = id => document.getElementById(id);
                 ['Precio de lista', item.precio > 0 ? plataJefe(item.precio) : 'Sin precio de lista'],
                 ['Subtotal', plataJefe(item.subtotal)],
             ];
+            if (item.sucursal) filas.splice(1, 0, ['Sucursal', item.sucursal]);
             if (item.codigo) filas.push(['Código', item.codigo]);
             const fondo = document.createElement('div');
             fondo.id = 'pedidoSheet';
@@ -2844,6 +2849,7 @@ const $ = id => document.getElementById(id);
                     return `<div class="pedido-fila">
                         <button type="button" class="pedido-cuerpo" data-pedido="${indice}">
                             <span class="pedido-nombre">${textoJefe(item.producto)}</span>
+                            ${item.sucursal ? `<span class="pedido-sucursal">${textoJefe(item.sucursal)}</span>` : ''}
                             <span class="pedido-meta"><b class="pedido-stock">${cantidadJefe(item.stock_actual)}</b><span class="pedido-pedir">pedir ${cantidadJefe(item.a_pedir)} ${textoJefe(unidad)}</span></span>
                         </button>
                         <button type="button" class="pedido-mas${enCarrito ? ' en-carrito' : ''}" data-sumar="${indice}" aria-label="Sumar al pedido">${accion}</button>
@@ -2993,13 +2999,14 @@ const $ = id => document.getElementById(id);
                 baseEmpresa = sessionUser.empresa || sessionUser.empresa_nombre || sessionUser.username || '';
             }
             if (!baseEmpresa) baseEmpresa = 'MACIEL';
-            const elegida = sucursalesConocidas.find((s) => s.id === activeSucursalId);
+            const elegida = sucursalesConocidas.find((s) => String(s.id) === String(activeSucursalId));
             if (elegida) {
                 nomEl.textContent = baseEmpresa.toUpperCase() + ' · ' + elegida.nombre.toUpperCase();
             } else {
                 nomEl.textContent = baseEmpresa.toUpperCase();
             }
         }
+        window.actualizarNombreEmpresaTopbar = actualizarNombreEmpresaTopbar;
         actualizarNombreEmpresaTopbar();
 
         function aplicarSucursal(id) {
@@ -3009,7 +3016,7 @@ const $ = id => document.getElementById(id);
                 else localStorage.setItem('crm_active_sucursal_id', String(id));
             } catch (_) {}
             const icono = $('topbarIcon');
-            const elegida = sucursalesConocidas.find((s) => s.id === id);
+            const elegida = sucursalesConocidas.find((s) => String(s.id) === String(id));
             if (icono) {
                 icono.classList.toggle('activa', id != null);
                 icono.setAttribute('aria-label', elegida ? elegida.nombre : 'Todas las sucursales');
@@ -3023,7 +3030,7 @@ const $ = id => document.getElementById(id);
             }
             const activeView = document.querySelector('.view.active');
             const vName = activeView ? activeView.id.replace('view-', '') : 'reporte';
-            if (vName !== 'cartera' && ['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket', 'dashboard'].includes(vName)) {
+            if (vName !== 'cartera') {
                 cargarJefe(vName === 'dashboard' ? 'reporte' : vName);
             }
         }
@@ -3176,10 +3183,23 @@ const $ = id => document.getElementById(id);
             lote();
         }
 
+        function fijarPeriodo(periodo, desde, hasta) {
+            const nombre = periodo || 'Hoy';
+            const ini = nombre === 'Período' ? (desde || '') : '';
+            const fin = nombre === 'Período' ? (hasta || '') : '';
+            window.vitrinaPeriodo = nombre;
+            window.vitrinaDesde = ini;
+            window.vitrinaHasta = fin;
+            periodoCaja = nombre;
+            periodoCajaDesde = ini;
+            periodoCajaHasta = fin;
+            periodoDesglose = nombre;
+            periodoDesgloseDesde = ini;
+            periodoDesgloseHasta = fin;
+        }
+
         window.cambiarPeriodoVitrina = function(periodo, desde, hasta) {
-            window.vitrinaPeriodo = periodo || 'Hoy';
-            window.vitrinaDesde = window.vitrinaPeriodo === 'Período' ? (desde || '') : '';
-            window.vitrinaHasta = window.vitrinaPeriodo === 'Período' ? (hasta || '') : '';
+            fijarPeriodo(periodo, desde, hasta);
             const refresh = $('btnRefresh');
             if (refresh && refresh.classList.contains('es-filtro')) {
                 refresh.classList.toggle('filtrando', window.vitrinaPeriodo !== 'Hoy');
@@ -3830,7 +3850,8 @@ const $ = id => document.getElementById(id);
                     const medios = c.medios_pago || [];
                     const sumaMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0);
                     const totalMedios = sumaMedios || 1;
-                    let html = `<div data-pantalla="arqueo" class="arqueo-lista">`;
+                    const periodoCajaTxt = c.etiqueta ? `<p class="caja-periodo">${textoJefe(c.etiqueta)}</p>` : '';
+                    let html = `${periodoCajaTxt}<div data-pantalla="arqueo" class="arqueo-lista">`;
                     if (medios.length === 0) {
                         html += `<p class="caja-vacio" style="padding:14px;">${(c.etiqueta && !String(c.etiqueta).startsWith('Hoy')) ? 'Sin movimientos de pago en este período.' : 'Sin movimientos de pago ese día.'}</p>`;
                     } else {
@@ -4289,11 +4310,6 @@ const $ = id => document.getElementById(id);
                 $('jefeBar').classList.toggle('field-hidden', !jefeVistas.includes(name));
             }
             cerrarFaltante();
-            if (name === 'reporte') {
-                window.vitrinaPeriodo = 'Hoy';
-                window.vitrinaDesde = '';
-                window.vitrinaHasta = '';
-            }
             if (name === 'ticket') {
                 ventasPantalla = 'historial';
                 filtroVentas.alcance = 'mes';
@@ -4302,9 +4318,6 @@ const $ = id => document.getElementById(id);
             }
             if (name === 'contabilidad') {
                 cajaPantalla = 'arqueo';
-                periodoCaja = 'Hoy';
-                periodoCajaDesde = '';
-                periodoCajaHasta = '';
             }
             programarDatos(name);
             if ($('cobranzasBar')) {
@@ -4400,9 +4413,7 @@ const $ = id => document.getElementById(id);
                     desde: periodoCajaDesde,
                     hasta: periodoCajaHasta,
                     alAplicar: (elegido, desde, hasta) => {
-                        periodoCaja = elegido;
-                        periodoCajaDesde = elegido === 'Período' ? desde : '';
-                        periodoCajaHasta = elegido === 'Período' ? hasta : '';
+                        fijarPeriodo(elegido, desde, hasta);
                         marcarEntrada('contabilidad');
                         void cargarJefe('contabilidad');
                     }

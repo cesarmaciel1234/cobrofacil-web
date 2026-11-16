@@ -170,12 +170,17 @@
         ponerMarca(client.nombre);
         marcarAtras(true);
         const alias = (client.nombres || []).filter((nombre) => nombre && nombre !== client.nombre);
+        const lugares = (client.sucursales || []).filter(Boolean);
         const notaNombres = alias.length
             ? `<p class="ficha-nota">También figura como ${alias.map(esc).join(', ')}</p>`
+            : '';
+        const notaLugar = lugares.length > 1
+            ? `<p class="ficha-nota">Figura en ${lugares.map(esc).join(' y ')}</p>`
             : '';
         if (ficha) {
             ficha.innerHTML = `
                 ${notaNombres}
+                ${notaLugar}
                 <div class="ficha-numeros">
                     <div><span>CAPITAL</span><strong>${formatCompact(saldo)}</strong></div>
                     <div><span>INTERÉS</span><strong>${interesTxt}</strong></div>
@@ -380,6 +385,7 @@
             pos_id: cliente.id,
             nombre: cliente.nombre,
             nombres: cliente.nombres || [],
+            sucursales: cliente.sucursales || [],
             cuit: cliente.dni,
             telefono: cliente.telefono,
             tipo_cliente: cliente.tipo,
@@ -450,7 +456,9 @@
                 : (Number(client.dias) > 0
                     ? `<span class="late">${esc(client.dias)} días<br>retraso</span>`
                     : '<span class="late ok">Al día</span>');
-            const pie = [client.cuit ? 'DNI ' + client.cuit : '', client.telefono || ''].filter(Boolean).join(' · ') || 'Ver historial';
+            const lugares = (client.sucursales || []).filter(Boolean);
+            const lugar = lugares.length > 1 ? lugares.join(' · ') : '';
+            const pie = [client.cuit ? 'DNI ' + client.cuit : '', lugar, client.telefono || ''].filter(Boolean).join(' · ') || 'Ver historial';
             return `
                 <article class="debt-card" data-id="${esc(client.id)}">
                     <div class="card-top">
@@ -584,7 +592,8 @@
         cromo,
         salir() {
             marcarAtras(false);
-            ponerMarca(marcaEmpresa);
+            if (window.actualizarNombreEmpresaTopbar) window.actualizarNombreEmpresaTopbar();
+            else ponerMarca(marcaEmpresa);
             cerrarMovimiento();
         },
         atras() {

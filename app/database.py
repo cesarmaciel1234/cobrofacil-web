@@ -1,13 +1,36 @@
 import sqlite3
 import re
+import threading
 from contextlib import contextmanager
 from app.config import Config
 
 try:
     import psycopg2
     import psycopg2.extras
+    import psycopg2.pool
 except ImportError:
     psycopg2 = None
+
+_pg_pool = None
+_pg_pool_lock = threading.Lock()
+
+def _get_pg_pool():
+    global _pg_pool
+    if _pg_pool is None and Config.DATABASE_URL and psycopg2:
+        with _pg_pool_lock:
+            if _pg_pool is None:
+                # Pool de conexiones persistentes con keepalive para evitar caídas y timeouts de Neon
+                _pg_pool = psycopg2.pool.ThreadedConnectionPool(
+                    minconn=1,
+                    maxconn=10,
+                    dsn=Config.DATABASE_URL,
+                    connect_timeout=10,
+                    keepalives=1,
+                    keepalives_idle=30,
+                    keepalives_interval=10,
+                    keepalives_count=5,
+                )
+    return _pg_pool
 
 def is_postgres():
     return bool(Config.DATABASE_URL and psycopg2) and not Config.TESTING
@@ -166,7 +189,31 @@ def _init_tenant_db(conn):
 @contextmanager
 def get_db(empresa_id=None):
     if is_postgres():
-        conn = psycopg2.connect(Config.DATABASE_URL)
+        pool = _get_pg_pool()
+        conn = None
+        es_del_pool = False
+        if pool:
+            for _ in range(2):
+                try:
+                    conn = pool.getconn()
+                    # Verificar si la conexión de Neon sigue viva
+                    if conn.closed:
+                        conn = pool.getconn()
+                    es_del_pool = True
+                    break
+                except Exception:
+                    pass
+        if not conn:
+            conn = psycopg2.connect(
+                Config.DATABASE_URL,
+                connect_timeout=10,
+                keepalives=1,
+                keepalives_idle=30,
+                keepalives_interval=10,
+                keepalives_count=5,
+            )
+            es_del_pool = False
+
         conn.cursor_factory = psycopg2.extras.DictCursor
         try:
             wrapper = PostgresConnWrapper(conn)
@@ -228,10 +275,26 @@ def get_db(empresa_id=None):
             yield wrapper
             conn.commit()
         except Exception:
-            conn.rollback()
+            try:
+                conn.rollback()
+            except Exception:
+                pass
             raise
         finally:
-            conn.close()
+            if conn:
+                if es_del_pool and pool:
+                    try:
+                        pool.putconn(conn)
+                    except Exception:
+                        try:
+                            conn.close()
+                        except Exception:
+                            pass
+                else:
+                    try:
+                        conn.close()
+                    except Exception:
+                        pass
     else:
         db_path = get_tenant_db_path(empresa_id)
         is_tenant = "master_total_empresa_" in db_path
