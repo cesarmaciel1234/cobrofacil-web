@@ -93,8 +93,8 @@ def _comercio(sucursal_id: int | None, sucursales: list[dict]) -> str:
     return "Todas las sucursales"
 
 
-def _ventas(sucursal_id: int | None = None):
-    columnas, filas = filas_de("ventas", sucursal_id)
+def _ventas(sucursal_id: int | None = None, desde: str | None = None, hasta: str | None = None):
+    columnas, filas = filas_de("ventas", sucursal_id, desde=desde, hasta=hasta)
     if not columnas:
         return [], {}
     idx = _indice(columnas)
@@ -206,16 +206,16 @@ def _desglose_sucursales(ventas: list[dict], dia: str, hasta: str | None = None)
 
 
 def _ranking_cortes(dia: str, sucursal_id: int | None, ventas: list[dict], hasta: str | None = None) -> list[dict]:
-    columnas, filas = filas_de("ventas_items", sucursal_id)
+    ini = (dia or "")[:10]
+    fin = (hasta or dia or "")[:10]
+    columnas, filas = filas_de("ventas_items", sucursal_id, desde=ini, hasta=fin)
     if not columnas:
-        columnas, filas = filas_de("detalle_ventas", sucursal_id)
+        columnas, filas = filas_de("detalle_ventas", sucursal_id, desde=ini, hasta=fin)
     if not columnas:
-        columnas, filas = filas_de("detalles_ventas", sucursal_id)
+        columnas, filas = filas_de("detalles_ventas", sucursal_id, desde=ini, hasta=fin)
     if not columnas:
         return []
     idx = _indice(columnas)
-    ini = (dia or "")[:10]
-    fin = (hasta or dia or "")[:10]
     ids_dia = {_clave(v["id"]) for v in ventas if (ini <= v["dia"] <= fin) and _clave(v.get("id"))}
     enlace = next((nombre for nombre in ("venta_id", "id_venta", "ticket_id", "venta") if nombre in idx), "")
     cortes: dict[str, dict] = {}
@@ -275,7 +275,7 @@ def _cobros_digitales(dia: str, sucursal_id: int | None = None, hasta: str | Non
         fin = ini
     pedido = _clave(sucursal_id) if sucursal_id is not None else ""
 
-    col_v, filas_v = filas_de("ventas", sucursal_id)
+    col_v, filas_v = filas_de("ventas", sucursal_id, desde=ini or None, hasta=fin or None)
     idx_v = _indice(col_v)
     vivas = []
     cancelados = 0.0
@@ -590,8 +590,6 @@ def _interes_del_libro(
     from app.services.pos_interes import proyectar_interes
 
     col_cfg, filas_cfg = filas_de("configuracion", sucursal_id)
-    if not col_cfg and sucursal_id is not None:
-        col_cfg, filas_cfg = filas_de("configuracion")
     configs = _dicts(col_cfg, filas_cfg) if col_cfg else []
     activacion = _activacion(configs)
     tasa_base, tasa_apal, plazo = _politica(configs)
@@ -1000,20 +998,29 @@ def panel(
 ) -> dict:
     sid = int(sucursal_id) if sucursal_id is not None else None
     clave = _clave_panel(nombre, sid, periodo, desde, hasta, filtro)
-    sellos = sellos_de(_TABLAS_SELLO, sid)
     with _panel_lock:
         guardado = _panel_cache.get(clave)
-        if guardado and guardado[0] == sellos:
+    if guardado:
+        sellos = sellos_de(_TABLAS_SELLO, sid)
+        if guardado[0] == sellos:
             return guardado[1]
-    dato = _armar_panel(
-        nombre,
-        sucursal_id,
-        periodo=periodo,
-        desde=desde,
-        hasta=hasta,
-        filtro=filtro,
-    )
-    dato["actualizado_en"] = ultima_carga(sucursal_id)
+    from app.services.pos_base import anclar_vista, soltar_vista
+
+    anclar_vista()
+    try:
+        dato = _armar_panel(
+            nombre,
+            sucursal_id,
+            periodo=periodo,
+            desde=desde,
+            hasta=hasta,
+            filtro=filtro,
+        )
+        sellos = sellos_de(_TABLAS_SELLO, sid)
+    finally:
+        soltar_vista()
+    marcas = [sello[0] for sello in sellos if sello and sello[0]]
+    dato["actualizado_en"] = max(marcas) if marcas else None
     with _panel_lock:
         _panel_cache[clave] = (sellos, dato)
     return dato
@@ -1028,11 +1035,6 @@ def _armar_panel(
     filtro: dict | None = None,
 ) -> dict:
     sucursales_disp = listar_sucursales()
-    from app.services.pos_base import precargar_tablas
-    precargar_tablas(
-        ("ventas", "detalles_ventas", "detalle_ventas", "ventas_items", "productos", "articulos", "clientes", "cuenta_corriente", "cobros_digitales", "mp_pagos", "proveedores"),
-        sucursal_id=sucursal_id,
-    )
 
     if nombre in ("admin", "cartera", "clientes"):
         cartera = _cartera_admin(sucursal_id)
@@ -1076,9 +1078,9 @@ def _armar_panel(
             "sucursal_id": sucursal_id,
         }
 
-    ventas, _idx = _ventas(sucursal_id)
-
     from app.services.pos_vitrina import resolver_rango
+    from app.services.pos_base import preparar_vista
+
     desde_iso, hasta_iso, nombre_periodo = resolver_rango(
         str(periodo or "Hoy"),
         desde_custom=desde or None,
@@ -1086,20 +1088,13 @@ def _armar_panel(
     )
     ini = desde_iso[:10]
     fin = hasta_iso[:10]
-
     hoy_real = datetime.now(_ZONA).date().isoformat()
-    if nombre_periodo == "Hoy" and ventas:
-        dias_con_ventas = {v["dia"] for v in ventas if v.get("dia")}
-        if hoy_real not in dias_con_ventas and dias_con_ventas:
-            dia_activo = max(dias_con_ventas)
-            ini = dia_activo
-            fin = dia_activo
-            desde = ini
-            hasta = fin
-        else:
-            dia_activo = hoy_real
+    if nombre_periodo == "Hoy":
+        ini = fin = preparar_vista(sucursal_id, hoy_real, hoy_real, desplazar_hoy=True)
     else:
-        dia_activo = ini
+        preparar_vista(sucursal_id, ini, fin, desplazar_hoy=False)
+    dia_activo = ini
+    ventas, _idx = _ventas(sucursal_id, desde=ini, hasta=fin)
 
     resumen = _resumen(ventas, ini, fin) if ventas else {
         "dia": ini, "ventas": 0.0, "tickets": 0, "promedio": 0.0, "pago": "", "es_hoy": (ini == hoy_real)
@@ -1144,7 +1139,7 @@ def _armar_panel(
     from app.services.pos_vitrina import calcular_vitrina
 
     vitrina = calcular_vitrina(
-        periodo=periodo,
+        periodo="Período",
         sucursal_id=sucursal_id,
         desde=ini,
         hasta=fin,

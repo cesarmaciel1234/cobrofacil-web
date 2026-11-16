@@ -138,14 +138,8 @@ def calcular_vitrina(
     es_hoy = nombre_periodo == "Hoy"
     sufijo_periodo = "del día" if es_hoy else "del período"
 
-    from app.services.pos_base import precargar_tablas
-    precargar_tablas(
-        ("ventas", "detalles_ventas", "detalle_ventas", "ventas_items", "productos", "articulos", "clientes", "cuenta_corriente", "cobros_digitales", "mp_pagos"),
-        sucursal_id=sucursal_id,
-    )
-
     # 1. Ventas en el rango
-    col_v, filas_v = filas_de("ventas", sucursal_id)
+    col_v, filas_v = filas_de("ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
     idx_v = _indice(col_v)
 
     cant_tickets = 0
@@ -183,9 +177,9 @@ def calcular_vitrina(
         descuento_total += _numero(_valor(fila, idx_v, "descuento"))
 
     # 2. Detalles ventas y Costo (para ganancia parcial y descuentos de oferta)
-    col_dv, filas_dv = filas_de("detalles_ventas", sucursal_id)
+    col_dv, filas_dv = filas_de("detalles_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
     if not col_dv:
-        col_dv, filas_dv = filas_de("detalle_ventas", sucursal_id)
+        col_dv, filas_dv = filas_de("detalle_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
     idx_dv = _indice(col_dv)
 
     col_p, filas_p = filas_de("productos", sucursal_id)

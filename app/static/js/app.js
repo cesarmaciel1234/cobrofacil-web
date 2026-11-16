@@ -2992,11 +2992,16 @@ const $ = id => document.getElementById(id);
             const nomEl = $('empresaNombre');
             if (!nomEl) return;
             let baseEmpresa = '';
-            try {
-                baseEmpresa = (JSON.parse(localStorage.getItem('empresa_datos') || '{}').nombre) || '';
-            } catch (_) {}
+            if (typeof sessionUser !== 'undefined' && sessionUser && sessionUser.empresa_nombre) {
+                baseEmpresa = sessionUser.empresa_nombre;
+            }
+            if (!baseEmpresa) {
+                try {
+                    baseEmpresa = (JSON.parse(localStorage.getItem('empresa_datos') || '{}').nombre) || '';
+                } catch (_) {}
+            }
             if (!baseEmpresa && typeof sessionUser !== 'undefined' && sessionUser) {
-                baseEmpresa = sessionUser.empresa || sessionUser.empresa_nombre || sessionUser.username || '';
+                baseEmpresa = sessionUser.empresa || sessionUser.username || '';
             }
             if (!baseEmpresa) baseEmpresa = 'MACIEL';
             const elegida = sucursalesConocidas.find((s) => String(s.id) === String(activeSucursalId));
@@ -3075,6 +3080,9 @@ const $ = id => document.getElementById(id);
                 const sucursales = data.sucursales || [];
                 sucursalesConocidas = sucursales;
                 try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursales)); } catch (_) {}
+                if (activeSucursalId != null && !sucursales.some((s) => String(s.id) === String(activeSucursalId))) {
+                    aplicarSucursal(null);
+                }
                 actualizarNombreEmpresaTopbar();
                 const cont = $('sucursalPillsContainer');
                 if (!cont) return;
@@ -5929,11 +5937,52 @@ const $ = id => document.getElementById(id);
                 .catch(() => {});
         }
 
+        function seguirCargaLibro() {
+            const caja = $('cargaLibro');
+            if (!caja) return;
+            const texto = $('cargaLibroTexto');
+            const cuenta = $('cargaLibroCuenta');
+            const barra = $('cargaLibroBarra');
+            let ocupado = false;
+            const pintar = async () => {
+                if (ocupado) return;
+                ocupado = true;
+                try {
+                    const res = await fetch('/api/pos/carga', { cache: 'no-store' });
+                    if (!res.ok) return;
+                    const dato = await res.json();
+                    if (!dato.visible) {
+                        caja.hidden = true;
+                        return;
+                    }
+                    const subidos = Number(dato.subidos) || 0;
+                    const total = Number(dato.total) || subidos;
+                    const pct = total > 0 ? Math.max(2, Math.min(100, Math.round((subidos / total) * 100))) : 0;
+                    caja.hidden = false;
+                    if (texto) {
+                        texto.textContent = dato.dia
+                            ? 'El día ya está. El resto sigue cargando.'
+                            : 'Subiendo la venta del día.';
+                    }
+                    if (cuenta) {
+                        cuenta.textContent = subidos.toLocaleString('es-AR') + ' de ' + total.toLocaleString('es-AR');
+                    }
+                    if (barra) barra.style.width = pct + '%';
+                } catch (e) {
+                } finally {
+                    ocupado = false;
+                }
+            };
+            void pintar();
+            setInterval(pintar, 4000);
+        }
+
         async function boot() {
             try {
                 marcarVersion();
                 wireCrmModules();
                 initBackupUi();
+                seguirCargaLibro();
                 cargarSucursalesSelector();
                 $('topbarIcon')?.addEventListener('click', () => abrirSelectorSucursal());
                 await CrmLoader.runBoot();

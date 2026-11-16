@@ -19,7 +19,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.38">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.39">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -99,6 +99,13 @@
             </div>
         </header>
         <div class="content">
+            <div id="cargaLibro" hidden>
+                <div class="carga-libro-top">
+                    <span id="cargaLibroTexto">Subiendo el libro</span>
+                    <span id="cargaLibroCuenta"></span>
+                </div>
+                <div class="carga-libro-riel" aria-hidden="true"><div id="cargaLibroBarra"></div></div>
+            </div>
             <div class="view active" id="view-reporte">
                 <span id="reporteDia" style="display:none;">Cerebro Jefe</span>
                 <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">Cargando vitrina de tienda…</div>
@@ -201,6 +208,6 @@
     <script src="/static/js/barra/toque.js?v=2"></script>
     <script src="/static/js/modulo-panel.js?v=5"></script>
     <script src="/static/js/barra/cartera-libro.js?v=7"></script>
-    <script src="/static/js/app.js?v=4.60"></script>
+    <script src="/static/js/app.js?v=4.63"></script>
 </body>
 </html>

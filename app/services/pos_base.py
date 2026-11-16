@@ -16,6 +16,49 @@ _SECRETOS = ("password", "passwd", "token", "secret", "api_key", "access_token",
 _CACHE_TTL = 5.0
 _cache_lock = threading.Lock()
 _cache: dict[tuple, tuple[float, tuple, list, list]] = {}
+_cache_dia: dict[tuple, tuple[float, list, list]] = {}
+# Mientras se arma UNA pantalla, la foto ya leída no caduca a mitad de camino.
+_ancla: dict[str, float] = {}
+_sucursales_mem: dict[str, tuple[float, list]] = {}
+_TABLAS_DIA = ("ventas", "ventas_items", "detalles_ventas", "detalle_ventas")
+_carga_lock = threading.Lock()
+_carga: dict[int, dict] = {}
+
+
+def anclar_vista() -> None:
+    """La pantalla que se está armando se queda con la foto que acaba de leer."""
+    with _cache_lock:
+        _ancla[_ambito_cache()] = time.monotonic()
+
+
+def soltar_vista() -> None:
+    with _cache_lock:
+        _ancla.pop(_ambito_cache(), None)
+
+
+def _vigente(momento: float, ahora: float, ambito: str | None = None) -> bool:
+    amb = ambito if ambito is not None else _ambito_cache()
+    ancla = _ancla.get(amb)
+    if ancla is not None and momento >= ancla:
+        return True
+    return ahora - momento < _CACHE_TTL
+
+
+def anotar_carga(empresa_id: int, enviadas: int, total: int, dia: bool) -> None:
+    """El día entra primero. Acá queda cuánto del libro ya llegó, para la barra de arriba."""
+    with _carga_lock:
+        previa = _carga.get(int(empresa_id)) or {}
+        _carga[int(empresa_id)] = {
+            "subidos": max(int(enviadas or 0), int(previa.get("subidos") or 0)),
+            "total": max(int(total or 0), int(previa.get("total") or 0)),
+            "dia": bool(dia) or bool(previa.get("dia")),
+        }
+
+
+def leer_carga(empresa_id: int) -> dict:
+    with _carga_lock:
+        dato = _carga.get(int(empresa_id))
+        return dict(dato) if dato else {}
 
 
 def _utc_now() -> str:
@@ -385,8 +428,8 @@ def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | N
         conn.execute(
             """
             INSERT INTO pos_base
-            (sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 sid,
@@ -397,6 +440,7 @@ def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | N
                 json.dumps(bloque, ensure_ascii=False),
                 len(bloque),
                 ahora,
+                _dia_de_filas(columnas, bloque),
             ),
         )
 
@@ -526,8 +570,8 @@ def guardar_parte(
         conn.execute(
             """
             INSERT INTO pos_base
-            (sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            (sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 sid,
@@ -538,6 +582,7 @@ def guardar_parte(
                 json.dumps(limpias, ensure_ascii=False),
                 len(limpias),
                 _utc_now(),
+                _dia_de_filas(columnas, limpias),
             ),
         )
     _olvidar_tabla(tabla)
@@ -621,6 +666,16 @@ def resumen_base() -> list[dict]:
 
 def ultima_carga(sucursal_id: int | None = None) -> str | None:
     """Cuándo llegó el último trozo del libro a la nube."""
+    ambito = _ambito_cache()
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    with _cache_lock:
+        marcas = [
+            hit[1][0]
+            for clave, hit in _cache.items()
+            if clave[0] == ambito and hit[1] and hit[1][0] and (sid is None or clave[2] in (sid, None))
+        ]
+    if marcas:
+        return max(marcas)
     with get_db() as conn:
         ensure_tenant_migrations(conn)
         if sucursal_id is None:
@@ -636,6 +691,12 @@ def ultima_carga(sucursal_id: int | None = None) -> str | None:
 
 
 def listar_sucursales() -> list[dict]:
+    ambito = _ambito_cache()
+    ahora = time.monotonic()
+    with _cache_lock:
+        hit = _sucursales_mem.get(ambito)
+        if hit and _vigente(hit[0], ahora, ambito):
+            return hit[1]
     with get_db() as conn:
         ensure_tenant_migrations(conn)
         rows = conn.execute(
@@ -646,13 +707,16 @@ def listar_sucursales() -> list[dict]:
             ORDER BY sucursal_id
             """
         ).fetchall()
-    return [
+    salida = [
         {
             "id": int(r["sucursal_id"]),
             "nombre": r["sucursal_nombre"] or f"Sucursal {r['sucursal_id']}",
         }
         for r in rows
     ]
+    with _cache_lock:
+        _sucursales_mem[ambito] = (time.monotonic(), salida)
+    return salida
 
 
 def _ambito_cache() -> str:
@@ -671,11 +735,32 @@ def _ambito_cache() -> str:
     return "sqlite:" + str(Config.DB_PATH)
 
 
+def _dia_de_filas(columnas: list, filas: list) -> str | None:
+    """Si la parte es un solo día, queda anotado para no bajar el libro entero."""
+    idx = _columna(columnas, "fecha", "fecha_hora", "fecha_venta", "created_at")
+    if idx is None:
+        return None
+    dias = set()
+    for fila in filas:
+        if idx >= len(fila):
+            continue
+        texto = str(fila[idx] or "")[:10]
+        if len(texto) == 10 and texto[4] == "-" and texto[7] == "-":
+            dias.add(texto)
+    if len(dias) == 1:
+        return dias.pop()
+    return None
+
+
 def _olvidar_tabla(tabla: str) -> None:
     with _cache_lock:
         for clave in list(_cache):
             if clave[1] == tabla:
                 _cache.pop(clave, None)
+        for clave in list(_cache_dia):
+            if clave[1] == tabla:
+                _cache_dia.pop(clave, None)
+        _sucursales_mem.clear()
     if tabla in ("clientes", "cuenta_corriente", "configuracion"):
         try:
             from app.services.pos_jefe import olvidar_cartera
@@ -699,7 +784,7 @@ def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None) -> tuple:
         todos_en_mem = True
         for t in pedidas:
             hit = _cache.get((ambito, t, sid))
-            if hit and ahora - hit[0] < _CACHE_TTL:
+            if hit and _vigente(hit[0], ahora, ambito):
                 sellos_mem.append(hit[1])
             else:
                 todos_en_mem = False
@@ -803,10 +888,10 @@ def _sellos_tablas(conn, tablas: list[str]) -> dict[str, dict]:
 def _libro_fresco(ambito: str, tabla: str, sid: int | None, ahora: float) -> bool:
     with _cache_lock:
         hit = _cache.get((ambito, tabla, sid))
-        if hit and ahora - hit[0] < _CACHE_TTL:
+        if hit and _vigente(hit[0], ahora, ambito):
             return True
         base = _cache.get((ambito, tabla, None))
-        return bool(sid is not None and not hit and base and ahora - base[0] < _CACHE_TTL)
+        return bool(sid is not None and not hit and base and _vigente(base[0], ahora, ambito))
 
 
 def _tabla_vigente(ambito: str, tabla: str, por_sid: dict, ahora: float) -> bool:
@@ -858,18 +943,184 @@ def _publicar_tabla(ambito: str, tabla: str, partes: list, ahora: float, sellos:
         _cache[(ambito, tabla, None)] = (ahora, consolidado[0], consolidado[1], consolidado[2])
 
 
-def filas_de(tabla: str, sucursal_id: int | None = None) -> tuple[list[str], list[list]]:
+def preparar_vista(
+    sucursal_id: int | None,
+    desde: str,
+    hasta: str,
+    desplazar_hoy: bool = False,
+) -> str:
+    """Una sola lectura trae el día y los catálogos. Devuelve el día que quedó."""
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    ambito = _ambito_cache()
+    ahora = time.monotonic()
+    dia_tablas = list(_TABLAS_DIA)
+    completas = (
+        "clientes", "productos", "articulos", "cuenta_corriente",
+        "cobros_digitales", "mp_pagos", "proveedores", "configuracion",
+    )
+    marcas = ", ".join("?" for _ in dia_tablas)
+    suc = "" if sid is None else " AND sucursal_id = ?"
+    with get_db() as conn:
+        if desplazar_hoy:
+            if sid is None:
+                partes = conn.execute(
+                    "WITH elegido AS ("
+                    " SELECT COALESCE("
+                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND dia = ?),"
+                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND dia IS NOT NULL AND dia <> '')) AS dia)"
+                    " SELECT p.tabla, p.sucursal_id, p.sucursal_nombre, p.columnas, p.filas,"
+                    " p.cantidad, p.actualizado_en, p.parte, e.dia AS dia_elegido"
+                    " FROM pos_base p, elegido e"
+                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas') AND p.dia = e.dia)"
+                    " OR p.tabla IN ('clientes', 'productos', 'configuracion'))"
+                    " ORDER BY p.tabla, p.sucursal_id, p.parte",
+                    (desde,),
+                ).fetchall()
+            else:
+                partes = conn.execute(
+                    "WITH elegido AS ("
+                    " SELECT COALESCE("
+                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia = ?),"
+                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia IS NOT NULL AND dia <> '')) AS dia)"
+                    " SELECT p.tabla, p.sucursal_id, p.sucursal_nombre, p.columnas, p.filas,"
+                    " p.cantidad, p.actualizado_en, p.parte, e.dia AS dia_elegido"
+                    " FROM pos_base p, elegido e"
+                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas') AND p.dia = e.dia)"
+                    " OR p.tabla IN ('clientes', 'productos', 'configuracion'))"
+                    " AND p.sucursal_id = ?"
+                    " ORDER BY p.tabla, p.sucursal_id, p.parte",
+                    (sid, desde, sid, sid),
+                ).fetchall()
+            elegido_dia = partes[0]["dia_elegido"] if partes else ""
+            dia_real = str(elegido_dia or desde)
+        else:
+            dia_real = desde
+            partes = conn.execute(
+                "SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en, parte "
+                f"FROM pos_base WHERE tabla IN ({marcas}) AND dia >= ? AND dia <= ?{suc} "
+                "ORDER BY tabla, sucursal_id, parte",
+                tuple([*dia_tablas, desde, hasta, *(([sid]) if sid is not None else [])]),
+            ).fetchall()
+            partes += conn.execute(
+                "SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en, parte "
+                f"FROM pos_base WHERE tabla IN ('clientes', 'productos', 'configuracion'){suc}",
+                tuple(([sid]) if sid is not None else []),
+            ).fetchall()
+    por_tabla: dict[str, list] = {}
+    for parte in partes:
+        por_tabla.setdefault(parte["tabla"], []).append(parte)
+    ahora = time.monotonic()
+    with _cache_lock:
+        for tabla, grupo in por_tabla.items():
+            columnas, filas = _armar_filas(grupo)
+            if sid is None and tabla in _TABLAS_DIA:
+                filas = _sin_copias(tabla, columnas, filas)
+            sello = _sello_partes(grupo)
+            _cache[(ambito, tabla, sid)] = (ahora, sello, columnas, filas)
+            if tabla in _TABLAS_DIA:
+                _cache_dia[(ambito, tabla, sid, desde, hasta)] = (ahora, columnas, filas)
+                if dia_real and dia_real != desde:
+                    _cache_dia[(ambito, tabla, sid, dia_real, dia_real)] = (ahora, columnas, filas)
+        for tabla in list(dia_tablas) + list(completas):
+            if (ambito, tabla, sid) not in _cache:
+                _cache[(ambito, tabla, sid)] = (ahora, (None, 0), [], [])
+        for tabla in dia_tablas:
+            if (ambito, tabla, sid, desde, hasta) not in _cache_dia:
+                _cache_dia[(ambito, tabla, sid, desde, hasta)] = (ahora, [], [])
+            if dia_real and (ambito, tabla, sid, dia_real, dia_real) not in _cache_dia:
+                _cache_dia[(ambito, tabla, sid, dia_real, dia_real)] = (ahora, [], [])
+    return dia_real
+
+
+def ultimo_dia_ventas(sucursal_id: int | None = None) -> str:
+    """El día más nuevo que ya está guardado, sin bajar los tickets."""
+    try:
+        with get_db() as conn:
+            if sucursal_id is None:
+                fila = conn.execute(
+                    "SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND dia IS NOT NULL AND dia <> ''"
+                ).fetchone()
+            else:
+                fila = conn.execute(
+                    "SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia IS NOT NULL AND dia <> ''",
+                    (int(sucursal_id),),
+                ).fetchone()
+    except Exception:
+        return ""
+    return str(fila[0] or "") if fila else ""
+
+
+def hay_dia_ventas(dia: str, sucursal_id: int | None = None) -> bool:
+    if not dia:
+        return False
+    try:
+        with get_db() as conn:
+            if sucursal_id is None:
+                fila = conn.execute(
+                    "SELECT 1 FROM pos_base WHERE tabla = 'ventas' AND dia = ? LIMIT 1",
+                    (dia,),
+                ).fetchone()
+            else:
+                fila = conn.execute(
+                    "SELECT 1 FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia = ? LIMIT 1",
+                    (int(sucursal_id), dia),
+                ).fetchone()
+    except Exception:
+        return False
+    return fila is not None
+
+
+def _filas_del_rango(tabla: str, sucursal_id: int | None, desde: str, hasta: str) -> tuple[list[str], list[list]]:
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    ambito = _ambito_cache()
+    ahora = time.monotonic()
+    clave = (ambito, tabla, sid, desde, hasta)
+    with _cache_lock:
+        hit = _cache_dia.get(clave)
+        if hit and _vigente(hit[0], ahora, ambito):
+            return hit[1], hit[2]
+    with get_db() as conn:
+        if sid is None:
+            partes = conn.execute(
+                "SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
+                "FROM pos_base WHERE tabla = ? AND dia >= ? AND dia <= ? "
+                "ORDER BY sucursal_id, parte",
+                (tabla, desde, hasta),
+            ).fetchall()
+        else:
+            partes = conn.execute(
+                "SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
+                "FROM pos_base WHERE tabla = ? AND sucursal_id = ? AND dia >= ? AND dia <= ? "
+                "ORDER BY parte",
+                (tabla, sid, desde, hasta),
+            ).fetchall()
+    columnas, filas = _armar_filas(partes)
+    if sid is None:
+        filas = _sin_copias(tabla, columnas, filas)
+    with _cache_lock:
+        _cache_dia[clave] = (ahora, columnas, filas)
+    return columnas, filas
+
+
+def filas_de(
+    tabla: str,
+    sucursal_id: int | None = None,
+    desde: str | None = None,
+    hasta: str | None = None,
+) -> tuple[list[str], list[list]]:
     if not _TABLA.match(tabla or ""):
         return [], []
+    if desde and hasta and tabla in _TABLAS_DIA:
+        return _filas_del_rango(tabla, sucursal_id, desde[:10], hasta[:10])
     sid = int(sucursal_id) if sucursal_id is not None else None
     ambito = _ambito_cache()
     ahora = time.monotonic()
     with _cache_lock:
         hit = _cache.get((ambito, tabla, sid))
-        if hit and ahora - hit[0] < _CACHE_TTL:
+        if hit and _vigente(hit[0], ahora, ambito):
             return hit[2], hit[3]
         base = _cache.get((ambito, tabla, None))
-        if sid is not None and not hit and base and ahora - base[0] < _CACHE_TTL:
+        if sid is not None and not hit and base and _vigente(base[0], ahora, ambito):
             return [], []
     precargar_tablas((tabla,), sucursal_id=sid)
     with _cache_lock:

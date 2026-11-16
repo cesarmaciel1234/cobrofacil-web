@@ -340,6 +340,15 @@ def api_pos_base_tabla():
         return jsonify({"error": str(e)}), 400
     parte = int(data.get("parte") or 1)
     partes = int(data.get("partes") or 1)
+    if str(data.get("tabla") or "") == "ventas" and data.get("total_filas") not in (None, ""):
+        from app.services.pos_base import anotar_carga
+
+        anotar_carga(
+            int(session.get("empresa_id") or 1),
+            int(data.get("enviadas") or 0),
+            int(data.get("total_filas") or 0),
+            bool(data.get("dia")),
+        )
     completo = str(data.get("modo") or "reemplazo") == "delta" or parte >= partes
     if completo and resultado.get("ok"):
         from app.services.signal_bus import broadcast_refresh
@@ -467,6 +476,25 @@ def api_pos_sucursales():
     from app.services.pos_base import listar_sucursales
 
     return jsonify({"ok": True, "sucursales": listar_sucursales()})
+
+
+@api_bp.route("/pos/carga", methods=["GET"])
+def api_pos_carga():
+    """Barra de arriba: el día ya entró y el resto del libro sigue llegando."""
+    from app.services.pos_base import leer_carga
+
+    dato = leer_carga(int(session.get("empresa_id") or 1))
+    subidos = int(dato.get("subidos") or 0)
+    total = int(dato.get("total") or 0)
+    if total < subidos:
+        total = subidos
+    return jsonify({
+        "ok": True,
+        "visible": total > 0 and subidos < total,
+        "subidos": subidos,
+        "total": total,
+        "dia": bool(dato.get("dia")),
+    })
 
 
 @api_bp.route("/pos/sync/status", methods=["GET"])

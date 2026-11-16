@@ -16,10 +16,12 @@
 ## 2. Archivos y Funciones Clave
 
 ### `pos_base.py`
-- `filas_de(tabla, sucursal_id=None)`: Lee el libro. Una bajada alcanza para Todas y para cada sucursal. A los 5 segundos pregunta el sello; si no cambió, no vuelve a traer las filas.
+- `filas_de(tabla, sucursal_id=None, desde=None, hasta=None)`: Lee el libro. Con fechas, baja solo esos días. Sin fechas, una bajada alcanza para Todas y para cada sucursal. A los 5 segundos pregunta el sello; si no cambió, no vuelve a traer las filas.
+- `preparar_vista(...)`: El reporte del día entra en una lectura (ese día y los catálogos). Si hoy no tiene ventas, queda el día más nuevo.
 - `enlaces_de_persona(buscado)`: Vincula registros de un cliente en múltiples sucursales por DNI o nombre.
 - `unir_clientes(columnas, filas)`: Agrupa clientes evitando duplicar saldos copiados.
 - `listar_sucursales()`: Descubre sucursales activas en el sistema (`id`, `nombre`, `tickets_count`).
+- `anotar_carga()` / `leer_carga()`: Guardan cuántos tickets del enlace ya llegaron, para la barra de arriba.
 
 ### `pos_jefe.py`
 - `obtener_panel_jefe(panel, sucursal_id)`: Genera los diccionarios con KPIs para las vistas ejecutivas (`reporte`, `jefe`, `contabilidad`, `cartera`, `digitales`, `pedidos`).

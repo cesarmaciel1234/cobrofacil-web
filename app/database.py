@@ -565,6 +565,16 @@ def _run_migrations(conn):
                 "ON operaciones_financieras(uuid) WHERE uuid IS NOT NULL"
             )
         _migrate_pagar_constraint(conn)
+    if _table_exists(conn, "pos_base"):
+        if is_pg:
+            columnas_base = _pg_column_names(conn, "pos_base")
+        else:
+            columnas_base = {row[1] for row in conn.execute("PRAGMA table_info(pos_base)")}
+        if "dia" not in columnas_base:
+            conn.execute("ALTER TABLE pos_base ADD COLUMN dia TEXT")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pos_base_dia ON pos_base(tabla, dia)"
+        )
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS pagos_clientes (

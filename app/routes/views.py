@@ -100,7 +100,11 @@ def auth_login_json():
         ok, limit_msg = check_login_rate_limit(username)
         if not ok:
             return jsonify({"error": limit_msg}), 429
-        user = authenticate_user(username, password)
+        try:
+            user = authenticate_user(username, password)
+        except Exception as exc:
+            current_app.logger.warning("login sin base: %s", type(exc).__name__)
+            return jsonify({"error": "La base no responde en este momento."}), 503
         if user:
             record_login_success(username)
             set_session_user(user)
