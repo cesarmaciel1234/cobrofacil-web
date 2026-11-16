@@ -1089,12 +1089,36 @@ def _armar_panel(
     ini = desde_iso[:10]
     fin = hasta_iso[:10]
     hoy_real = datetime.now(_ZONA).date().isoformat()
-    if nombre_periodo == "Hoy":
+    if nombre == "ticket":
+        pedido = dict(filtro or {})
+        if pedido.get("fecha_ini"):
+            ini = str(pedido.get("fecha_ini"))[:10]
+            fin = str(pedido.get("fecha_fin") or ini)[:10]
+        else:
+            ini, fin = rango_fechas(
+                str(pedido.get("alcance") or "dia"),
+                str(pedido.get("fecha") or ""),
+                bool(pedido.get("historico")),
+                hoy_real,
+            )
+        if ini and fin and ini == fin == hoy_real:
+            nombre_periodo = "Hoy"
+        elif not ini or not fin:
+            nombre_periodo = "Todo"
+        else:
+            nombre_periodo = "Período"
+    if not ini or not fin:
+        ventas, _idx = _ventas(sucursal_id)
+        dias = [v["dia"] for v in ventas if v.get("dia")]
+        ini = min(dias) if dias else hoy_real
+        fin = max(dias) if dias else hoy_real
+    elif nombre_periodo == "Hoy":
         ini = fin = preparar_vista(sucursal_id, hoy_real, hoy_real, desplazar_hoy=True)
+        ventas, _idx = _ventas(sucursal_id, desde=ini, hasta=fin)
     else:
         preparar_vista(sucursal_id, ini, fin, desplazar_hoy=False)
+        ventas, _idx = _ventas(sucursal_id, desde=ini, hasta=fin)
     dia_activo = ini
-    ventas, _idx = _ventas(sucursal_id, desde=ini, hasta=fin)
 
     resumen = _resumen(ventas, ini, fin) if ventas else {
         "dia": ini, "ventas": 0.0, "tickets": 0, "promedio": 0.0, "pago": "", "es_hoy": (ini == hoy_real)
@@ -1144,6 +1168,12 @@ def _armar_panel(
         desde=ini,
         hasta=fin,
     )
+    vitrina["periodo"] = nombre_periodo
+    vitrina["es_hoy"] = nombre_periodo == "Hoy"
+    if nombre_periodo == "Hoy":
+        vitrina["tickets"]["titulo"] = "Tickets del día"
+        vitrina["ganancia_parcial"]["titulo"] = "Ganancia parcial"
+        vitrina["cancelaciones"]["titulo"] = "Cancelaciones del día"
 
     col_c, filas_c = filas_de("clientes", sucursal_id)
     col_p, filas_p = filas_de("productos", sucursal_id)

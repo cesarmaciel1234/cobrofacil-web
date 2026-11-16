@@ -305,6 +305,25 @@ def api_pos_novedades():
     ))
 
 
+@api_bp.route("/pos/espejo", methods=["GET"])
+def api_pos_espejo():
+    """Sello del libro. Cada aparato baja la tabla que todavía no tiene."""
+    from app.services.pos_base import indice_espejo
+
+    return jsonify(indice_espejo())
+
+
+@api_bp.route("/pos/espejo/tabla", methods=["GET"])
+def api_pos_espejo_tabla():
+    """Una tabla del libro, para guardarla en el teléfono, la PC o la tablet."""
+    from app.services.pos_base import tabla_espejo
+
+    try:
+        return jsonify(tabla_espejo(request.args.get("tabla") or ""))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
 @api_bp.route("/pos/base", methods=["GET"])
 def api_pos_base():
     """Lista las tablas de Cobro Fácil que ya están en la nube."""

@@ -1514,11 +1514,30 @@ body.sidebar-open .dashboard-bar,
 .dig-vacio { margin: 0; padding: 16px; color: #64748b; }
 .dig-estado { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 800; }
 .dig-nota { color: #64748b; font-size: 12px; margin: 8px 0 0; }
+.periodo-fila { margin: 0 0 8px; }
 .vitrina-periodos {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 6px;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
     width: 100%;
+}
+.periodo-fechas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin-top: 6px;
+}
+.periodo-fechas input {
+    min-height: 32px;
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #E2E8F0;
+    border-radius: 10px;
+    padding: 0 8px;
+    font: inherit;
+    font-size: 12px;
+    color: #0F172A;
+    background: #fff;
 }
 .vitrina-periodos::-webkit-scrollbar {
     display: none;
@@ -1528,8 +1547,8 @@ body.sidebar-open .dashboard-bar,
     color: #475569;
     border: 1px solid #E2E8F0;
     border-radius: 9999px;
-    padding: 8px 6px;
-    font-size: 12px;
+    padding: 6px 2px;
+    font-size: 11px;
     font-weight: 700;
     cursor: pointer;
     width: 100%;
@@ -1994,6 +2013,12 @@ select.periodo-pill.active option { color: #0F172A; }
 .pedido-copiar { min-height: 44px; border-radius: 10px; font-weight: 800; background: #16a34a; border-color: #16a34a; }
 .pedido-sheet-back { position: fixed; inset: 0; background: rgba(15, 23, 42, 0.45); z-index: 1100; }
 .pedido-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 1101; background: #fff; border-radius: 18px 18px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); max-height: min(88vh, 640px); overflow: auto; }
+.pedido-sheet.pedido-carrito { display: flex; flex-direction: column; overflow: hidden; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.pedido-carrito-lista { overflow: auto; min-height: 0; flex: 1 1 auto; }
+.pedido-carrito-pie { flex: 0 0 auto; background: #fff; }
+.pedido-carrito-acciones { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pedido-carrito-acciones .carrito-compartir,
+.pedido-carrito-acciones .carrito-copiar { margin-top: 0; }
 .pedido-sheet-titulo { display: block; margin-bottom: 10px; font-size: 1.15rem; }
 .pedido-dato { display: flex; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid #f1f5f9; font-size: 14px; }
 .pedido-dato span { color: #64748b; }

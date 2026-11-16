@@ -2495,8 +2495,9 @@ const $ = id => document.getElementById(id);
             const fondo = document.createElement('div');
             fondo.id = 'pedidoSheet';
             fondo.className = 'pedido-sheet-back';
-            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Pedido">
+            fondo.innerHTML = `<div class="pedido-sheet pedido-carrito" role="dialog" aria-label="Pedido">
                 <strong class="pedido-sheet-titulo">Pedido</strong>
+                <div class="pedido-carrito-lista">
                 ${entradas.map(([clave, entry]) => {
                     alinearCarrito(clave, entry);
                     return `<div class="carrito-item">
@@ -2509,10 +2510,15 @@ const $ = id => document.getElementById(id);
                     </div>
                 </div>`;
                 }).join('')}
-                <div class="pedido-dato"><span>Costo</span><b>${plataJefe(total)}</b></div>
-                <button type="button" class="carrito-compartir" data-wasap>WhatsApp</button>
-                <button type="button" class="carrito-copiar" data-copiar>Copiar</button>
-                <button type="button" class="pedido-cerrar" data-cerrar>Cerrar</button>
+                </div>
+                <div class="pedido-carrito-pie">
+                    <div class="pedido-dato"><span>Costo</span><b>${plataJefe(total)}</b></div>
+                    <div class="pedido-carrito-acciones">
+                        <button type="button" class="carrito-compartir" data-wasap>WhatsApp</button>
+                        <button type="button" class="carrito-copiar" data-copiar>Copiar</button>
+                    </div>
+                    <button type="button" class="pedido-cerrar" data-cerrar>Cerrar</button>
+                </div>
             </div>`;
             fondo.addEventListener('click', (ev) => {
                 const menos = ev.target.closest('[data-menos]');
@@ -2961,11 +2967,12 @@ const $ = id => document.getElementById(id);
                     ['Día', resumen.dia || '—'],
                 ];
             } else if (panel === 'ticket') {
-                const filas = (dato && dato.tickets) || [];
+                const cant = Number(dato.tickets_ok || 0);
+                const total = Number(dato.filtrado || 0);
                 items = [
-                    ['Tickets', String(filas.length)],
-                    ['Ventas', plataJefe(resumen.ventas)],
-                    ['Promedio', plataJefe(resumen.promedio)],
+                    ['Tickets', String(cant)],
+                    ['Ventas', plataJefe(total)],
+                    ['Promedio', plataJefe(cant ? total / cant : 0)],
                     ['Día', resumen.dia || '—'],
                 ];
             }
@@ -3109,8 +3116,17 @@ const $ = id => document.getElementById(id);
         }
 
         let jefeCargaToken = 0;
+        let jefeVistaEnCurso = '';
         let pinturaCartera = 0;
         const panelesListos = new Map();
+
+        function panelGuardadoVacio(dato) {
+            const v = dato && dato.vitrina;
+            if (!v || !v.tickets) return false;
+            const cant = Number(v.tickets.cant || 0);
+            const deuda = Number((v.deuda_clientes && v.deuda_clientes.valor) || 0);
+            return cant === 0 && deuda === 0;
+        }
 
         function claveJefe(panel) {
             let empresa = '';
@@ -3194,18 +3210,19 @@ const $ = id => document.getElementById(id);
 
         function fijarPeriodo(periodo, desde, hasta) {
             const nombre = periodo || 'Hoy';
-            const ini = nombre === 'Período' ? (desde || '') : '';
-            const fin = nombre === 'Período' ? (hasta || '') : '';
+            const ini = nombre === 'Período' ? (desde || hoyLocal()) : '';
+            const fin = nombre === 'Período' ? (hasta || ini) : '';
             window.vitrinaPeriodo = nombre;
             window.vitrinaDesde = ini;
             window.vitrinaHasta = fin;
-            periodoCaja = nombre;
-            periodoCajaDesde = ini;
-            periodoCajaHasta = fin;
-            periodoDesglose = nombre;
-            periodoDesgloseDesde = ini;
-            periodoDesgloseHasta = fin;
         }
+
+        window.cambiarPeriodoCaja = function(periodo, desde, hasta) {
+            periodoCaja = periodo || 'Hoy';
+            periodoCajaDesde = periodoCaja === 'Período' ? (desde || periodoCajaDesde || hoyLocal()) : '';
+            periodoCajaHasta = periodoCaja === 'Período' ? (hasta || periodoCajaHasta || periodoCajaDesde) : '';
+            void cargarJefe('contabilidad');
+        };
 
         window.cambiarPeriodoVitrina = function(periodo, desde, hasta) {
             fijarPeriodo(periodo, desde, hasta);
@@ -3308,6 +3325,7 @@ const $ = id => document.getElementById(id);
                 await ping;
                 window.__crmDesacoplado = false;
                 if (dato && dato.actualizado_en) localStorage.setItem('crm-novedad', dato.actualizado_en);
+                if (window.Espejo) void Espejo.asegurar();
                 try {
                     localStorage.setItem('crm-replica', JSON.stringify({
                         filas: dato && dato.cantidad ? dato.cantidad : 0,
@@ -3329,25 +3347,36 @@ const $ = id => document.getElementById(id);
         let jefeAbort = null;
 
         async function cargarJefe(panel) {
+            const clave = claveJefe(panel);
+            if (jefeVistaEnCurso === clave) return;
             const token = ++jefeCargaToken;
             if (jefeAbort) jefeAbort.abort();
             const ctrl = new AbortController();
             jefeAbort = ctrl;
-            const clave = claveJefe(panel);
+            jefeVistaEnCurso = clave;
+            const periodoPedido = window.vitrinaPeriodo;
+            const desdePedido = window.vitrinaDesde;
+            const hastaPedido = window.vitrinaHasta;
             const listo = panelesListos.get(clave);
             let habiaLocal = false;
             try {
-                if (listo) {
+                if (listo && !panelGuardadoVacio(listo.dato)) {
                     habiaLocal = true;
                     aplicarDatosJefe(panel, listo.dato, false);
                 } else {
                     const crudo = leerPanelJefe(clave);
                     if (crudo) {
-                        habiaLocal = true;
-                        aplicarDatosJefe(panel, JSON.parse(crudo), true);
+                        const guardado = JSON.parse(crudo);
+                        if (!panelGuardadoVacio(guardado)) {
+                            habiaLocal = true;
+                            aplicarDatosJefe(panel, guardado, true);
+                        }
                     }
                 }
             } catch (e) {}
+            window.vitrinaPeriodo = periodoPedido;
+            window.vitrinaDesde = desdePedido;
+            window.vitrinaHasta = hastaPedido;
             if (!navigator.onLine) {
                 if (!habiaLocal) aplicarDatosJefe(panel, { libro: false }, false);
                 return;
@@ -3385,6 +3414,7 @@ const $ = id => document.getElementById(id);
                 if (e && e.name === 'AbortError') return;
                 dato = null;
             }
+            if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
             if (token !== jefeCargaToken) return;
             if (!dato) {
                 if (!habiaLocal) aplicarDatosJefe(panel, { libro: false }, false);
@@ -3778,7 +3808,14 @@ const $ = id => document.getElementById(id);
             ];
             for (const [panel, periodo] of pedidos) {
                 const clave = clavePeriodo(panel, periodo);
-                if (leerPanelJefe(clave)) continue;
+                const guardado = leerPanelJefe(clave);
+                if (guardado) {
+                    try {
+                        if (!panelGuardadoVacio(JSON.parse(guardado))) continue;
+                    } catch (e) {
+                        continue;
+                    }
+                }
                 try {
                     let url = '/api/pos/jefe?panel=' + encodeURIComponent(panel) + '&periodo=' + encodeURIComponent(periodo);
                     if (activeSucursalId !== null && activeSucursalId !== undefined) {
@@ -3849,7 +3886,55 @@ const $ = id => document.getElementById(id);
             }
         }
 
+        function cruzarConEspejo(panel, dato) {
+            const libro = window.Espejo && Espejo.ventas ? Espejo.ventas() : null;
+            if (!libro || !libro.sucursales || !dato) return dato;
+            if (libro.sello && dato.actualizado_en && libro.sello < dato.actualizado_en) return dato;
+            if (panel === 'reporte' || panel === 'jefe') {
+                const rango = Espejo.rangoPeriodo(window.vitrinaPeriodo, window.vitrinaDesde, window.vitrinaHasta);
+                const suma = Espejo.sumar(libro, rango[0], rango[1], activeSucursalId);
+                if (!dato.vitrina) dato.vitrina = {};
+                dato.vitrina.tickets = Object.assign({}, dato.vitrina.tickets || {}, {
+                    cant: suma.cant,
+                    total: suma.total,
+                    texto: suma.cant + ' · ' + plataJefe(suma.total)
+                });
+                if (dato.resumen) {
+                    dato.resumen.ventas = suma.total;
+                    dato.resumen.tickets = suma.cant;
+                    dato.resumen.promedio = suma.cant ? Math.round((suma.total / suma.cant) * 100) / 100 : 0;
+                }
+            }
+            const filtroEstrecho = filtroVentas.q || filtroVentas.franja || filtroVentas.caja || (filtroVentas.pago && filtroVentas.pago !== 'TODOS');
+            if (panel === 'ticket' && !filtroEstrecho) {
+                const rango = Espejo.rangoVentas(filtroVentas);
+                const lista = Espejo.listar(libro, rango[0], rango[1], activeSucursalId);
+                dato.filtrado = lista.total;
+                dato.tickets_ok = lista.cant;
+                dato.tickets = lista.tickets;
+                dato.recorte = lista.recorte;
+                dato.libro = lista.cant > 0 || (libro.sucursales || []).length > 0;
+                if (dato.resumen) {
+                    dato.resumen.ventas = lista.total;
+                    dato.resumen.tickets = lista.cant;
+                    dato.resumen.promedio = lista.cant ? Math.round((lista.total / lista.cant) * 100) / 100 : 0;
+                    if (rango[0] && rango[1]) dato.resumen.dia = rango[0] === rango[1] ? rango[0] : (rango[0] + ' → ' + rango[1]);
+                }
+            }
+            return dato;
+        }
+
+        function pintarDesdeEspejo() {
+            const activa = document.querySelector('.view.active');
+            const name = activa ? activa.id.replace('view-', '') : '';
+            const panel = name === 'ticket' && ventasPantalla === 'desglose' ? 'desglose' : name;
+            if (panel !== 'reporte' && panel !== 'ticket') return;
+            const listo = panelesListos.get(claveJefe(panel));
+            if (listo && listo.dato) aplicarDatosJefe(panel, listo.dato, false);
+        }
+
         function aplicarDatosJefe(panel, dato, enCurso) {
+            dato = cruzarConEspejo(panel, dato);
             const grid = document.querySelector('.vitrina-grid');
             if (grid) grid.style.opacity = '1';
             const resumen = dato.resumen || {};
@@ -3891,8 +3976,8 @@ const $ = id => document.getElementById(id);
             // 2. JEFE / REPORTE & VITRINA
             if (panel === 'reporte' && $('reporteCuerpo')) {
                 const v = dato.vitrina || null;
-                const perActual = (v && v.periodo) || window.vitrinaPeriodo || 'Hoy';
-                window.vitrinaPeriodo = perActual;
+                if (!window.vitrinaPeriodo) window.vitrinaPeriodo = 'Hoy';
+                const perActual = window.vitrinaPeriodo;
 
                 $('reporteDia').textContent = (v && v.es_hoy ? 'Hoy · ' : 'Período · ') + perActual + (dato.actualizado_en ? ' · espejo ' + String(dato.actualizado_en).replace('T', ' ').slice(0, 16) : '');
 
@@ -3902,24 +3987,8 @@ const $ = id => document.getElementById(id);
                     let html = '';
 
                     if (v) {
-                        const largos = ['Semana p.', 'Mes', 'Año', 'Período'];
-                        const esLargo = largos.includes(perActual);
-
                         html += `
                         <div class="vitrina-wrap">
-                            <div class="vitrina-head">
-                                <div class="vitrina-periodos">
-                                    <button type="button" class="periodo-pill ${perActual === 'Hoy' ? 'active' : ''}" onclick="window.cambiarPeriodoVitrina('Hoy')">Hoy</button>
-                                    <button type="button" class="periodo-pill ${perActual === 'Semana' ? 'active' : ''}" onclick="window.cambiarPeriodoVitrina('Semana')">Semana</button>
-                                    <select class="periodo-pill ${esLargo ? 'active' : ''}" aria-label="Período" onchange="window.cambiarPeriodoVitrina(this.value)">
-                                        <option value="Período" ${perActual === 'Período' || !esLargo ? 'selected' : ''}>Período</option>
-                                        <option value="Semana p." ${perActual === 'Semana p.' ? 'selected' : ''}>Semana p.</option>
-                                        <option value="Mes" ${perActual === 'Mes' ? 'selected' : ''}>Mes</option>
-                                        <option value="Año" ${perActual === 'Año' ? 'selected' : ''}>Año</option>
-                                    </select>
-                                </div>
-                            </div>
-
                             <div class="vitrina-banner">
                                 <span>⚠️</span>
                                 <span>${window.__crmDesacoplado ? 'Motor desacoplado / Operando 100% offline' : ('En línea — datos de la tienda al ' + (v.actualizado_en_texto || '—'))}</span>
@@ -4431,9 +4500,8 @@ const $ = id => document.getElementById(id);
                     desde: periodoCajaDesde,
                     hasta: periodoCajaHasta,
                     alAplicar: (elegido, desde, hasta) => {
-                        fijarPeriodo(elegido, desde, hasta);
+                        window.cambiarPeriodoCaja(elegido, desde, hasta);
                         marcarEntrada('contabilidad');
-                        void cargarJefe('contabilidad');
                     }
                 });
                 else if (nombre === 'contabilidad' && cajaPantalla === 'digital') abrirFiltroPeriodo({
@@ -5979,6 +6047,10 @@ const $ = id => document.getElementById(id);
 
         async function boot() {
             try {
+                if (window.Espejo) {
+                    Espejo.alActualizar(pintarDesdeEspejo);
+                    void Espejo.asegurar();
+                }
                 marcarVersion();
                 wireCrmModules();
                 initBackupUi();

@@ -23,6 +23,7 @@
 ### `api_pos.py`
 - `pos_jefe_sucursales()`: Llama a `pos_base.listar_sucursales()` y devuelve `{ok: true, sucursales: [...]}`.
 - `api_pos_carga()`: Lee el avance que va dejando el enlace y lo muestra en la barra de arriba mientras llega el resto del libro.
+- `api_pos_espejo()` y `api_pos_espejo_tabla()`: Entregan el libro para la copia que queda en cada aparato.
 - `pos_jefe_panel()`: Llama a `pos_jefe.obtener_panel_jefe(panel, sucursal_id)`.
 - `pos_jefe_vitrina()`: Llama a `pos_vitrina.calcular_vitrina_12(periodo, sucursal_id)`.
 

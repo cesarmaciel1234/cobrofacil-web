@@ -17,7 +17,8 @@
 
 ### `pos_base.py`
 - `filas_de(tabla, sucursal_id=None, desde=None, hasta=None)`: Lee el libro. Con fechas, baja solo esos días. Sin fechas, una bajada alcanza para Todas y para cada sucursal. A los 5 segundos pregunta el sello; si no cambió, no vuelve a traer las filas.
-- `preparar_vista(...)`: El reporte del día entra en una lectura (ese día y los catálogos). Si hoy no tiene ventas, queda el día más nuevo.
+- `preparar_vista(...)`: El reporte del día entra en una lectura (ese día y los catálogos). Si hoy no tiene ventas, queda el día más nuevo. Un trozo que llegó sin sello de día igual cuenta: se mira la fecha de cada venta. Ese recorte no reemplaza el libro entero: Ventas lee el mismo rango.
+- `indice_espejo()` / `tabla_espejo(tabla)`: El teléfono, la PC y la tablet guardan el libro. Bajan la tabla cuyo sello cambió.
 - `enlaces_de_persona(buscado)`: Vincula registros de un cliente en múltiples sucursales por DNI o nombre.
 - `unir_clientes(columnas, filas)`: Agrupa clientes evitando duplicar saldos copiados.
 - `listar_sucursales()`: Descubre sucursales activas en el sistema (`id`, `nombre`, `tickets_count`).

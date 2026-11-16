@@ -14,7 +14,8 @@
 ---
 
 ## 2. Archivos Principales
-- `app.js`: Script principal. Gestiona la inicialización de sesión, la navegación SPA, el filtro de sucursales (`aplicarSucursal`), la barra de subida del libro (`seguirCargaLibro`) y la actualización del topbar (`actualizarNombreEmpresaTopbar`).
+- `app.js`: Script principal. Gestiona la inicialización de sesión, la navegación SPA, el filtro de sucursales (`aplicarSucursal`), la barra de subida del libro (`seguirCargaLibro`) y la actualización del topbar (`actualizarNombreEmpresaTopbar`). El período del reporte y de Caja se elige con el botón de filtro del encabezado. En un pedido largo, WhatsApp y Copiar quedan fijos abajo de la lista. Una copia guardada en cero no se muestra como la semana en curso: se espera la lectura nueva. Reporte y Ventas cuentan los tickets del espejo local cuando ya está en el aparato.
+- `espejo.js`: Copia entera del libro en el navegador (`crm-espejo`). El teléfono, la PC y la tablet bajan cada tabla, también las grandes, cuando cambia el sello, y leen esa misma copia.
 - `modulo-panel.js`: Funciones auxiliares para construir el HTML de las tarjetas de métricas.
 - `pos-offline.js`: Abstracción de IndexedDB para modo sin conexión.
 - `sync-engine.js`: Motor de subida de tickets locales al servidor.

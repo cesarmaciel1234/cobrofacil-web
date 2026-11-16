@@ -1,5 +1,5 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.22';
+const CACHE_VERSION = 'crm-frigorifico-v4.5';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',
@@ -14,6 +14,7 @@ const SHELL_ASSETS = [
   '/static/js/crm-loader.js',
   '/static/js/crm-delete.js',
   '/static/js/crm-backup.js',
+  '/static/js/espejo.js',
   '/static/js/app.js',
   '/static/js/modulo-panel.js',
   '/static/js/barra/ventas.js',
@@ -33,6 +34,7 @@ const NETWORK_FIRST_PATHS = [
   '/',
   '/login',
   '/pos',
+  '/static/js/espejo.js',
   '/static/js/app.js',
   '/static/js/modulo-panel.js',
   '/static/js/crm-sync-api.js',

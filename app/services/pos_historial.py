@@ -485,7 +485,20 @@ def evaluar_ticket(
 def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> dict:
     """Lista del historial. La suma no cuenta canceladas ni la parte de un mixto que no pidieron."""
     pedido = filtro or {}
-    columnas, filas = filas_de("ventas", sucursal_id)
+    if pedido.get("fecha_ini"):
+        ini = str(pedido.get("fecha_ini"))[:10]
+        fin = str(pedido.get("fecha_fin") or ini)[:10]
+    else:
+        ini, fin = rango_fechas(
+            str(pedido.get("alcance") or "dia"),
+            str(pedido.get("fecha") or ""),
+            bool(pedido.get("historico")),
+            hoy,
+        )
+    if ini and fin:
+        columnas, filas = filas_de("ventas", sucursal_id, desde=ini, hasta=fin)
+    else:
+        columnas, filas = filas_de("ventas", sucursal_id)
     if not columnas:
         return {
             "libro": False,
@@ -497,16 +510,6 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             "recorte": False,
         }
     idx = {str(col).lower(): i for i, col in enumerate(columnas)}
-    if pedido.get("fecha_ini"):
-        ini = str(pedido.get("fecha_ini"))[:10]
-        fin = str(pedido.get("fecha_fin") or ini)[:10]
-    else:
-        ini, fin = rango_fechas(
-            str(pedido.get("alcance") or "dia"),
-            str(pedido.get("fecha") or ""),
-            bool(pedido.get("historico")),
-            hoy,
-        )
     texto = str(pedido.get("texto") or "")
     nombres: dict[str, str] = {}
     if texto.strip():
@@ -616,14 +619,17 @@ def _medida(es_pesable, unidad) -> str:
 
 def desglose_articulos(sucursal_id: int | None, fecha_ini: str, fecha_fin: str) -> dict:
     """Suma los cortes de las ventas cerradas del rango. La cancelada no entra."""
-    columnas, filas = filas_de("ventas", sucursal_id)
-    if not columnas:
-        return {"libro": False, "filas": [], "articulos": 0, "kilos": 0.0, "unidades": 0.0, "monto": 0.0, "tickets": 0}
-    idx = {str(col).lower(): i for i, col in enumerate(columnas)}
     ini = str(fecha_ini or "")[:10]
     fin = str(fecha_fin or ini)[:10]
     if ini and fin and ini > fin:
         ini, fin = fin, ini
+    if ini and fin:
+        columnas, filas = filas_de("ventas", sucursal_id, desde=ini, hasta=fin)
+    else:
+        columnas, filas = filas_de("ventas", sucursal_id)
+    if not columnas:
+        return {"libro": False, "filas": [], "articulos": 0, "kilos": 0.0, "unidades": 0.0, "monto": 0.0, "tickets": 0}
+    idx = {str(col).lower(): i for i, col in enumerate(columnas)}
     vivas: set[str] = set()
     for fila in filas:
         estado = str(_tomar(fila, idx, "estado") or "").strip().upper()
@@ -655,9 +661,14 @@ def desglose_articulos(sucursal_id: int | None, fecha_ini: str, fecha_fin: str) 
             _tomar(fila, pidx, "unidad", "unidad_medida"),
         )
 
-    dcols, dfilas = filas_de("detalles_ventas", sucursal_id)
-    if not dcols:
-        dcols, dfilas = filas_de("detalle_ventas", sucursal_id)
+    if ini and fin:
+        dcols, dfilas = filas_de("detalles_ventas", sucursal_id, desde=ini, hasta=fin)
+        if not dcols:
+            dcols, dfilas = filas_de("detalle_ventas", sucursal_id, desde=ini, hasta=fin)
+    else:
+        dcols, dfilas = filas_de("detalles_ventas", sucursal_id)
+        if not dcols:
+            dcols, dfilas = filas_de("detalle_ventas", sucursal_id)
     didx = {str(col).lower(): i for i, col in enumerate(dcols)}
     enlace = next((nombre for nombre in ("id_venta", "venta_id", "ticket_id", "venta") if nombre in didx), "")
     grupos: dict[str, dict] = {}

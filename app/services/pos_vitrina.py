@@ -152,9 +152,11 @@ def calcular_vitrina(
     ventas_vivas_ids = set()
 
     for fila in filas_v:
-        fecha_str = str(_valor(fila, idx_v, "fecha") or "")
+        fecha_str = str(_valor(fila, idx_v, "fecha") or "").replace("T", " ")
         if not (desde_iso <= fecha_str <= hasta_iso):
-            continue
+            dia = fecha_str[:10]
+            if not (len(dia) == 10 and dia[4] == "-" and desde_iso[:10] <= dia <= hasta_iso[:10]):
+                continue
 
         estado = _valor(fila, idx_v, "estado")
         total = _numero(_valor(fila, idx_v, "total"))

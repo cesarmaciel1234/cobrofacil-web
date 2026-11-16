@@ -421,10 +421,29 @@ def _borrar_partes(conn, tabla: str, sid: int | None) -> None:
         conn.execute("DELETE FROM pos_base WHERE tabla = ? AND sucursal_id = ?", (tabla, sid))
 
 
+def _bloques_por_dia(columnas: list, filas: list) -> list[tuple[str | None, list]]:
+    """Cada trozo queda de un solo día. Así el reporte no tiene que bajar el libro entero."""
+    if not filas:
+        return [(None, [])]
+    idx = _columna(columnas, "fecha", "fecha_hora", "fecha_venta", "created_at")
+    if idx is None:
+        return [(None, filas)]
+    grupos: dict[str, list] = {}
+    for fila in filas:
+        texto = str(fila[idx] or "")[:10] if idx < len(fila) else ""
+        dia = texto if len(texto) == 10 and texto[4] == "-" and texto[7] == "-" else ""
+        grupos.setdefault(dia, []).append(fila)
+    bloques: list[tuple[str | None, list]] = []
+    for dia in sorted(grupos, reverse=True):
+        grupo = grupos[dia]
+        for inicio in range(0, len(grupo), 150):
+            bloques.append((dia or None, grupo[inicio : inicio + 150]))
+    return bloques or [(None, [])]
+
+
 def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | None, columnas: list, filas: list, ahora: str) -> None:
     _borrar_partes(conn, tabla, sid)
-    bloques = [filas[i : i + 150] for i in range(0, len(filas), 150)] or [[]]
-    for numero, bloque in enumerate(bloques, start=1):
+    for numero, (dia, bloque) in enumerate(_bloques_por_dia(columnas, filas), start=1):
         conn.execute(
             """
             INSERT INTO pos_base
@@ -440,7 +459,7 @@ def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | N
                 json.dumps(bloque, ensure_ascii=False),
                 len(bloque),
                 ahora,
-                _dia_de_filas(columnas, bloque),
+                dia or _dia_de_filas(columnas, bloque),
             ),
         )
 
@@ -640,6 +659,67 @@ def _guardar_delta(tabla: str, columnas: list, limpias: list, sid: int | None, s
     return {"ok": True, "tabla": tabla, "parte": 1, "filas": tocadas, "modo": "delta"}
 
 
+def indice_espejo() -> dict[str, Any]:
+    """Sello de cada tabla. El teléfono, la PC y la tablet bajan solo la que cambió."""
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        rows = conn.execute(
+            """
+            SELECT tabla, sucursal_id, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n
+            FROM pos_base
+            GROUP BY tabla, sucursal_id
+            ORDER BY tabla
+            """
+        ).fetchall()
+    sello = ""
+    tablas = []
+    for row in rows:
+        marca = str(row["marca"] or "")
+        if marca > sello:
+            sello = marca
+        tablas.append({
+            "tabla": row["tabla"],
+            "sucursal_id": row["sucursal_id"],
+            "sello": marca,
+            "filas": int(row["n"] or 0),
+        })
+    return {"ok": True, "sello": sello, "tablas": tablas}
+
+
+def tabla_espejo(tabla: str) -> dict[str, Any]:
+    """Una tabla del libro, junta, para guardarla en el aparato."""
+    if not _TABLA.match(tabla or ""):
+        raise ValueError("Nombre de tabla inválido")
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        partes = conn.execute(
+            """
+            SELECT sucursal_id, sucursal_nombre, columnas, filas, actualizado_en
+            FROM pos_base WHERE tabla = ?
+            ORDER BY sucursal_id, parte
+            """,
+            (tabla,),
+        ).fetchall()
+    grupos: dict[Any, dict] = {}
+    orden: list[Any] = []
+    sello = ""
+    for parte in partes:
+        marca = str(parte["actualizado_en"] or "")
+        if marca > sello:
+            sello = marca
+        sid = parte["sucursal_id"]
+        if sid not in grupos:
+            orden.append(sid)
+            grupos[sid] = {
+                "sucursal_id": sid,
+                "sucursal": parte["sucursal_nombre"] or "",
+                "columnas": json.loads(parte["columnas"]),
+                "filas": [],
+            }
+        grupos[sid]["filas"].extend(json.loads(parte["filas"]))
+    return {"ok": True, "tabla": tabla, "sello": sello, "sucursales": [grupos[sid] for sid in orden]}
+
+
 def resumen_base() -> list[dict]:
     with get_db() as conn:
         ensure_tenant_migrations(conn)
@@ -733,6 +813,24 @@ def _ambito_cache() -> str:
             pass
         return "pg:0"
     return "sqlite:" + str(Config.DB_PATH)
+
+
+def _dia_texto(valor) -> str:
+    texto = str(valor or "")[:10]
+    if len(texto) == 10 and texto[4] == "-" and texto[7] == "-":
+        return texto
+    return ""
+
+
+def _recortar_dias(columnas: list, filas: list, desde: str, hasta: str) -> list:
+    """Deja las filas cuya fecha cae en el rango. Un trozo sin sello también entra."""
+    idx = _columna(columnas, "fecha", "fecha_hora", "fecha_venta", "created_at")
+    if idx is None:
+        return filas
+    return [
+        fila for fila in filas
+        if (dia := _dia_texto(fila[idx] if idx < len(fila) else "")) and desde <= dia <= hasta
+    ]
 
 
 def _dia_de_filas(columnas: list, filas: list) -> str | None:
@@ -971,7 +1069,8 @@ def preparar_vista(
                     " SELECT p.tabla, p.sucursal_id, p.sucursal_nombre, p.columnas, p.filas,"
                     " p.cantidad, p.actualizado_en, p.parte, e.dia AS dia_elegido"
                     " FROM pos_base p, elegido e"
-                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas') AND p.dia = e.dia)"
+                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
+                    " AND (p.dia = e.dia OR p.dia IS NULL OR p.dia = ''))"
                     " OR p.tabla IN ('clientes', 'productos', 'configuracion'))"
                     " ORDER BY p.tabla, p.sucursal_id, p.parte",
                     (desde,),
@@ -985,7 +1084,8 @@ def preparar_vista(
                     " SELECT p.tabla, p.sucursal_id, p.sucursal_nombre, p.columnas, p.filas,"
                     " p.cantidad, p.actualizado_en, p.parte, e.dia AS dia_elegido"
                     " FROM pos_base p, elegido e"
-                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas') AND p.dia = e.dia)"
+                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
+                    " AND (p.dia = e.dia OR p.dia IS NULL OR p.dia = ''))"
                     " OR p.tabla IN ('clientes', 'productos', 'configuracion'))"
                     " AND p.sucursal_id = ?"
                     " ORDER BY p.tabla, p.sucursal_id, p.parte",
@@ -997,7 +1097,7 @@ def preparar_vista(
             dia_real = desde
             partes = conn.execute(
                 "SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en, parte "
-                f"FROM pos_base WHERE tabla IN ({marcas}) AND dia >= ? AND dia <= ?{suc} "
+                f"FROM pos_base WHERE tabla IN ({marcas}) AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = ''){suc} "
                 "ORDER BY tabla, sucursal_id, parte",
                 tuple([*dia_tablas, desde, hasta, *(([sid]) if sid is not None else [])]),
             ).fetchall()
@@ -1013,15 +1113,21 @@ def preparar_vista(
     with _cache_lock:
         for tabla, grupo in por_tabla.items():
             columnas, filas = _armar_filas(grupo)
+            if tabla in _TABLAS_DIA:
+                corte_desde = dia_real if desplazar_hoy else desde
+                corte_hasta = dia_real if desplazar_hoy else hasta
+                filas = _recortar_dias(columnas, filas, corte_desde, corte_hasta)
             if sid is None and tabla in _TABLAS_DIA:
                 filas = _sin_copias(tabla, columnas, filas)
             sello = _sello_partes(grupo)
-            _cache[(ambito, tabla, sid)] = (ahora, sello, columnas, filas)
             if tabla in _TABLAS_DIA:
+                # El recorte del período no puede ocupar el lugar del libro entero.
                 _cache_dia[(ambito, tabla, sid, desde, hasta)] = (ahora, columnas, filas)
                 if dia_real and dia_real != desde:
                     _cache_dia[(ambito, tabla, sid, dia_real, dia_real)] = (ahora, columnas, filas)
-        for tabla in list(dia_tablas) + list(completas):
+            else:
+                _cache[(ambito, tabla, sid)] = (ahora, sello, columnas, filas)
+        for tabla in completas:
             if (ambito, tabla, sid) not in _cache:
                 _cache[(ambito, tabla, sid)] = (ahora, (None, 0), [], [])
         for tabla in dia_tablas:
@@ -1083,18 +1189,19 @@ def _filas_del_rango(tabla: str, sucursal_id: int | None, desde: str, hasta: str
         if sid is None:
             partes = conn.execute(
                 "SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                "FROM pos_base WHERE tabla = ? AND dia >= ? AND dia <= ? "
+                "FROM pos_base WHERE tabla = ? AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
                 "ORDER BY sucursal_id, parte",
                 (tabla, desde, hasta),
             ).fetchall()
         else:
             partes = conn.execute(
                 "SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                "FROM pos_base WHERE tabla = ? AND sucursal_id = ? AND dia >= ? AND dia <= ? "
+                "FROM pos_base WHERE tabla = ? AND sucursal_id = ? AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
                 "ORDER BY parte",
                 (tabla, sid, desde, hasta),
             ).fetchall()
     columnas, filas = _armar_filas(partes)
+    filas = _recortar_dias(columnas, filas, desde, hasta)
     if sid is None:
         filas = _sin_copias(tabla, columnas, filas)
     with _cache_lock:
