@@ -168,14 +168,17 @@ def movimientos_de(pos_id) -> list[dict]:
     columnas, crudas = filas_de("cuenta_corriente")
     if not columnas:
         return []
+    from app.services.pos_base import ids_de_persona
+
     buscado = str(pos_id)
+    personas = ids_de_persona(buscado)
     clave = (id(crudas), buscado)
     guardado = _mov_armado.get(clave)
     if guardado is not None:
         return guardado
     filas = [
         fila for fila in _dicts(columnas, crudas)
-        if str(fila.get("cliente_id")) == buscado
+        if str(fila.get("cliente_id")) in personas
         and "MANTENIMIENTO" not in str(fila.get("descripcion") or "").upper()
     ]
     tickets = _proyeccion(filas).get("tickets") or {}

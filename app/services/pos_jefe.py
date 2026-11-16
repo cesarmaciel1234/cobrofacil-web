@@ -739,8 +739,9 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
         else:
             al_dia += 1
 
+        dni_principal = "".join(caracter for caracter in dni if caracter.isdigit())
         ficha = {
-            "id": _valor(fila, idx, "id"),
+            "id": dni_principal or _valor(fila, idx, "id"),
             "nombre": nombre,
             "telefono": tel,
             "dni": dni,

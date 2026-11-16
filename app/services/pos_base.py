@@ -40,6 +40,167 @@ def _indice_id(columnas: list) -> int | None:
     return None
 
 
+def _columna(columnas: list, *nombres: str) -> int | None:
+    buscados = {nombre.lower() for nombre in nombres}
+    for i, col in enumerate(columnas):
+        if str(col).lower() in buscados:
+            return i
+    return None
+
+
+def _digitos(valor: Any) -> str:
+    return "".join(caracter for caracter in str(valor or "") if caracter.isdigit())
+
+
+def _clave_cliente(columnas: list, fila: list) -> str:
+    """El DNI es el id de la persona. Sin DNI, el id de la caja junto con el nombre."""
+    dni_i = _columna(columnas, "dni", "cuit")
+    if dni_i is not None:
+        dni = _digitos(fila[dni_i] if dni_i < len(fila) else "")
+        if dni:
+            return "dni:" + dni
+    id_i = _indice_id(columnas)
+    if id_i is None or id_i >= len(fila) or fila[id_i] in (None, ""):
+        return ""
+    nombre_i = _columna(columnas, "nombre")
+    nombre = ""
+    if nombre_i is not None and nombre_i < len(fila):
+        nombre = str(fila[nombre_i] or "").strip().casefold()
+    return "id:" + str(fila[id_i]) + ":" + nombre
+
+
+def _clave_venta(columnas: list, fila: list) -> tuple:
+    """Mismo id y mismo número de ticket. Si el número es el id, la fecha confirma que es la misma venta."""
+    id_i = _indice_id(columnas)
+    if id_i is None or id_i >= len(fila) or fila[id_i] in (None, ""):
+        return ()
+    venta_id = str(fila[id_i])
+    num_i = _columna(columnas, "numero_ticket", "numero", "nro", "ticket")
+    if num_i is not None and num_i < len(fila) and str(fila[num_i] or "").strip():
+        return (venta_id, str(fila[num_i]).strip())
+    fecha_i = _columna(columnas, "fecha", "fecha_hora", "fecha_venta")
+    fecha = str(fila[fecha_i] if fecha_i is not None and fecha_i < len(fila) else "")[:19]
+    return (venta_id, fecha)
+
+
+def _clave_linea(columnas: list, fila: list) -> tuple:
+    id_i = _indice_id(columnas)
+    venta_i = _columna(columnas, "id_venta", "venta_id")
+    if id_i is None or venta_i is None or id_i >= len(fila) or venta_i >= len(fila):
+        return ()
+    if fila[id_i] in (None, "") or fila[venta_i] in (None, ""):
+        return ()
+    return (str(fila[id_i]), str(fila[venta_i]))
+
+
+def _clave_movimiento(columnas: list, fila: list) -> tuple:
+    id_i = _indice_id(columnas)
+    if id_i is None or id_i >= len(fila) or fila[id_i] in (None, ""):
+        return ()
+    fecha_i = _columna(columnas, "fecha", "fecha_hora")
+    fecha = str(fila[fecha_i] if fecha_i is not None and fecha_i < len(fila) else "")[:19]
+    return (str(fila[id_i]), fecha)
+
+
+def _armar_clave(tabla: str, columnas: list, fila: list):
+    if tabla == "clientes":
+        return _clave_cliente(columnas, fila)
+    if tabla == "ventas":
+        return _clave_venta(columnas, fila)
+    if tabla in ("detalles_ventas", "ventas_items"):
+        return _clave_linea(columnas, fila)
+    if tabla == "cuenta_corriente":
+        return _clave_movimiento(columnas, fila)
+    return None
+
+
+def _claves_en(conn, tabla: str, sid: int | None, ajenas: bool) -> tuple[set, dict]:
+    if ajenas:
+        if sid is None:
+            partes = conn.execute(
+                "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id IS NOT NULL",
+                (tabla,),
+            ).fetchall()
+        else:
+            partes = conn.execute(
+                "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND (sucursal_id IS NULL OR sucursal_id != ?)",
+                (tabla, sid),
+            ).fetchall()
+    else:
+        if sid is None:
+            partes = conn.execute(
+                "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL",
+                (tabla,),
+            ).fetchall()
+        else:
+            partes = conn.execute(
+                "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id = ?",
+                (tabla, sid),
+            ).fetchall()
+    claves: set = set()
+    duenos: dict = {}
+    for parte in partes:
+        columnas = json.loads(parte["columnas"])
+        id_i = _indice_id(columnas)
+        for fila in json.loads(parte["filas"]):
+            clave = _armar_clave(tabla, columnas, fila)
+            if not clave:
+                continue
+            claves.add(clave)
+            if tabla == "clientes" and id_i is not None and id_i < len(fila):
+                duenos.setdefault(clave, str(fila[id_i]))
+    return claves, duenos
+
+
+def _omitir_copias(conn, tabla: str, columnas: list, filas: list, sid: int | None, modo: str, parte: int) -> list:
+    """La copia de otra PC no se agrega. La que ya está en el libro se queda."""
+    if tabla not in ("clientes", "ventas", "detalles_ventas", "ventas_items", "cuenta_corriente"):
+        return filas
+    ajenas, _ = _claves_en(conn, tabla, sid, True)
+    propias: set = set()
+    duenos: dict = {}
+    if not (modo == "reemplazo" and parte == 1):
+        propias, duenos = _claves_en(conn, tabla, sid, False)
+    id_i = _indice_id(columnas)
+    salida = []
+    vistas: set = set()
+    for fila in filas:
+        clave = _armar_clave(tabla, columnas, fila)
+        if not clave:
+            salida.append(fila)
+            continue
+        if clave in ajenas or clave in vistas:
+            continue
+        if clave in propias and modo == "reemplazo":
+            continue
+        if clave in propias and tabla == "clientes" and modo == "delta":
+            actual = str(fila[id_i]) if id_i is not None and id_i < len(fila) else ""
+            if duenos.get(clave) not in (None, actual):
+                continue
+        vistas.add(clave)
+        salida.append(fila)
+    return salida
+
+
+def ids_de_persona(buscado: Any) -> set[str]:
+    """El id de la ficha puede ser el DNI. Devuelve los id de caja de esa persona."""
+    texto = str(buscado or "")
+    ids = {texto} if texto else set()
+    columnas, filas = filas_de("clientes")
+    id_i = _indice_id(columnas)
+    dni_i = _columna(columnas, "dni", "cuit")
+    if id_i is None:
+        return ids
+    for fila in filas:
+        if id_i >= len(fila):
+            continue
+        cid = str(fila[id_i])
+        dni = _digitos(fila[dni_i]) if dni_i is not None and dni_i < len(fila) else ""
+        if cid == texto or (dni and dni == texto):
+            ids.add(cid)
+    return ids
+
+
 def _leer_crudo(conn, tabla: str, sid: int | None) -> tuple[list, list]:
     if sid is None:
         partes = conn.execute(
@@ -182,7 +343,11 @@ def guardar_parte(
             None if columna_secreta(col) else valor
             for col, valor in zip(columnas, fila)
         ])
-    if str(modo or "reemplazo") == "delta":
+    modo_txt = "delta" if str(modo or "reemplazo") == "delta" else "reemplazo"
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+        limpias = _omitir_copias(conn, tabla, columnas, limpias, sid, modo_txt, parte)
+    if modo_txt == "delta":
         return _guardar_delta(tabla, columnas, limpias, sid, sucursal_nombre, list(bajas or []))
     with get_db() as conn:
         ensure_tenant_migrations(conn)
