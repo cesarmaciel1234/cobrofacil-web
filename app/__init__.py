@@ -42,9 +42,16 @@ def create_app():
 
     with app.app_context():
         init_db()
-        from app.services.users import ensure_default_admin
+        try:
+            from app.services.users import ensure_default_admin
 
-        ensure_default_admin()
+            ensure_default_admin()
+        except Exception as exc:
+            from app.database import is_postgres
+
+            if app.config.get("TESTING") or not is_postgres():
+                raise
+            app.logger.warning("admin inicial no se pudo asegurar: %s", type(exc).__name__)
 
     from app.routes.views import views_bp
     from app.routes.api import api_bp

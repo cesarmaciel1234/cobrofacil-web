@@ -3082,7 +3082,7 @@ const $ = id => document.getElementById(id);
                 let html = `<button type="button" class="btn btn-sm ${activeSucursalId === null ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="todas" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">Consolidado (Todas)</button>`;
 
                 sucursales.forEach(s => {
-                    const isAct = activeSucursalId === s.id;
+                    const isAct = String(activeSucursalId) === String(s.id);
                     html += `<button type="button" class="btn btn-sm ${isAct ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="${s.id}" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">📍 ${textoJefe(s.nombre)}</button>`;
                 });
                 cont.innerHTML = html;

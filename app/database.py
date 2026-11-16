@@ -21,7 +21,7 @@ def _get_pg_pool():
             if _pg_pool is None:
                 # Pool de conexiones persistentes con keepalive para evitar caídas y timeouts de Neon
                 _pg_pool = psycopg2.pool.ThreadedConnectionPool(
-                    minconn=1,
+                    minconn=0,
                     maxconn=10,
                     dsn=Config.DATABASE_URL,
                     connect_timeout=10,

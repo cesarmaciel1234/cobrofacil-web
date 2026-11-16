@@ -13,7 +13,7 @@ Endpoints para recibir datos del servidor POS:
 - GET /api/pos/sync/logs - Obtener historial de sincronización
 - GET /api/pos/sync/status - Obtener estado de última sincronización
 """
-from flask import jsonify, request, session
+from flask import current_app, jsonify, request, session
 
 from app.routes.api import api_bp
 from app.services.pos_config import (
@@ -454,7 +454,11 @@ def api_pos_jefe():
         "proveedor", "promedio", "ticket", "desglose"
     ):
         return jsonify({"error": "Panel desconocido"}), 400
-    return jsonify(panel(nombre, sucursal_id=sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro))
+    try:
+        return jsonify(panel(nombre, sucursal_id=sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro))
+    except Exception as exc:
+        current_app.logger.warning("panel %s no respondió: %s", nombre, type(exc).__name__)
+        return jsonify({"ok": False, "libro": False, "error": "La base no responde en este momento."}), 503
 
 
 @api_bp.route("/pos/sucursales", methods=["GET"])

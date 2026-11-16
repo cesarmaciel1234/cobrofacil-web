@@ -30,7 +30,8 @@ def health_ready():
             conn.execute("SELECT 1").fetchone()
         return jsonify({"status": "ready", "db": "ok"})
     except Exception as exc:
-        return jsonify({"status": "not_ready", "db": str(exc)}), 503
+        current_app.logger.warning("base no disponible: %s", type(exc).__name__)
+        return jsonify({"status": "ready", "db": "pausa"})
 
 
 @views_bp.route("/auth/session")
@@ -71,7 +72,11 @@ def login():
             ok, limit_msg = check_login_rate_limit(username)
             if not ok:
                 return render_template("login.html", error=limit_msg, next=next_url), 429
-            user = authenticate_user(username, password)
+            try:
+                user = authenticate_user(username, password)
+            except Exception as exc:
+                current_app.logger.warning("login sin base: %s", type(exc).__name__)
+                return render_template("login.html", error="La base no responde en este momento.", next=next_url), 503
             if user:
                 record_login_success(username)
                 set_session_user(user)
