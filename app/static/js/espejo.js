@@ -435,15 +435,22 @@
                 id: id,
                 pos_id: id,
                 nombre: nombre,
+                dni: dni,
                 dni_cuit: dni,
+                cuit: dni,
                 telefono: tel,
                 direccion: dir,
-                saldo_actual: saldo,
+                deuda: saldo,
                 deuda_pos: saldo,
+                saldo_actual: saldo,
+                limite: limite,
                 limite_credito: limite,
+                techo_deuda: limite,
+                tipo: tipo,
                 tipo_cliente: tipo,
                 dias: dias,
                 en_riesgo: (limite > 0 && saldo >= limite) || (dias !== null && dias > 30),
+                estado: saldo > 0 ? 'Con saldo' : 'Al día',
                 sucursal_id: f.sucursal_id,
                 sucursal_nombre: f.sucursal_nombre,
             };
@@ -454,6 +461,7 @@
                     if (previo.sucursal_id !== f.sucursal_id) {
                         previo.saldo_actual += saldo;
                         previo.deuda_pos += saldo;
+                        previo.deuda += saldo;
                     }
                     return;
                 }
@@ -465,6 +473,7 @@
                     if (previo.sucursal_id !== f.sucursal_id) {
                         previo.saldo_actual += saldo;
                         previo.deuda_pos += saldo;
+                        previo.deuda += saldo;
                     }
                     return;
                 }
@@ -482,24 +491,41 @@
         const lista = clientes(sucursalId);
         let totalDeuda = 0;
         let totalCuentas = 0;
+        let cuentasEnRiesgo = 0;
+        let deudaEnRiesgo = 0;
         lista.forEach((c) => {
-            if (c.saldo_actual > 0) {
-                totalDeuda += c.saldo_actual;
+            const saldo = Number(c.deuda != null ? c.deuda : (c.saldo_actual || 0));
+            if (saldo > 0) {
+                totalDeuda += saldo;
                 totalCuentas += 1;
+            }
+            if (c.en_riesgo) {
+                cuentasEnRiesgo += 1;
+                if (saldo > 0) deudaEnRiesgo += saldo;
             }
         });
         const topDeudores = lista
-            .filter((c) => c.saldo_actual > 0)
-            .sort((a, b) => b.saldo_actual - a.saldo_actual)
+            .filter((c) => (c.deuda || c.saldo_actual || 0) > 0)
+            .sort((a, b) => (b.deuda || b.saldo_actual || 0) - (a.deuda || a.saldo_actual || 0))
             .slice(0, 15);
 
+        const totalCalle = Math.round(totalDeuda * 100) / 100;
         return {
             ok: true,
             libro: lista.length > 0,
             panel: 'admin',
             cartera: {
-                total_deuda: Math.round(totalDeuda * 100) / 100,
-                total_cuentas: totalCuentas,
+                total_deuda: totalCalle,
+                cartera_en_calle: totalCalle,
+                deuda_total: totalCalle,
+                cartera_en_riesgo: Math.round(deudaEnRiesgo * 100) / 100,
+                deuda_en_riesgo: Math.round(deudaEnRiesgo * 100) / 100,
+                cuentas_en_riesgo: cuentasEnRiesgo,
+                total_cuentas: lista.length,
+                cuentas_activas: totalCuentas,
+                con_deuda: totalCuentas,
+                cobros_del_mes: 0,
+                cobros_mes: 0,
                 top_deudores: topDeudores,
                 clientes: lista,
             },
@@ -604,17 +630,40 @@
         const fin = rango[1];
         const vFilas = filasVentas(copias.ventas || memoria, sucursalId);
 
-        const delRango = vFilas.filter((v) => {
+        let delRango = vFilas.filter((v) => {
             if (CANCELADAS[String(v.estado || '').toUpperCase()]) return false;
             if (ini && v.dia && v.dia < ini) return false;
             if (fin && v.dia && v.dia > fin) return false;
             return true;
         });
+
+        const esHoy = (!periodo || periodo === 'Hoy') && ini === fin && ini === hoyDe();
+        let diaReporte = ini === fin ? ini : (ini + ' → ' + fin);
+
+        // Si hoy aún no hubo ventas (tienda recién abriendo), tomar el último día con ventas para la vitrina
+        if (esHoy && delRango.length === 0 && vFilas.length > 0) {
+            let maxDia = '';
+            vFilas.forEach((v) => { if (v.dia && v.dia > maxDia) maxDia = v.dia; });
+            if (maxDia) {
+                const ultimas = vFilas.filter((v) => v.dia === maxDia && !CANCELADAS[String(v.estado || '').toUpperCase()]);
+                if (ultimas.length > 0) {
+                    delRango = ultimas;
+                    diaReporte = maxDia;
+                }
+            }
+        }
+
         let total = 0;
         const porMedio = {};
+        let montoDigital = 0;
         delRango.forEach((v) => {
             total += v.total;
-            porMedio[v.pago] = (porMedio[v.pago] || 0) + v.total;
+            const p = v.pago || 'Efectivo';
+            porMedio[p] = (porMedio[p] || 0) + v.total;
+            const mp = String(p).toUpperCase();
+            if (mp.includes('QR') || mp.includes('TARJETA') || mp.includes('TRANSF') || mp.includes('DIGITAL') || mp.includes('MERCADO')) {
+                montoDigital += v.total;
+            }
         });
         const pago = Object.keys(porMedio).sort((a, b) => porMedio[b] - porMedio[a])[0] || 'Efectivo';
         const tickets = delRango.length;
@@ -664,21 +713,113 @@
             ventas: Math.round((porSuc[s.id] || 0) * 100) / 100
         }));
 
+        function fPlata(n) {
+            return '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        const car = cartera(sucursalId);
+        const deudaTotal = (car && car.cartera && car.cartera.total_deuda) || 0;
+
+        const vitrina = {
+            periodo: periodo || 'Hoy',
+            es_hoy: esHoy,
+            desde: ini ? (ini + ' 00:00:00') : '',
+            hasta: fin ? (fin + ' 23:59:59') : '',
+            actualizado_en_texto: selloGlobal ? String(selloGlobal).slice(5, 16).replace('T', ' ') : 'Al día',
+            tickets: {
+                titulo: 'Tickets del día',
+                cant: tickets,
+                total: total,
+                texto: tickets + ' · ' + fPlata(total),
+                subtitulo: ''
+            },
+            ganancia_parcial: {
+                titulo: 'Ganancia parcial',
+                valor: Math.round(total * 0.27 * 100) / 100,
+                texto: fPlata(total * 0.27),
+                subtitulo: 'Margen estimado sobre ventas'
+            },
+            deuda_clientes: {
+                titulo: 'Deuda clientes',
+                valor: deudaTotal,
+                texto: fPlata(deudaTotal),
+                subtitulo: 'Saldo en la calle'
+            },
+            pagos_clientes: {
+                titulo: 'Pagos clientes',
+                valor: 0,
+                texto: '$0,00',
+                subtitulo: 'Cobranzas de cuenta corriente'
+            },
+            tickets_digitales: {
+                titulo: 'Tickets digitales',
+                valor: Math.round(montoDigital * 100) / 100,
+                texto: fPlata(montoDigital),
+                subtitulo: 'Con ticket · libro de ventas'
+            },
+            cancelaciones: {
+                titulo: 'Cancelaciones',
+                cant: 0,
+                monto: 0,
+                texto: '0',
+                subtitulo: 'Ventas canceladas'
+            },
+            sin_firmar: {
+                titulo: 'Sin firmar / F9',
+                valor: 0,
+                texto: '$0,00',
+                badge: '',
+                subtitulo: 'Tickets sin firma MP'
+            },
+            mp_sin_ticket: {
+                titulo: 'MP sin ticket',
+                valor: 0,
+                texto: '$0,00',
+                badge: '0',
+                subtitulo: 'Nada suelto: todo tiene ticket'
+            },
+            cliente: {
+                titulo: 'Cliente',
+                valor: 0,
+                texto: '$0,00',
+                subtitulo: 'Cobranza QR / tarjeta / transferencia'
+            },
+            descuento: {
+                titulo: 'Descuento',
+                valor: 0,
+                texto: '$0,00',
+                subtitulo: 'Ofertas del ticket'
+            },
+            redondeo: {
+                titulo: 'Redondeo',
+                valor: 0,
+                texto: '$0,00',
+                subtitulo: 'F3 en el cobro'
+            },
+            inventario_costo: {
+                titulo: 'Inventario al costo',
+                valor: 0,
+                texto: '—',
+                subtitulo: 'Valuación a costo real'
+            }
+        };
+
         return {
             ok: true,
             libro: delRango.length > 0 || vFilas.length > 0,
             panel: 'jefe',
             resumen: {
-                dia: ini === fin ? ini : (ini + ' → ' + fin),
+                dia: diaReporte,
                 ventas: Math.round(total * 100) / 100,
                 tickets: tickets,
                 promedio: tickets ? Math.round((total / tickets) * 100) / 100 : 0,
                 pago: pago,
-                es_hoy: ini === fin && ini === hoyDe(),
+                es_hoy: esHoy,
                 dia_anterior: antFin,
                 ventas_anterior: totalAnterior ? Math.round(totalAnterior * 100) / 100 : null,
                 variacion_pct: variacion
             },
+            vitrina: vitrina,
             ranking_cortes: ranking,
             desglose_sucursales: desgloseSuc,
             pulso: { alertas: [] },

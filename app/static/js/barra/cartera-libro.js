@@ -390,25 +390,37 @@
     }
 
     function desdeLibro(cliente) {
+        const deuda = cliente.deuda != null ? cliente.deuda : (cliente.saldo_actual != null ? cliente.saldo_actual : (cliente.deuda_pos != null ? cliente.deuda_pos : 0));
+        const limite = cliente.limite != null ? cliente.limite : (cliente.limite_credito != null ? cliente.limite_credito : (cliente.techo_deuda != null ? cliente.techo_deuda : 0));
+        const dni = cliente.dni != null ? cliente.dni : (cliente.dni_cuit != null ? cliente.dni_cuit : (cliente.cuit || ''));
+        const tipo = cliente.tipo || cliente.tipo_cliente || 'Minorista';
+        const numDeuda = Number(deuda) || 0;
+        const numLimite = Number(limite) || 0;
+        const numDias = cliente.dias != null && cliente.dias !== '' ? Number(cliente.dias) : null;
         return aplicarPerfilLocal({
             id: cliente.id,
-            pos_id: cliente.id,
-            nombre: cliente.nombre,
-            nombres: cliente.nombres || [],
-            sucursales: cliente.sucursales || [],
-            cuit: cliente.dni,
-            telefono: cliente.telefono,
-            tipo_cliente: cliente.tipo,
-            deuda_pos: cliente.deuda,
-            techo_deuda: cliente.limite,
-            dias: cliente.dias,
-            mantenimiento: cliente.mantenimiento,
-            mantenimiento_origen: cliente.mantenimiento_origen,
-            tarifa: cliente.tarifa,
-            en_riesgo: cliente.en_riesgo,
-            estado: cliente.estado,
+            pos_id: cliente.pos_id || cliente.id,
+            nombre: cliente.nombre || '',
+            nombres: cliente.nombres || [cliente.nombre || ''],
+            sucursales: cliente.sucursales || (cliente.sucursal_nombre ? [cliente.sucursal_nombre] : []),
+            cuit: dni,
+            dni: dni,
+            telefono: cliente.telefono || '',
+            tipo_cliente: tipo,
+            tipo: tipo,
+            deuda: numDeuda,
+            deuda_pos: numDeuda,
+            saldo_actual: numDeuda,
+            techo_deuda: numLimite,
+            limite_credito: numLimite,
+            dias: numDias,
+            mantenimiento: cliente.mantenimiento != null ? Number(cliente.mantenimiento) : 0,
+            mantenimiento_origen: cliente.mantenimiento_origen || '',
+            tarifa: cliente.tarifa || '',
+            en_riesgo: !!(cliente.en_riesgo || (numLimite > 0 && numDeuda >= numLimite) || (numDias !== null && numDias > 30)),
+            estado: cliente.estado || (numDeuda > 0 ? 'Con saldo' : 'Al día'),
             sucursal_nombre: cliente.sucursal_nombre || '',
-            direccion: ''
+            direccion: cliente.direccion || ''
         });
     }
 

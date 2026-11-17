@@ -3551,7 +3551,11 @@ const $ = id => document.getElementById(id);
                     habiaLocal = true;
                     aplicarDatosJefe(panel, previo, false);
                 }
-                void Nodo.encargar(pieza, consulta);
+                Nodo.encargar(pieza, consulta).then((dato) => {
+                    if (dato && !panelGuardadoVacio(dato)) {
+                        aplicarDatosJefe(panel, dato, false);
+                    }
+                }).catch(() => {});
                 if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
                 return;
             }
@@ -4156,6 +4160,15 @@ const $ = id => document.getElementById(id);
         function pintarDesdeEspejo() {
             const activa = document.querySelector('.view.active');
             const name = activa ? activa.id.replace('view-', '') : '';
+            if (name === 'cartera' && window.CarteraLibro) {
+                if (window.Espejo && Espejo.cartera) {
+                    const carteraEspejo = Espejo.cartera(activeSucursalId);
+                    if (carteraEspejo && carteraEspejo.cartera && carteraEspejo.cartera.clientes && carteraEspejo.cartera.clientes.length) {
+                        CarteraLibro.recibir(carteraEspejo);
+                    }
+                }
+                return;
+            }
             const panel = name === 'ticket' && ventasPantalla === 'desglose' ? 'desglose' : name;
             if (!panel) return;
             cargarJefe(panel);
@@ -6329,7 +6342,7 @@ const $ = id => document.getElementById(id);
                         if (!dato) return;
                         if (pieza === 'cartera' && window.CarteraLibro && CarteraLibro.recibir) {
                             const activa = document.querySelector('.view.active');
-                            if (activa && activa.id === 'view-cartera' && consultaNodo('cartera') === consulta) {
+                            if (activa && activa.id === 'view-cartera') {
                                 CarteraLibro.recibir(dato);
                             }
                             return;
@@ -6337,7 +6350,7 @@ const $ = id => document.getElementById(id);
                         const activa = document.querySelector('.view.active');
                         const name = activa ? activa.id.replace('view-', '') : '';
                         const panel = name === 'ticket' && ventasPantalla === 'desglose' ? 'desglose' : name;
-                        if (piezaNodo(panel) !== pieza || consultaNodo(panel) !== consulta) return;
+                        if (piezaNodo(panel) !== pieza) return;
                         aplicarDatosJefe(panel, dato, false);
                         const syncTxt = (dato.vitrina && dato.vitrina.actualizado_en_texto) || textoSync(dato.actualizado_en);
                         marcarRed(true, syncTxt);
