@@ -710,6 +710,8 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
     columnas, filas = _filas_clientes(sucursal_id)
     idx = _indice(columnas)
     total_deuda = 0.0
+    total_capital = 0.0
+    total_interes = 0.0
     total_a_favor = 0.0
     con_deuda = 0
     al_dia = 0
@@ -777,9 +779,13 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
         sobre_cupo = limite > 0 and deuda > limite
         es_riesgo = False
         estado = "Normal"
+        mant_val = float(mantenimiento) if mantenimiento and float(mantenimiento) > 0 else 0.0
+        total_cliente = round(deuda + mant_val, 2) if deuda > 0.009 else round(deuda, 2)
         if deuda > 0.009:
             con_deuda += 1
-            total_deuda += deuda
+            total_capital += deuda
+            total_interes += mant_val
+            total_deuda += (deuda + mant_val)
             if dias is not None and dias >= 30:
                 mora_30 += 1
             if dias is not None and dias >= 60:
@@ -790,7 +796,7 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
             if (dias is not None and dias > 30) or sobre_cupo or libro.get("en_apalancamiento"):
                 es_riesgo = True
                 estado = "Atención"
-                deuda_en_riesgo += deuda
+                deuda_en_riesgo += (deuda + mant_val)
                 cuentas_en_riesgo += 1
         elif deuda < -0.009:
             a_favor += 1
@@ -814,6 +820,7 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
             "limite": round(limite, 2),
             "mantenimiento": mantenimiento,
             "mantenimiento_origen": origen,
+            "total_a_pagar": total_cliente,
             "dias": dias,
             "tarifa": tarifa_str,
             "en_riesgo": es_riesgo,
@@ -822,13 +829,15 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
         if deuda > 0.009:
             deudores.append(ficha)
 
-    deudores.sort(key=lambda x: x["deuda"], reverse=True)
-    clientes.sort(key=lambda x: (x["deuda"] <= 0, -x["deuda"], x["nombre"]))
+    deudores.sort(key=lambda x: x.get("total_a_pagar", x["deuda"]), reverse=True)
+    clientes.sort(key=lambda x: (x["deuda"] <= 0, -x.get("total_a_pagar", x["deuda"]), x["nombre"]))
     return {
         "total_cuentas": len(filas),
         "con_deuda": con_deuda,
         "deuda_total": round(total_deuda, 2),
         "cartera_en_calle": round(total_deuda, 2),
+        "capital_total": round(total_capital, 2),
+        "interes_total": round(total_interes, 2),
         "cuentas_activas": con_deuda,
         "al_dia": al_dia,
         "a_favor": a_favor,

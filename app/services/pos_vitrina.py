@@ -380,7 +380,7 @@ def calcular_vitrina(
             "titulo": "Deuda clientes",
             "valor": round(deuda_clientes_total, 2),
             "texto": _formatear_pesos(deuda_clientes_total),
-            "subtitulo": "",
+            "subtitulo": f"Capital: {_formatear_pesos(cartera_oficial.get('capital_total') or 0)} · Interés: {_formatear_pesos(cartera_oficial.get('interes_total') or 0)}" if cartera_oficial.get("interes_total") else "Saldo en la calle",
         },
         "tickets_digitales": {
             "titulo": "Tickets digitales",

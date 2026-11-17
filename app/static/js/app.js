@@ -4273,7 +4273,7 @@ const $ = id => document.getElementById(id);
                                         <span class="vitrina-card-lbl">${v.deuda_clientes?.titulo || 'Deuda clientes'}</span>
                                     </div>
                                     <div class="vitrina-card-val">${v.deuda_clientes?.texto || '—'}</div>
-                                    <div class="vitrina-card-sub">Saldo en la calle</div>
+                                    <div class="vitrina-card-sub">${v.deuda_clientes?.subtitulo || 'Saldo en la calle'}</div>
                                 </div>
 
                                 <div class="vitrina-card">
