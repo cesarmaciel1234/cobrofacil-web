@@ -19,7 +19,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.41">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.42">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -107,12 +107,13 @@
                 <div class="carga-libro-riel" aria-hidden="true"><div id="cargaLibroBarra"></div></div>
             </div>
             <div class="view active" id="view-reporte">
-                <span id="reporteDia" style="display:none;">Cerebro Jefe</span>
+                <p id="reporteDia" class="periodo-chip">Hoy</p>
                 <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">Cargando vitrina de tienda…</div>
                 </div>
             <div class="view" id="view-ticket">
+                <p id="ticketPeriodo" class="periodo-chip">Mes</p>
                 <div class="card" id="ticketLista">
-                    <p id="ticketFiltro" class="ticket-suma">Filtrado —</p>
+                    <p id="ticketFiltro" class="ticket-suma">Mes · —</p>
                     <div class="table-wrap"><table class="data-table"><thead><tr><th>Hora</th><th>Ticket</th><th>Pago</th><th>Total</th></tr></thead><tbody id="ticketCuerpo"></tbody></table></div>
                 </div>
                 <div class="card" id="desgloseLista" hidden>
@@ -120,6 +121,7 @@
                 </div>
             </div>
             <div class="view" id="view-contabilidad">
+                <p id="cajaPeriodo" class="periodo-chip">Hoy</p>
                 <div class="card">
                     <div class="card-body" id="contaCuerpo">Cargando el libro…</div>
                 </div>
@@ -207,8 +209,10 @@
     <script src="/static/js/barra/armar.js?v=2"></script>
     <script src="/static/js/barra/toque.js?v=2"></script>
     <script src="/static/js/modulo-panel.js?v=5"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=7"></script>
-    <script src="/static/js/espejo.js?v=2"></script>
-    <script src="/static/js/app.js?v=4.69"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=9"></script>
+    <script src="/static/js/espejo.js?v=4"></script>
+    <script src="/static/js/espejo-engine.js?v=3"></script>
+    <script src="/static/js/nodo.js?v=1"></script>
+    <script src="/static/js/app.js?v=4.73"></script>
 </body>
 </html>

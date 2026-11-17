@@ -521,6 +521,29 @@
             vacio.textContent = 'Cargando el libro…';
         }
         try {
+            // 1. Consulta al Espejo local primero (0ms de latencia, cero conflicto en la nube)
+            if (window.Espejo && Espejo.cartera) {
+                const carteraEspejo = Espejo.cartera(sucursalId);
+                if (carteraEspejo && carteraEspejo.cartera && carteraEspejo.cartera.clientes && carteraEspejo.cartera.clientes.length) {
+                    aplicarLibro(carteraEspejo);
+                    if (window.EspejoEngine && EspejoEngine.syncDelta) {
+                        void EspejoEngine.syncDelta();
+                    }
+                    return;
+                }
+            }
+
+            const consulta = sucursalId ? ('sucursal_id=' + encodeURIComponent(sucursalId)) : '';
+            if (window.Nodo) {
+                const previo = Nodo.tomar('cartera', consulta);
+                if (previo) aplicarLibro(previo);
+                const dato = await Nodo.encargar('cartera', consulta);
+                if (dato) {
+                    try { localStorage.setItem(claveCacheCartera(), JSON.stringify(dato)); } catch (e) {}
+                    aplicarLibro(dato);
+                }
+                return;
+            }
             let url = `${API_BASE}/pos/jefe?panel=admin`;
             if (sucursalId) url += '&sucursal_id=' + encodeURIComponent(sucursalId);
             const response = await fetch(url);
@@ -574,6 +597,7 @@
         filtroActual() { return currentFilter; },
         filtrar(filtro) { setFilter(filtro || 'all'); },
         actualizar() { return loadClients(); },
+        recibir(dato) { if (dato) aplicarLibro(dato); },
         sucursal(id) {
             sucursalId = (id == null || id === '') ? '' : String(id);
             try {
@@ -611,4 +635,15 @@
         const previo = localStorage.getItem(claveCacheCartera()) || sessionStorage.getItem(claveCacheCartera());
         if (previo) aplicarLibro(JSON.parse(previo));
     } catch (e) {}
+
+    if (window.Espejo && Espejo.alActualizar) {
+        Espejo.alActualizar(() => {
+            if (vistaActiva && vistaActiva()) {
+                const carteraEspejo = Espejo.cartera(sucursalId);
+                if (carteraEspejo && carteraEspejo.cartera && carteraEspejo.cartera.clientes) {
+                    aplicarLibro(carteraEspejo);
+                }
+            }
+        });
+    }
 })();

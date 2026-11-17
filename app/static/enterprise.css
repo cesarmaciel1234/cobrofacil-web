@@ -1394,10 +1394,13 @@ body.sidebar-open .dashboard-bar,
     gap: 5px;
     font-size: 10px;
     font-weight: 700;
-    padding: 0 8px;
-    height: 24px;
+    min-height: 24px;
+    height: auto;
     border-radius: 999px;
-    white-space: nowrap;
+    white-space: normal;
+    text-align: center;
+    line-height: 1.25;
+    padding: 4px 8px;
 }
 .mobile-conn-pill .dot {
     width: 7px;
@@ -1414,6 +1417,21 @@ body.sidebar-open .dashboard-bar,
     background: var(--danger-muted);
     color: var(--danger);
     border: 1px solid rgba(239, 68, 68, 0.25);
+}
+.mobile-conn-pill.reposo {
+    background: #f1f5f9;
+    color: #475569;
+    border: 1px solid #e2e8f0;
+}
+.periodo-chip {
+    display: inline-flex;
+    margin: 0 0 8px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 12px;
+    font-weight: 800;
 }
 
 .pwa-update-toast {

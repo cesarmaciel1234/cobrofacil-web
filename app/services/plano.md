@@ -24,6 +24,7 @@
 ```
 app/services/
 ├── pos_base.py           <-- Motor de identidad, lectura de tablas espejo y caché TTL 5s
+├── nodo.py               <-- Nodo maestro: arma reporte y el resto en segundo plano
 ├── pos_jefe.py           <-- Generador de paneles (Reporte, Jefe, Contabilidad, Cartera, Pedidos)
 ├── pos_vitrina.py        <-- Motor de control de gestión (12 tarjetas)
 ├── sync_hub.py           <-- Motor de replicación LWW, idempotencia y changelog

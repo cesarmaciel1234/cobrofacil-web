@@ -441,7 +441,31 @@ def _bloques_por_dia(columnas: list, filas: list) -> list[tuple[str | None, list
     return bloques or [(None, [])]
 
 
+def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None) -> str | None:
+    """Una sucursal que ya tiene nombre se queda con ese. No abre otra por un texto distinto."""
+    texto = (pedido or "").strip() or None
+    if sid is None:
+        return texto
+    filas = conn.execute(
+        """
+        SELECT DISTINCT sucursal_nombre
+        FROM pos_base
+        WHERE sucursal_id = ? AND sucursal_nombre IS NOT NULL AND TRIM(sucursal_nombre) <> ''
+        """,
+        (int(sid),),
+    ).fetchall()
+    nombres = []
+    for fila in filas:
+        nombre = str(fila["sucursal_nombre"] or "").strip()
+        if nombre and nombre not in nombres:
+            nombres.append(nombre)
+    if len(nombres) == 1:
+        return nombres[0]
+    return texto
+
+
 def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | None, columnas: list, filas: list, ahora: str) -> None:
+    sucursal_nombre = _nombre_que_ya_tiene(conn, sid, sucursal_nombre)
     _borrar_partes(conn, tabla, sid)
     for numero, (dia, bloque) in enumerate(_bloques_por_dia(columnas, filas), start=1):
         conn.execute(
@@ -564,6 +588,7 @@ def guardar_parte(
         return _guardar_delta(tabla, columnas, limpias, sid, sucursal_nombre, list(bajas or []))
     with get_db() as conn:
         ensure_tenant_migrations(conn)
+        sucursal_nombre = _nombre_que_ya_tiene(conn, sid, sucursal_nombre)
         if parte == 1:
             if sid is None:
                 conn.execute(
@@ -718,6 +743,74 @@ def tabla_espejo(tabla: str) -> dict[str, Any]:
             }
         grupos[sid]["filas"].extend(json.loads(parte["filas"]))
     return {"ok": True, "tabla": tabla, "sello": sello, "sucursales": [grupos[sid] for sid in orden]}
+
+
+def delta_espejo(sello_desde: str = "") -> dict[str, Any]:
+    """
+    Delta de cambios en el espejo desde un sello dado.
+    Devuelve solo las tablas que cambiaron después del sello con sus datos completos.
+    Si no hay sello, devuelve el índice completo (para primer sync).
+    """
+    with get_db() as conn:
+        ensure_tenant_migrations(conn)
+
+        if not sello_desde:
+            # Sin sello: devolver índice completo (no datos)
+            ind = indice_espejo()
+            ind["es_indice"] = True
+            ind["cambios"] = []
+            return ind
+
+        # Con sello: buscar tablas con actualizado_en > sello_desde
+        rows = conn.execute(
+            """
+            SELECT DISTINCT tabla
+            FROM pos_base
+            WHERE actualizado_en > ?
+            ORDER BY tabla
+            """,
+            (sello_desde,),
+        ).fetchall()
+
+    tablas_cambiadas = [row["tabla"] for row in rows]
+
+    if not tablas_cambiadas:
+        return {
+            "ok": True,
+            "sello": sello_desde,
+            "cambios": [],
+            "cantidad": 0,
+        }
+
+    # Para cada tabla cambiada, obtener sus datos completos
+    cambios = []
+    sello_global = sello_desde
+
+    for nombre_tabla in tablas_cambiadas:
+        if not _TABLA.match(nombre_tabla or ""):
+            continue
+
+        try:
+            tabla_data = tabla_espejo(nombre_tabla)
+            if tabla_data.get("ok"):
+                cambios.append({
+                    "tabla": nombre_tabla,
+                    "sello": tabla_data.get("sello", ""),
+                    "sucursales": tabla_data.get("sucursales", []),
+                })
+                marca = tabla_data.get("sello", "")
+                if marca > sello_global:
+                    sello_global = marca
+        except Exception:
+            # Si falla una tabla, la skippeamos
+            continue
+
+    return {
+        "ok": True,
+        "sello": sello_global,
+        "cambios": cambios,
+        "cantidad": len(cambios),
+    }
 
 
 def resumen_base() -> list[dict]:
@@ -1122,9 +1215,8 @@ def preparar_vista(
             sello = _sello_partes(grupo)
             if tabla in _TABLAS_DIA:
                 # El recorte del período no puede ocupar el lugar del libro entero.
-                _cache_dia[(ambito, tabla, sid, desde, hasta)] = (ahora, columnas, filas)
-                if dia_real and dia_real != desde:
-                    _cache_dia[(ambito, tabla, sid, dia_real, dia_real)] = (ahora, columnas, filas)
+                # Si hoy todavía no tiene ventas, el día elegido no se guarda bajo la fecha vacía.
+                _cache_dia[(ambito, tabla, sid, corte_desde, corte_hasta)] = (ahora, columnas, filas)
             else:
                 _cache[(ambito, tabla, sid)] = (ahora, sello, columnas, filas)
         for tabla in completas:
@@ -1209,6 +1301,42 @@ def _filas_del_rango(tabla: str, sucursal_id: int | None, desde: str, hasta: str
     return columnas, filas
 
 
+def _filas_sucursal(columnas: list, filas: list, sid: int) -> tuple[list, list]:
+    """El libro de Todas ya está en memoria: de ahí sale una sucursal, sin devolver vacío."""
+    idx = _columna(columnas, "sucursal_id")
+    if idx is None:
+        return columnas, filas
+    salida = []
+    for fila in filas:
+        if idx >= len(fila):
+            continue
+        if _sucursal_id(fila[idx]) == sid:
+            salida.append(fila)
+    return columnas, salida
+
+
+def hay_tabla(tabla: str, sucursal_id: int | None = None) -> bool:
+    """La tabla existe en el libro, aunque el período pedido no tenga filas."""
+    if not _TABLA.match(tabla or ""):
+        return False
+    sid = int(sucursal_id) if sucursal_id is not None else None
+    try:
+        with get_db() as conn:
+            if sid is None:
+                fila = conn.execute(
+                    "SELECT 1 FROM pos_base WHERE tabla = ? LIMIT 1",
+                    (tabla,),
+                ).fetchone()
+            else:
+                fila = conn.execute(
+                    "SELECT 1 FROM pos_base WHERE tabla = ? AND sucursal_id = ? LIMIT 1",
+                    (tabla, sid),
+                ).fetchone()
+    except Exception:
+        return False
+    return fila is not None
+
+
 def filas_de(
     tabla: str,
     sucursal_id: int | None = None,
@@ -1228,7 +1356,7 @@ def filas_de(
             return hit[2], hit[3]
         base = _cache.get((ambito, tabla, None))
         if sid is not None and not hit and base and _vigente(base[0], ahora, ambito):
-            return [], []
+            return _filas_sucursal(base[2], base[3], sid)
     precargar_tablas((tabla,), sucursal_id=sid)
     with _cache_lock:
         hit = _cache.get((ambito, tabla, sid))

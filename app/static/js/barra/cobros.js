@@ -5,9 +5,9 @@ window.BarraModulos.push({
     nombre: 'Ventas',
     icono: '🧺',
     vista: 'ticket',
-    pantalla: 'Historial del día',
+    pantalla: 'Historial',
     herramientas: [
-        { id: 'historial', titulo: 'Historial del día', tipo: 'pantalla' },
+        { id: 'historial', titulo: 'Historial', tipo: 'pantalla' },
         { id: 'desglose', titulo: 'Desglose de artículos', tipo: 'pantalla' }
     ]
 });

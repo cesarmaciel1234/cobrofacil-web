@@ -60,6 +60,10 @@ def create_app():
     app.register_blueprint(api_bp)
     app.register_blueprint(api_bp, url_prefix="/api/v1", name="api_v1")
 
+    from app.services.nodo import arrancar
+
+    arrancar(app)
+
     limiter.limit("10 per minute")(app.view_functions["views.auth_login_json"])
     limiter.limit("5 per minute")(app.view_functions["views.login"])
 

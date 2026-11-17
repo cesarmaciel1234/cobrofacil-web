@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
-from app.services.pos_base import filas_de
+from app.services.pos_base import filas_de, hay_tabla
 from app.services.pos_interes import MARCA_INTERES, clave_ticket, proyectar_interes
 
 _ACTIVACION = "2026-01-01 00:00:00"
@@ -397,16 +397,34 @@ def _hora_minutos(valor):
 
 
 def rango_fechas(alcance: str, fecha: str, historico: bool, hoy: str) -> tuple[str | None, str | None]:
-    """Día o mes del calendario. El histórico no recorta fechas."""
+    """Día, semana o mes del calendario. El histórico no recorta fechas."""
     if historico:
         return None, None
+    nombre = str(alcance or "").lower()
     dia = _dia_iso(fecha) or hoy
-    if str(alcance or "").lower() == "mes":
+    if nombre == "mes":
         anio, mes = int(dia[:4]), int(dia[5:7])
         import calendar
         ultimo = calendar.monthrange(anio, mes)[1]
         return f"{anio:04d}-{mes:02d}-01", f"{anio:04d}-{mes:02d}-{ultimo:02d}"
+    if nombre == "semana":
+        base = date.fromisoformat(dia)
+        lunes = base - timedelta(days=base.weekday())
+        return lunes.isoformat(), base.isoformat()
     return dia, dia
+
+
+def _libro_vacio(sucursal_id: int | None) -> dict:
+    """El período no tiene filas. Si la tabla existe, el libro ya llegó."""
+    return {
+        "libro": hay_tabla("ventas", sucursal_id),
+        "tickets": [],
+        "filtrado": 0.0,
+        "tickets_ok": 0,
+        "cajas": [],
+        "medios": [],
+        "recorte": False,
+    }
 
 
 def evaluar_ticket(
@@ -500,15 +518,7 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
     else:
         columnas, filas = filas_de("ventas", sucursal_id)
     if not columnas:
-        return {
-            "libro": False,
-            "tickets": [],
-            "filtrado": 0.0,
-            "tickets_ok": 0,
-            "cajas": [],
-            "medios": [],
-            "recorte": False,
-        }
+        return _libro_vacio(sucursal_id)
     idx = {str(col).lower(): i for i, col in enumerate(columnas)}
     texto = str(pedido.get("texto") or "")
     nombres: dict[str, str] = {}
@@ -628,7 +638,15 @@ def desglose_articulos(sucursal_id: int | None, fecha_ini: str, fecha_fin: str) 
     else:
         columnas, filas = filas_de("ventas", sucursal_id)
     if not columnas:
-        return {"libro": False, "filas": [], "articulos": 0, "kilos": 0.0, "unidades": 0.0, "monto": 0.0, "tickets": 0}
+        return {
+            "libro": hay_tabla("ventas", sucursal_id),
+            "filas": [],
+            "articulos": 0,
+            "kilos": 0.0,
+            "unidades": 0.0,
+            "monto": 0.0,
+            "tickets": 0,
+        }
     idx = {str(col).lower(): i for i, col in enumerate(columnas)}
     vivas: set[str] = set()
     for fila in filas:

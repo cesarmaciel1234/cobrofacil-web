@@ -89,7 +89,7 @@ def test_desglose_suma_el_dia_y_deja_afuera_la_cancelada(monkeypatch):
         ),
     }
 
-    def falso(tabla, sucursal_id=None):
+    def falso(tabla, sucursal_id=None, desde=None, hasta=None):
         return tablas.get(tabla, ([], []))
 
     monkeypatch.setattr("app.services.pos_historial.filas_de", falso)
@@ -106,3 +106,5 @@ def test_desglose_suma_el_dia_y_deja_afuera_la_cancelada(monkeypatch):
 def test_el_mes_cubre_el_calendario():
     assert rango_fechas("mes", "2026-11-14", False, "2026-11-14") == ("2026-11-01", "2026-11-30")
     assert rango_fechas("dia", "", True, "2026-11-14") == (None, None)
+    assert rango_fechas("semana", "2026-11-16", False, "2026-11-16") == ("2026-11-16", "2026-11-16")
+    assert rango_fechas("semana", "2026-11-18", False, "2026-11-18") == ("2026-11-16", "2026-11-18")

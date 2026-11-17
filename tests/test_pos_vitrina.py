@@ -168,6 +168,50 @@ def test_calcular_vitrina_12_tarjetas(app):
         assert res["cancelaciones"]["monto"] == 5000.0
 
 
+def test_inventario_ignora_stock_de_mostrador_y_el_margen_no_cuenta_costo_cero(app):
+    with app.app_context():
+        hoy_str = datetime.now(_ZONA).date().isoformat()
+        guardar_parte(
+            tabla="productos",
+            sucursal_id=1,
+            columnas=["id", "nombre", "stock", "costo", "precio"],
+            filas=[
+                [1, "Cadril", 1000024.0, 13500.0, 13500.0],
+                [2, "Huevo", 10.0, 1000.0, 1500.0],
+                [3, "Asado", 2.0, 0.0, 8000.0],
+            ],
+            parte=1,
+            partes=1,
+        )
+        guardar_parte(
+            tabla="ventas",
+            sucursal_id=1,
+            columnas=["id", "fecha", "total", "metodo_pago", "estado"],
+            filas=[
+                [201, f"{hoy_str} 10:00:00", 15000.0, "Efectivo", "PAGADO"],
+                [202, f"{hoy_str} 11:00:00", 8000.0, "Efectivo", "PAGADO"],
+            ],
+            parte=1,
+            partes=1,
+        )
+        guardar_parte(
+            tabla="detalles_ventas",
+            sucursal_id=1,
+            columnas=["id", "id_venta", "id_producto", "cantidad", "subtotal"],
+            filas=[
+                [1, 201, 2, 10.0, 15000.0],
+                [2, 202, 3, 1.0, 8000.0],
+            ],
+            parte=1,
+            partes=1,
+        )
+        res = calcular_vitrina(periodo="Hoy", sucursal_id=1)
+        assert res["inventario_costo"]["valor"] == 10000.0
+        assert "no controla" in res["inventario_costo"]["subtitulo"]
+        assert res["ganancia_parcial"]["valor"] == 5000.0
+        assert "sin costo" in res["ganancia_parcial"]["subtitulo"]
+
+
 def test_api_pos_jefe_vitrina_endpoint(auth_client):
     res = auth_client.get("/api/pos/jefe?panel=reporte&periodo=Semana")
     assert res.status_code == 200

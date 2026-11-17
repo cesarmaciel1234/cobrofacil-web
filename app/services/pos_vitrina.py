@@ -189,10 +189,15 @@ def calcular_vitrina(
         col_p, filas_p = filas_de("articulos", sucursal_id)
     idx_p = _indice(col_p)
 
+    # El mostrador deja cerca de un millón de kilos para no cortar la venta.
+    # Ese número no es mercadería en la cámara.
+    _stock_sin_control = 100_000.0
+
     # Mapa de productos por ID
     mapa_costos: dict[str, float] = {}
     mapa_precios: dict[str, float] = {}
     inventario_costo_total = 0.0
+    inventario_sin_control = 0
 
     for fila in filas_p:
         pid = str(_valor(fila, idx_p, "id") or "")
@@ -204,11 +209,16 @@ def calcular_vitrina(
             mapa_costos[pid] = costo
             mapa_precios[pid] = precio
 
+        if stock >= _stock_sin_control:
+            inventario_sin_control += 1
+            continue
         if stock > 0 and costo > 0:
             inventario_costo_total += stock * costo
 
-    # Ganancia parcial & ofertas
+    # Ganancia parcial & ofertas. El artículo sin costo no entra como ganancia del 100%.
     costo_ventas_rango = 0.0
+    venta_con_costo = 0.0
+    venta_sin_costo = 0.0
     hay_costo_cargado = False
     ahorro_ofertas = 0.0
 
@@ -226,6 +236,9 @@ def calcular_vitrina(
             if costo_unit > 0.009:
                 hay_costo_cargado = True
                 costo_ventas_rango += cantidad * costo_unit
+                venta_con_costo += subtotal
+            else:
+                venta_sin_costo += subtotal
 
             precio_unit = mapa_precios.get(id_prod, 0.0)
             if precio_unit > 0:
@@ -233,11 +246,14 @@ def calcular_vitrina(
                 if diferencia > 0.009:
                     ahorro_ofertas += diferencia
 
-    if hay_costo_cargado and total_tickets > 0:
-        ganancia_val = round(total_tickets - costo_ventas_rango, 2)
+    if hay_costo_cargado and venta_con_costo > 0:
+        ganancia_val = round(venta_con_costo - costo_ventas_rango, 2)
         ganancia_txt = _formatear_pesos(ganancia_val)
-        margen = round(ganancia_val / total_tickets * 100, 1)
-        ganancia_sub = f"Margen {margen}% sobre costo"
+        margen = round(ganancia_val / venta_con_costo * 100, 1)
+        if venta_sin_costo > 0.009:
+            ganancia_sub = f"Margen {margen}% · sin costo {_formatear_pesos(venta_sin_costo)}"
+        else:
+            ganancia_sub = f"Margen {margen}%"
     else:
         ganancia_val = None
         ganancia_txt = "Sin costo cargado"
@@ -335,7 +351,11 @@ def calcular_vitrina(
             "titulo": "Inventario al costo",
             "valor": round(inventario_costo_total, 2),
             "texto": _formatear_pesos(inventario_costo_total),
-            "subtitulo": "",
+            "subtitulo": (
+                "Sin el stock que el mostrador no controla"
+                if inventario_sin_control
+                else "Valuación a costo real"
+            ),
         },
         "pagos_clientes": {
             "titulo": "Pagos clientes",

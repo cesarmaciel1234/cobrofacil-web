@@ -17,11 +17,16 @@
 
 ### `pos_base.py`
 - `filas_de(tabla, sucursal_id=None, desde=None, hasta=None)`: Lee el libro. Con fechas, baja solo esos días. Sin fechas, una bajada alcanza para Todas y para cada sucursal. A los 5 segundos pregunta el sello; si no cambió, no vuelve a traer las filas.
-- `preparar_vista(...)`: El reporte del día entra en una lectura (ese día y los catálogos). Si hoy no tiene ventas, queda el día más nuevo. Un trozo que llegó sin sello de día igual cuenta: se mira la fecha de cada venta. Ese recorte no reemplaza el libro entero: Ventas lee el mismo rango.
+- `preparar_vista(...)`: El reporte del día entra en una lectura (ese día y los catálogos). Si hoy no tiene ventas, queda el día más nuevo. Un trozo que llegó sin sello de día igual cuenta: se mira la fecha de cada venta. Ese recorte no reemplaza el libro entero: Ventas lee el mismo rango. Si Todas ya está en memoria, una sucursal sale de ahí y no vuelve vacía.
 - `indice_espejo()` / `tabla_espejo(tabla)`: El teléfono, la PC y la tablet guardan el libro. Bajan la tabla cuyo sello cambió.
 - `enlaces_de_persona(buscado)`: Vincula registros de un cliente en múltiples sucursales por DNI o nombre.
 - `unir_clientes(columnas, filas)`: Agrupa clientes evitando duplicar saldos copiados.
-- `listar_sucursales()`: Descubre sucursales activas en el sistema (`id`, `nombre`, `tickets_count`).
+- `listar_sucursales()`: Descubre sucursales activas en el sistema (`id`, `nombre`). Si ese número ya tiene un solo nombre, el siguiente envío no abre otro.
+
+### `nodo.py`
+- `leer(pieza, ...)`: Devuelve reporte, caja, ventas o cartera ya armados. Si el sello del libro no cambió, no vuelve a calcular.
+- `alimentar()`: En segundo plano arma primero el reporte del día que ya está en el libro y después caja, ventas del mes y cartera.
+- `estado()`: Solo el sello y qué piezas están listas. La PWA lo consulta para saber si hay datos nuevos.
 - `anotar_carga()` / `leer_carga()`: Guardan cuántos tickets del enlace ya llegaron, para la barra de arriba.
 
 ### `pos_jefe.py`
@@ -29,7 +34,7 @@
 - `_pedidos_abastecimiento(sucursal_id)`: Calcula los faltantes de stock y genera el texto para WhatsApp de pedidos a proveedores.
 
 ### `pos_vitrina.py`
-- `calcular_vitrina_12(periodo_dias, sucursal_id)`: Calcula las 12 métricas clave de control de gestión.
+- `calcular_vitrina(...)`: Las 12 tarjetas. El inventario no multiplica el millón de stock que el mostrador deja para no cortar la venta. El margen sale solo de los artículos con costo; el resto se marca aparte.
 
 ### `sync_hub.py`
 - `apply_sync_operations(device_id, operations)`: Aplica lote de operaciones LWW con idempotencia.

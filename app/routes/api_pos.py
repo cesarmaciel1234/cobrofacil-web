@@ -313,6 +313,34 @@ def api_pos_espejo():
     return jsonify(indice_espejo())
 
 
+@api_bp.route("/pos/nodo", methods=["GET"])
+def api_pos_nodo():
+    """Pieza ya armada del libro. La PWA la pide en segundo plano."""
+    from app.services.nodo import estado, filtro_de, leer
+
+    pieza = (request.args.get("pieza") or "estado").strip().lower()
+    sucursal_id = request.args.get("sucursal_id", type=int)
+    if sucursal_id is None:
+        sucursal_id = request.args.get("branch_id", type=int)
+    if pieza == "estado":
+        return jsonify(estado(sucursal_id))
+    filtro = filtro_de(pieza, request.args.to_dict())
+    try:
+        return jsonify(leer(
+            pieza,
+            sucursal_id=sucursal_id,
+            periodo=(request.args.get("periodo") or "Hoy").strip(),
+            desde=request.args.get("desde"),
+            hasta=request.args.get("hasta"),
+            filtro=filtro,
+        ))
+    except ValueError:
+        return jsonify({"error": "Pieza desconocida"}), 400
+    except Exception as exc:
+        current_app.logger.warning("nodo %s no respondió: %s", pieza, type(exc).__name__)
+        return jsonify({"ok": False, "libro": False, "error": "La base no responde en este momento."}), 503
+
+
 @api_bp.route("/pos/espejo/tabla", methods=["GET"])
 def api_pos_espejo_tabla():
     """Una tabla del libro, para guardarla en el teléfono, la PC o la tablet."""
@@ -322,6 +350,28 @@ def api_pos_espejo_tabla():
         return jsonify(tabla_espejo(request.args.get("tabla") or ""))
     except ValueError as exc:
         return jsonify({"error": str(exc)}), 400
+
+
+@api_bp.route("/pos/espejo/delta", methods=["GET"])
+def api_pos_espejo_delta():
+    """
+    Delta de cambios en el espejo desde un sello dado.
+    Devuelve solo las tablas que cambiaron, optimizando ancho de banda.
+    Soporta compresión gzip/brotli vía headers del servidor Flask.
+    """
+    from app.services.pos_base import delta_espejo
+
+    sello_desde = (request.args.get("sello") or "").strip().replace(" ", "+")
+    try:
+        response = jsonify(delta_espejo(sello_desde))
+        # El servidor Flask/Render comprime automáticamente si el cliente Accept-Encoding incluye gzip/br
+        # Forzamos que se envíe el content-type correcto
+        response.headers['Content-Type'] = 'application/json; charset=utf-8'
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        return response
+    except Exception as exc:
+        current_app.logger.warning("delta espejo falló: %s", type(exc).__name__)
+        return jsonify({"ok": False, "error": str(exc)}), 500
 
 
 @api_bp.route("/pos/base", methods=["GET"])
@@ -461,12 +511,14 @@ def api_pos_jefe():
     desde = request.args.get("desde")
     hasta = request.args.get("hasta")
     filtro = None
-    if nombre in ("ticket", "contabilidad"):
+    if nombre in ("ticket", "contabilidad", "desglose"):
         filtro = {
             "texto": request.args.get("q") or "",
             "metodo": request.args.get("pago") or "TODOS",
             "alcance": request.args.get("alcance") or "dia",
             "fecha": request.args.get("fecha") or "",
+            "fecha_ini": request.args.get("fecha_ini") or "",
+            "fecha_fin": request.args.get("fecha_fin") or "",
             "historico": request.args.get("historico") in ("1", "true", "si"),
             "hora_desde": request.args.get("hora_desde") or "00:00",
             "hora_hasta": request.args.get("hora_hasta") or "23:59",

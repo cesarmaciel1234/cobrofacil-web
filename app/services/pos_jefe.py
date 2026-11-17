@@ -1089,7 +1089,7 @@ def _armar_panel(
     ini = desde_iso[:10]
     fin = hasta_iso[:10]
     hoy_real = datetime.now(_ZONA).date().isoformat()
-    if nombre == "ticket":
+    if nombre in ("ticket", "desglose"):
         pedido = dict(filtro or {})
         if pedido.get("fecha_ini"):
             ini = str(pedido.get("fecha_ini"))[:10]
@@ -1114,11 +1114,18 @@ def _armar_panel(
         fin = max(dias) if dias else hoy_real
     elif nombre_periodo == "Hoy":
         ini = fin = preparar_vista(sucursal_id, hoy_real, hoy_real, desplazar_hoy=True)
-        ventas, _idx = _ventas(sucursal_id, desde=ini, hasta=fin)
+        d0 = datetime.fromisoformat(ini).date()
+        ant_ini = (d0 - timedelta(days=1)).isoformat()
+        ventas, _idx = _ventas(sucursal_id, desde=ant_ini, hasta=fin)
     else:
         preparar_vista(sucursal_id, ini, fin, desplazar_hoy=False)
-        ventas, _idx = _ventas(sucursal_id, desde=ini, hasta=fin)
+        d0 = datetime.fromisoformat(ini).date()
+        d1 = datetime.fromisoformat(fin).date()
+        duracion = (d1 - d0).days + 1
+        ant_ini = (d0 - timedelta(days=duracion)).isoformat()
+        ventas, _idx = _ventas(sucursal_id, desde=ant_ini, hasta=fin)
     dia_activo = ini
+    libro_ini, libro_fin = ini, fin
 
     resumen = _resumen(ventas, ini, fin) if ventas else {
         "dia": ini, "ventas": 0.0, "tickets": 0, "promedio": 0.0, "pago": "", "es_hoy": (ini == hoy_real)
@@ -1156,6 +1163,30 @@ def _armar_panel(
             "panel": "desglose",
             "resumen": resumen,
             "desglose": {**libro, "etiqueta": etiqueta, "periodo": nombre_periodo},
+            "sucursales": sucursales_disp,
+            "sucursal_id": sucursal_id,
+        }
+
+    if nombre == "ticket":
+        pedido = dict(filtro or {})
+        if (
+            str(pedido.get("alcance") or "dia").lower() == "dia"
+            and not pedido.get("historico")
+            and not pedido.get("fecha_ini")
+        ):
+            pedido["fecha_ini"] = libro_ini
+            pedido["fecha_fin"] = libro_fin
+        libro = historial_ventas(sucursal_id, pedido, datetime.now(_ZONA).date().isoformat())
+        return {
+            "ok": True,
+            "libro": libro["libro"],
+            "panel": nombre,
+            "resumen": resumen,
+            "tickets": libro["tickets"],
+            "filtrado": libro["filtrado"],
+            "tickets_ok": libro["tickets_ok"],
+            "cajas": libro["cajas"],
+            "recorte": libro["recorte"],
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }
@@ -1222,6 +1253,9 @@ def _armar_panel(
             pedido["fecha_fin"] = hasta_iso[:10]
             ini, fin = pedido["fecha_ini"], pedido["fecha_fin"]
             if nombre_periodo == "Hoy":
+                ini, fin = libro_ini, libro_fin
+                pedido["fecha_ini"] = ini
+                pedido["fecha_fin"] = fin
                 etiqueta = "Hoy · " + ini
             elif nombre_periodo == "Período":
                 etiqueta = "Período · " + ini + (" → " + fin if fin != ini else "")
@@ -1250,21 +1284,6 @@ def _armar_panel(
                 etiqueta,
             ),
             "desglose_sucursales": desglose_suc,
-            "sucursales": sucursales_disp,
-            "sucursal_id": sucursal_id,
-        }
-    if nombre == "ticket":
-        libro = historial_ventas(sucursal_id, filtro, datetime.now(_ZONA).date().isoformat())
-        return {
-            "ok": True,
-            "libro": libro["libro"],
-            "panel": nombre,
-            "resumen": resumen,
-            "tickets": libro["tickets"],
-            "filtrado": libro["filtrado"],
-            "tickets_ok": libro["tickets_ok"],
-            "cajas": libro["cajas"],
-            "recorte": libro["recorte"],
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }

@@ -282,7 +282,7 @@ const $ = id => document.getElementById(id);
         let isProMode = true;
         let selectedDeuda = null;
         let selectedAuditId = null;
-        let sessionUser = { role: 'admin', username: 'jefe', empresa_id: 1, empresa_nombre: '' };
+        let sessionUser = { role: 'admin', username: '', empresa_id: 1, empresa_nombre: '' };
 
         let histPagosFiltro = '';
         let activeRowIndex = -1;
@@ -305,8 +305,11 @@ const $ = id => document.getElementById(id);
             franja: false,
             hora_desde: '08:00',
             hora_hasta: '21:00',
-            caja: ''
+            caja: '',
+            desde: '',
+            hasta: ''
         };
+        let redCrm = { enLinea: true, sync: '' };
         let cajaPantalla = 'arqueo';
         let periodoDigital = 'Semana';
         let periodoDigitalDesde = '';
@@ -2017,7 +2020,7 @@ const $ = id => document.getElementById(id);
             } catch (_) {}
             return {
                 role: localStorage.getItem('session_role') || 'admin',
-                username: localStorage.getItem('sync_user') || 'jefe',
+                username: localStorage.getItem('sync_user') || '',
                 empresa_id: parseInt(localStorage.getItem('sync_empresa') || '1', 10),
                 empresa_nombre: localStorage.getItem('session_empresa_nombre') || '',
             };
@@ -2039,8 +2042,8 @@ const $ = id => document.getElementById(id);
             if (typeof actualizarNombreEmpresaTopbar === 'function') {
                 actualizarNombreEmpresaTopbar();
             } else {
-                const etiqueta = (sessionUser.empresa_nombre || sessionUser.username || '').toUpperCase();
-                if (etiqueta && nameEl.textContent !== etiqueta) nameEl.textContent = etiqueta;
+                const etiqueta = (sessionUser.empresa_nombre || '').toUpperCase();
+                if (etiqueta && etiqueta !== 'JEFE' && nameEl.textContent !== etiqueta) nameEl.textContent = etiqueta;
             }
         }
 
@@ -2062,7 +2065,7 @@ const $ = id => document.getElementById(id);
                 if (s.authenticated === false) throw new Error('no autenticado');
                 sessionUser = {
                     role: s.role || 'admin',
-                    username: s.username || 'jefe',
+                    username: s.username || '',
                     empresa_id: s.empresa_id || 1,
                     empresa_nombre: s.empresa_nombre || '',
                 };
@@ -2283,6 +2286,17 @@ const $ = id => document.getElementById(id);
 
         function plataJefe(n) {
             return '$' + Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function porcentajesQueCierran(montos) {
+            const total = montos.reduce((acc, n) => acc + (Number(n) || 0), 0);
+            if (total <= 0) return montos.map(() => '0,0');
+            const milesimas = montos.map((n) => ((Number(n) || 0) / total) * 1000);
+            const base = milesimas.map((n) => Math.floor(n));
+            let resto = 1000 - base.reduce((acc, n) => acc + n, 0);
+            const orden = milesimas.map((n, i) => ({ i: i, frac: n - Math.floor(n) })).sort((a, b) => b.frac - a.frac);
+            for (let k = 0; k < resto; k++) base[orden[k % orden.length].i] += 1;
+            return base.map((n) => (n / 10).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
         }
 
         function cantidadJefe(n) {
@@ -2541,9 +2555,51 @@ const $ = id => document.getElementById(id);
             return ahora.getFullYear() + '-' + mes + '-' + dia;
         }
 
+        function fechaVisible(iso) {
+            const texto = String(iso || '').slice(0, 10);
+            if (texto.length === 10 && texto[4] === '-') return texto.slice(8, 10) + '/' + texto.slice(5, 7) + '/' + texto.slice(0, 4);
+            return '';
+        }
+
+        function parseFechaAR(texto) {
+            const partes = String(texto || '').trim().split('/');
+            if (partes.length !== 3) return '';
+            const dia = partes[0].padStart(2, '0');
+            const mes = partes[1].padStart(2, '0');
+            const anio = partes[2];
+            if (anio.length !== 4 || Number(mes) < 1 || Number(mes) > 12 || Number(dia) < 1 || Number(dia) > 31) return '';
+            return anio + '-' + mes + '-' + dia;
+        }
+
+        function escribirFechaAR(input) {
+            const digitos = String(input.value || '').replace(/\D/g, '').slice(0, 8);
+            let salida = digitos;
+            if (digitos.length > 4) salida = digitos.slice(0, 2) + '/' + digitos.slice(2, 4) + '/' + digitos.slice(4);
+            else if (digitos.length > 2) salida = digitos.slice(0, 2) + '/' + digitos.slice(2);
+            input.value = salida;
+        }
+
+        function etiquetaPeriodoVentas() {
+            const f = filtroVentas;
+            if (f.historico) return 'Todas';
+            if (f.alcance === 'semana') return 'Semana';
+            if (f.alcance === 'mes') return 'Mes';
+            if (f.alcance === 'periodo') {
+                const desde = fechaVisible(f.desde || f.fecha);
+                const hasta = fechaVisible(f.hasta || f.desde || f.fecha);
+                return desde && hasta && desde !== hasta ? (desde + ' → ' + hasta) : (desde || 'Período');
+            }
+            return 'Hoy';
+        }
+
+        function pintarChipPeriodo(id, texto) {
+            const nodo = $(id);
+            if (nodo && texto) nodo.textContent = texto;
+        }
+
         function claveFiltroVentas() {
             const f = filtroVentas;
-            return [f.q, f.pago, f.alcance, f.fecha, f.historico ? '1' : '0', f.franja ? '1' : '0', f.hora_desde, f.hora_hasta, f.caja].join('|');
+            return [f.q, f.pago, f.alcance, f.fecha, f.desde, f.hasta, f.historico ? '1' : '0', f.franja ? '1' : '0', f.hora_desde, f.hora_hasta, f.caja].join('|');
         }
 
         function queryFiltroVentas() {
@@ -2551,9 +2607,17 @@ const $ = id => document.getElementById(id);
             let extra = '';
             if (f.q) extra += '&q=' + encodeURIComponent(f.q);
             if (f.pago && f.pago !== 'TODOS') extra += '&pago=' + encodeURIComponent(f.pago);
-            if (f.alcance && f.alcance !== 'dia') extra += '&alcance=' + encodeURIComponent(f.alcance);
-            if (f.fecha) extra += '&fecha=' + encodeURIComponent(f.fecha);
             if (f.historico) extra += '&historico=1';
+            else if (f.alcance === 'periodo') {
+                extra += '&alcance=periodo';
+                if (f.desde) extra += '&fecha_ini=' + encodeURIComponent(f.desde);
+                if (f.hasta || f.desde) extra += '&fecha_fin=' + encodeURIComponent(f.hasta || f.desde);
+            } else if (f.alcance && f.alcance !== 'dia') {
+                extra += '&alcance=' + encodeURIComponent(f.alcance);
+                if (f.fecha) extra += '&fecha=' + encodeURIComponent(f.fecha);
+            } else if (f.fecha) {
+                extra += '&fecha=' + encodeURIComponent(f.fecha);
+            }
             if (f.franja) {
                 extra += '&hora_desde=' + encodeURIComponent(f.hora_desde || '00:00');
                 extra += '&hora_hasta=' + encodeURIComponent(f.hora_hasta || '23:59');
@@ -2567,7 +2631,8 @@ const $ = id => document.getElementById(id);
             const hoy = hoyLocal();
             const mesDistinto = f.alcance === 'mes' && f.fecha && f.fecha.slice(0, 7) !== hoy.slice(0, 7);
             return !!(f.q || (f.pago && f.pago !== 'TODOS') || f.historico || f.caja || f.franja
-                || f.alcance !== 'mes' || mesDistinto);
+                || f.alcance === 'semana' || f.alcance === 'periodo' || f.alcance === 'dia'
+                || mesDistinto);
         }
 
         function mostrarPantallaVentas() {
@@ -2598,12 +2663,17 @@ const $ = id => document.getElementById(id);
             if (!cuerpo) return;
             const libro = (dato && dato.desglose) || { filas: [], articulos: 0, kilos: 0, unidades: 0, monto: 0, etiqueta: '' };
             const filas = libro.filas || [];
+            const periodoTxt = etiquetaPeriodoVentas();
+            pintarChipPeriodo('ticketPeriodo', periodoTxt);
             if (!dato || dato.libro === false) {
-                cuerpo.innerHTML = '<p class="caja-vacio" style="padding:14px;">El libro todavía no llegó.</p>';
+                cuerpo.innerHTML = '<p class="caja-vacio" style="padding:14px;">El libro de Cobro Fácil todavía no llegó a la nube para esta sucursal. Cuando termine el envío, este número sale de ahí.</p>';
                 return;
             }
             if (!filas.length) {
-                cuerpo.innerHTML = `<p class="desglose-fecha">${textoJefe(libro.etiqueta || '')}</p><p class="caja-vacio" style="padding:14px;">Sin artículos en este período.</p>`;
+                const vacio = periodoTxt === 'Hoy'
+                    ? 'Hoy todavía no tiene ventas registradas.'
+                    : ('Sin artículos en ' + periodoTxt + '.');
+                cuerpo.innerHTML = `<p class="desglose-fecha">${textoJefe(libro.etiqueta || periodoTxt)}</p><p class="caja-vacio" style="padding:14px;">${textoJefe(vacio)}</p>`;
                 return;
             }
             const lista = filas.map((fila, i) => `<div class="desglose-fila"><span class="nro">${i + 1}</span><b>${textoJefe(fila.nombre)}</b><span class="cant">${textoJefe(medidaJefe(fila.cantidad, fila.medida))}</span><strong>${plataJefe(fila.monto)}</strong></div>`).join('');
@@ -2615,16 +2685,21 @@ const $ = id => document.getElementById(id);
             const cuerpo = $('ticketCuerpo');
             const suma = $('ticketFiltro');
             if (!cuerpo) return;
+            const periodoTxt = etiquetaPeriodoVentas();
+            pintarChipPeriodo('ticketPeriodo', periodoTxt);
             if (suma) {
                 const extra = ticketsResumen.recorte ? ' · los 400 más nuevos' : '';
                 suma.textContent = (ticketsEnPantalla.length || ticketsResumen.ok)
-                    ? ('Filtrado ' + plataJefe(ticketsResumen.total) + ' · ' + ticketsResumen.ok + ' tickets' + extra)
-                    : 'Filtrado $0,00';
+                    ? (periodoTxt + ' · ' + plataJefe(ticketsResumen.total) + ' · ' + ticketsResumen.ok + ' tickets' + extra)
+                    : (periodoTxt + ' · $0,00');
             }
             cuerpo.innerHTML = ticketsEnPantalla.length
                 ? ticketsEnPantalla.map((t) => {
                     const cancel = String(t.estado || '').toUpperCase().startsWith('CANCELAD');
-                    return `<tr class="ticket-fila${cancel ? ' ticket-cancel' : ''}" data-ticket="${textoJefe(t.id)}"><td>${textoJefe((t.fecha || '').slice(11, 16))}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(cancel ? 'Cancelada' : (t.pago || '—'))}</td><td>${plataJefe(t.total)}</td></tr>`;
+                    const dia = (t.fecha || '').slice(0, 10);
+                    const hora = (t.fecha || '').slice(11, 16);
+                    const cuando = (dia && dia !== hoyLocal()) ? (fechaVisible(dia) + ' ' + hora) : hora;
+                    return `<tr class="ticket-fila${cancel ? ' ticket-cancel' : ''}" data-ticket="${textoJefe(t.id)}"><td>${textoJefe(cuando)}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(cancel ? 'Cancelada' : (t.pago || '—'))}</td><td>${plataJefe(t.total)}</td></tr>`;
                 }).join('')
                 : `<tr><td colspan="4">${textoJefe(ticketsAviso || 'Sin tickets con ese filtro.')}</td></tr>`;
         }
@@ -2657,7 +2732,26 @@ const $ = id => document.getElementById(id);
             document.body.appendChild(fondo);
             const hoja = fondo.querySelector('.pedido-sheet');
             try {
-                const dato = await fetch('/api/pos/ticket?id=' + encodeURIComponent(id)).then((r) => r.json());
+                let dato = null;
+                if (window.Espejo && Espejo.ticket) {
+                    const localT = Espejo.ticket(id);
+                    if (localT) {
+                        dato = {
+                            encontrado: true,
+                            id: localT.id,
+                            fecha: localT.fecha,
+                            total: localT.total,
+                            pago: localT.pago,
+                            estado: localT.estado,
+                            usuario: '',
+                            caja: '',
+                            items: (localT.items || []).map((i) => ({ nombre: i.producto, cantidad: i.cantidad, subtotal: i.subtotal }))
+                        };
+                    }
+                }
+                if (!dato) {
+                    dato = await fetch('/api/pos/ticket?id=' + encodeURIComponent(id)).then((r) => r.json());
+                }
                 if (!hoja) return;
                 if (!dato.encontrado) {
                     hoja.innerHTML = `<strong class="pedido-sheet-titulo">Ticket #${textoJefe(id)}</strong><p>Ese ticket todavía no está en la nube.</p><button type="button" class="pedido-cerrar" data-cerrar>Cerrar</button>`;
@@ -2686,9 +2780,17 @@ const $ = id => document.getElementById(id);
 
         function modoFiltroVentas(f) {
             if (f.historico) return 'todas';
+            if (f.alcance === 'semana') return 'semana';
             if (f.alcance === 'mes') return 'mes';
-            if (f.fecha && f.fecha !== hoyLocal()) return 'fecha';
+            if (f.alcance === 'periodo') return 'periodo';
             return 'hoy';
+        }
+
+        function avisoSinTickets(libroLlego) {
+            const periodoTxt = etiquetaPeriodoVentas();
+            if (!libroLlego) return 'El libro de Cobro Fácil todavía no llegó a la nube para esta sucursal. Cuando termine el envío, este número sale de ahí.';
+            if (periodoTxt === 'Hoy') return 'Hoy todavía no tiene ventas registradas.';
+            return 'Sin tickets en ' + periodoTxt + '.';
         }
 
         function abrirFiltroVentas() {
@@ -2713,11 +2815,15 @@ const $ = id => document.getElementById(id);
                 <label>Buscar folio, producto o cajero<input id="filtroQ" type="search" value="${textoJefe(f.q)}" placeholder="1024, asado o cajero"></label>
                 <div class="filtro-periodos" role="group" aria-label="Período">
                     <button type="button" class="filtro-periodo${modo === 'hoy' ? ' active' : ''}" data-modo="hoy">Hoy</button>
+                    <button type="button" class="filtro-periodo${modo === 'semana' ? ' active' : ''}" data-modo="semana">Semana</button>
                     <button type="button" class="filtro-periodo${modo === 'mes' ? ' active' : ''}" data-modo="mes">Mes</button>
-                    <button type="button" class="filtro-periodo${modo === 'fecha' ? ' active' : ''}" data-modo="fecha">Fecha</button>
+                    <button type="button" class="filtro-periodo${modo === 'periodo' ? ' active' : ''}" data-modo="periodo">Período</button>
                     <button type="button" class="filtro-periodo${modo === 'todas' ? ' active' : ''}" data-modo="todas">Todas</button>
                 </div>
-                <label id="filtroFechaCampo" ${modo === 'hoy' || modo === 'todas' ? 'hidden' : ''}>${modo === 'mes' ? 'Mes' : 'Día'}<input id="filtroFecha" type="date" value="${textoJefe(f.fecha || hoyLocal())}"></label>
+                <div class="filtro-horas" id="filtroFechaCampo"${modo === 'periodo' ? '' : ' hidden'}>
+                    <label>Desde<input id="filtroFechaDesde" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" value="${textoJefe(fechaVisible(f.desde || f.fecha || hoyLocal()))}"></label>
+                    <label>Hasta<input id="filtroFechaHasta" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" value="${textoJefe(fechaVisible(f.hasta || f.desde || f.fecha || hoyLocal()))}"></label>
+                </div>
                 <label>Pago<select id="filtroPago">${pagos.map((op) => `<option value="${op}"${op === (f.pago || 'TODOS') ? ' selected' : ''}>${rotulos[op]}</option>`).join('')}</select></label>
                 <button type="button" class="pedido-cerrar" data-aplicar>Aplicar</button>
             </div>`;
@@ -2726,11 +2832,11 @@ const $ = id => document.getElementById(id);
                     boton.classList.toggle('active', boton.dataset.modo === elegido);
                 });
                 const campo = fondo.querySelector('#filtroFechaCampo');
-                if (!campo) return;
-                const visible = elegido === 'mes' || elegido === 'fecha';
-                campo.hidden = !visible;
-                campo.firstChild.textContent = elegido === 'mes' ? 'Mes' : 'Día';
+                if (campo) campo.hidden = elegido !== 'periodo';
             }
+            fondo.querySelectorAll('#filtroFechaDesde, #filtroFechaHasta').forEach((input) => {
+                input.addEventListener('input', () => escribirFechaAR(input));
+            });
             fondo.addEventListener('click', (ev) => {
                 const tuerca = ev.target.closest('[data-franja]');
                 if (tuerca) {
@@ -2747,24 +2853,28 @@ const $ = id => document.getElementById(id);
                     return;
                 }
                 if (ev.target.closest('[data-aplicar]')) {
-                    const elegido = fondo.querySelector('.filtro-periodo.active')?.dataset.modo || 'hoy';
-                    const fecha = fondo.querySelector('#filtroFecha')?.value || hoyLocal();
+                    const elegido = fondo.querySelector('.filtro-periodo.active')?.dataset.modo || 'mes';
+                    const desde = parseFechaAR(fondo.querySelector('#filtroFechaDesde')?.value) || hoyLocal();
+                    const hasta = parseFechaAR(fondo.querySelector('#filtroFechaHasta')?.value) || desde;
                     const franja = fondo.querySelector('.filtro-tuerca')?.classList.contains('active');
+                    const alcance = elegido === 'mes' ? 'mes' : (elegido === 'semana' ? 'semana' : (elegido === 'periodo' ? 'periodo' : 'dia'));
                     filtroVentas = {
                         q: (fondo.querySelector('#filtroQ')?.value || '').trim(),
                         pago: fondo.querySelector('#filtroPago')?.value || 'TODOS',
-                        alcance: elegido === 'mes' ? 'mes' : 'dia',
-                        fecha: elegido === 'todas' ? '' : (elegido === 'hoy' ? hoyLocal() : fecha),
+                        alcance: elegido === 'todas' ? 'mes' : alcance,
+                        fecha: elegido === 'hoy' ? hoyLocal() : (elegido === 'periodo' ? desde : ''),
                         historico: elegido === 'todas',
                         franja: !!franja,
                         hora_desde: franja ? (fondo.querySelector('#filtroDesde')?.value || '08:00') : '08:00',
                         hora_hasta: franja ? (fondo.querySelector('#filtroHasta')?.value || '21:00') : '21:00',
-                        caja: ''
+                        caja: '',
+                        desde: elegido === 'periodo' ? desde : '',
+                        hasta: elegido === 'periodo' ? hasta : ''
                     };
                     cerrarTicket();
                     const refresh = $('btnRefresh');
                     if (refresh) refresh.classList.toggle('filtrando', filtroVentasActivo());
-                    void cargarJefe('ticket');
+                    void cargarJefe(ventasPantalla === 'desglose' ? 'desglose' : 'ticket');
                     return;
                 }
                 if (ev.target === fondo) cerrarTicket();
@@ -3007,10 +3117,11 @@ const $ = id => document.getElementById(id);
                     baseEmpresa = (JSON.parse(localStorage.getItem('empresa_datos') || '{}').nombre) || '';
                 } catch (_) {}
             }
-            if (!baseEmpresa && typeof sessionUser !== 'undefined' && sessionUser) {
-                baseEmpresa = sessionUser.empresa || sessionUser.username || '';
+            if (!baseEmpresa) {
+                const puesto = (nomEl.textContent || '').trim();
+                if (puesto && puesto.toUpperCase() !== 'JEFE') baseEmpresa = puesto;
             }
-            if (!baseEmpresa) baseEmpresa = 'MACIEL';
+            if (!baseEmpresa) return;
             const elegida = sucursalesConocidas.find((s) => String(s.id) === String(activeSucursalId));
             if (elegida) {
                 nomEl.textContent = baseEmpresa.toUpperCase() + ' · ' + elegida.nombre.toUpperCase();
@@ -3247,11 +3358,14 @@ const $ = id => document.getElementById(id);
                     ${modos.map((nombre) => `<button type="button" class="filtro-periodo${nombre === actual ? ' active' : ''}" data-modo="${nombre}">${nombre}</button>`).join('')}
                 </div>
                 <div class="filtro-horas" id="filtroRango"${actual === 'Período' ? '' : ' hidden'}>
-                    <label>Desde<input id="filtroDesdeDia" type="date" value="${textoJefe(opciones.desde || hoy)}"></label>
-                    <label>Hasta<input id="filtroHastaDia" type="date" value="${textoJefe(opciones.hasta || hoy)}"></label>
+                    <label>Desde<input id="filtroDesdeDia" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" value="${textoJefe(fechaVisible(opciones.desde || hoy))}"></label>
+                    <label>Hasta<input id="filtroHastaDia" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" value="${textoJefe(fechaVisible(opciones.hasta || hoy))}"></label>
                 </div>
                 <button type="button" class="pedido-cerrar" data-aplicar>Aplicar</button>
             </div>`;
+            fondo.querySelectorAll('#filtroDesdeDia, #filtroHastaDia').forEach((input) => {
+                input.addEventListener('input', () => escribirFechaAR(input));
+            });
             fondo.addEventListener('click', (ev) => {
                 const periodo = ev.target.closest('[data-modo]');
                 if (periodo) {
@@ -3264,8 +3378,8 @@ const $ = id => document.getElementById(id);
                 }
                 if (ev.target.closest('[data-aplicar]')) {
                     const elegido = fondo.querySelector('.filtro-periodo.active')?.dataset.modo || 'Hoy';
-                    const desde = fondo.querySelector('#filtroDesdeDia')?.value || hoy;
-                    const hasta = fondo.querySelector('#filtroHastaDia')?.value || hoy;
+                    const desde = parseFechaAR(fondo.querySelector('#filtroDesdeDia')?.value) || hoy;
+                    const hasta = parseFechaAR(fondo.querySelector('#filtroHastaDia')?.value) || desde;
                     cerrarTicket();
                     opciones.alAplicar(elegido, desde, hasta);
                     return;
@@ -3377,7 +3491,71 @@ const $ = id => document.getElementById(id);
             window.vitrinaPeriodo = periodoPedido;
             window.vitrinaDesde = desdePedido;
             window.vitrinaHasta = hastaPedido;
+
+            // 1. Consulta al Espejo local de base de datos primero (0ms, sin peticiones bloqueantes a la nube)
+            let datoEspejo = null;
+            if (window.Espejo && Espejo.tieneDatos && Espejo.tieneDatos()) {
+                try {
+                    if (panel === 'reporte' || panel === 'jefe') {
+                        datoEspejo = Espejo.resumenJefe(window.vitrinaPeriodo, window.vitrinaDesde, window.vitrinaHasta, activeSucursalId);
+                    } else if (panel === 'ticket') {
+                        const rango = Espejo.rangoVentas(filtroVentas);
+                        const lista = Espejo.listar(null, rango[0], rango[1], activeSucursalId);
+                        datoEspejo = {
+                            ok: true, libro: true, panel: 'ticket',
+                            filtrado: lista.total, tickets_ok: lista.cant,
+                            tickets: lista.tickets, recorte: lista.recorte,
+                            resumen: {
+                                ventas: lista.total, tickets: lista.cant,
+                                promedio: lista.cant ? Math.round(lista.total / lista.cant * 100) / 100 : 0,
+                                dia: rango[0] && rango[1] ? (rango[0] === rango[1] ? rango[0] : (rango[0] + ' → ' + rango[1])) : ''
+                            }
+                        };
+                    } else if (panel === 'desglose') {
+                        const rango = Espejo.rangoVentas(filtroVentas);
+                        const art = Espejo.desglose(rango[0], rango[1], activeSucursalId);
+                        if (art) {
+                            datoEspejo = {
+                                ok: true, libro: true, panel: 'desglose',
+                                desglose: Object.assign({}, art, { etiqueta: etiquetaPeriodoVentas() }),
+                                resumen: { ventas: art.monto, tickets: art.tickets }
+                            };
+                        }
+                    } else if (panel === 'contabilidad') {
+                        datoEspejo = Espejo.contabilidad(periodoCaja || 'Hoy', periodoCajaDesde, periodoCajaHasta, activeSucursalId);
+                    } else if (panel === 'cartera' || panel === 'admin') {
+                        datoEspejo = Espejo.cartera(activeSucursalId);
+                    }
+                } catch (errEspejo) {
+                    console.warn('[PWA] Error consultando espejo local:', errEspejo);
+                }
+            }
+
+            if (datoEspejo && datoEspejo.libro) {
+                habiaLocal = true;
+                aplicarDatosJefe(panel, datoEspejo, false);
+                marcarRed(true, "Espejo local · " + textoSync(Espejo.sello()));
+                if (window.EspejoEngine && EspejoEngine.syncDelta) {
+                    void EspejoEngine.syncDelta();
+                }
+                if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
+                return;
+            }
+
+            if (window.Nodo && ['reporte', 'contabilidad', 'ticket', 'desglose', 'cartera', 'admin'].includes(panel)) {
+                const pieza = piezaNodo(panel);
+                const consulta = consultaNodo(panel);
+                const previo = Nodo.tomar(pieza, consulta);
+                if (previo && !panelGuardadoVacio(previo)) {
+                    habiaLocal = true;
+                    aplicarDatosJefe(panel, previo, false);
+                }
+                void Nodo.encargar(pieza, consulta);
+                if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
+                return;
+            }
             if (!navigator.onLine) {
+                marcarRed(false);
                 if (!habiaLocal) aplicarDatosJefe(panel, { libro: false }, false);
                 return;
             }
@@ -3399,11 +3577,7 @@ const $ = id => document.getElementById(id);
                     if (periodoCaja === 'Período' && periodoCajaHasta) url += '&hasta=' + encodeURIComponent(periodoCajaHasta);
                 }
                 if (panel === 'ticket') url += queryFiltroVentas();
-                if (panel === 'desglose') {
-                    url += '&periodo=' + encodeURIComponent(periodoDesglose || 'Hoy');
-                    if (periodoDesglose === 'Período' && periodoDesgloseDesde) url += '&desde=' + encodeURIComponent(periodoDesgloseDesde);
-                    if (periodoDesglose === 'Período' && periodoDesgloseHasta) url += '&hasta=' + encodeURIComponent(periodoDesgloseHasta);
-                }
+                if (panel === 'desglose') url += queryFiltroVentas();
                 if (activeSucursalId !== null && activeSucursalId !== undefined) {
                     url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
                 }
@@ -3417,9 +3591,12 @@ const $ = id => document.getElementById(id);
             if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
             if (token !== jefeCargaToken) return;
             if (!dato) {
+                marcarRed(false);
                 if (!habiaLocal) aplicarDatosJefe(panel, { libro: false }, false);
                 return;
             }
+            const syncTxt = (dato.vitrina && dato.vitrina.actualizado_en_texto) || textoSync(dato.actualizado_en);
+            marcarRed(true, syncTxt);
             const mismoLibro = listo && dato.actualizado_en && dato.actualizado_en === listo.marca;
             panelesListos.set(clave, { marca: dato.actualizado_en || '', dato: dato });
             guardarPanelJefe(clave, dato);
@@ -3886,13 +4063,47 @@ const $ = id => document.getElementById(id);
             }
         }
 
+        function espejoTieneFilas(libro) {
+            return !!(libro && (libro.sucursales || []).some((suc) => (suc.filas || []).length));
+        }
+
+        function piezaNodo(panel) {
+            if (panel === 'admin' || panel === 'cartera') return 'cartera';
+            if (panel === 'caja') return 'contabilidad';
+            return panel;
+        }
+
+        function consultaNodo(panel) {
+            let q = '';
+            if (panel === 'reporte') {
+                const periodo = window.vitrinaPeriodo || 'Hoy';
+                q = 'periodo=' + encodeURIComponent(periodo);
+                if (periodo === 'Período' && window.vitrinaDesde) q += '&desde=' + encodeURIComponent(window.vitrinaDesde);
+                if (periodo === 'Período' && window.vitrinaHasta) q += '&hasta=' + encodeURIComponent(window.vitrinaHasta);
+            } else if (panel === 'contabilidad') {
+                q = 'periodo=' + encodeURIComponent(periodoCaja || 'Hoy');
+                if (periodoCaja === 'Período' && periodoCajaDesde) q += '&desde=' + encodeURIComponent(periodoCajaDesde);
+                if (periodoCaja === 'Período' && periodoCajaHasta) q += '&hasta=' + encodeURIComponent(periodoCajaHasta);
+            } else if (panel === 'ticket' || panel === 'desglose') {
+                q = queryFiltroVentas().replace(/^&/, '');
+            }
+            if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                q += (q ? '&' : '') + 'sucursal_id=' + encodeURIComponent(activeSucursalId);
+            }
+            return q;
+        }
+
         function cruzarConEspejo(panel, dato) {
+            dato = dato || {};
+            if (dato.nodo) return dato;
             const libro = window.Espejo && Espejo.ventas ? Espejo.ventas() : null;
-            if (!libro || !libro.sucursales || !dato) return dato;
-            if (libro.sello && dato.actualizado_en && libro.sello < dato.actualizado_en) return dato;
+            if (!espejoTieneFilas(libro)) return dato;
+            const serverMasNuevo = !!(libro.sello && dato.actualizado_en && libro.sello < dato.actualizado_en);
             if (panel === 'reporte' || panel === 'jefe') {
+                if (serverMasNuevo && dato.vitrina && dato.vitrina.tickets && Number(dato.vitrina.tickets.cant) > 0) return dato;
                 const rango = Espejo.rangoPeriodo(window.vitrinaPeriodo, window.vitrinaDesde, window.vitrinaHasta);
                 const suma = Espejo.sumar(libro, rango[0], rango[1], activeSucursalId);
+                if (!suma.cant && dato.vitrina && dato.vitrina.tickets && Number(dato.vitrina.tickets.cant) > 0) return dato;
                 if (!dato.vitrina) dato.vitrina = {};
                 dato.vitrina.tickets = Object.assign({}, dato.vitrina.tickets || {}, {
                     cant: suma.cant,
@@ -3904,21 +4115,35 @@ const $ = id => document.getElementById(id);
                     dato.resumen.tickets = suma.cant;
                     dato.resumen.promedio = suma.cant ? Math.round((suma.total / suma.cant) * 100) / 100 : 0;
                 }
+                dato.libro = true;
             }
             const filtroEstrecho = filtroVentas.q || filtroVentas.franja || filtroVentas.caja || (filtroVentas.pago && filtroVentas.pago !== 'TODOS');
-            if (panel === 'ticket' && !filtroEstrecho) {
+            if ((panel === 'ticket' || panel === 'desglose') && !filtroEstrecho) {
                 const rango = Espejo.rangoVentas(filtroVentas);
-                const lista = Espejo.listar(libro, rango[0], rango[1], activeSucursalId);
-                dato.filtrado = lista.total;
-                dato.tickets_ok = lista.cant;
-                dato.tickets = lista.tickets;
-                dato.recorte = lista.recorte;
-                dato.libro = lista.cant > 0 || (libro.sucursales || []).length > 0;
-                if (dato.resumen) {
-                    dato.resumen.ventas = lista.total;
-                    dato.resumen.tickets = lista.cant;
-                    dato.resumen.promedio = lista.cant ? Math.round((lista.total / lista.cant) * 100) / 100 : 0;
-                    if (rango[0] && rango[1]) dato.resumen.dia = rango[0] === rango[1] ? rango[0] : (rango[0] + ' → ' + rango[1]);
+                if (panel === 'desglose' && Espejo.desglose) {
+                    const art = Espejo.desglose(rango[0], rango[1], activeSucursalId);
+                    const serverTiene = dato.desglose && (dato.desglose.filas || []).length;
+                    if (art && (art.filas.length || !serverTiene)) {
+                        dato.desglose = Object.assign({}, art, { etiqueta: dato.desglose && dato.desglose.etiqueta ? dato.desglose.etiqueta : etiquetaPeriodoVentas() });
+                        dato.libro = true;
+                    }
+                }
+                if (panel === 'ticket') {
+                    const lista = Espejo.listar(libro, rango[0], rango[1], activeSucursalId);
+                    const serverTiene = (dato.tickets || []).length > 0;
+                    if (serverMasNuevo && serverTiene) return dato;
+                    if (!lista.cant && serverTiene) return dato;
+                    dato.filtrado = lista.total;
+                    dato.tickets_ok = lista.cant;
+                    dato.tickets = lista.tickets;
+                    dato.recorte = lista.recorte;
+                    dato.libro = true;
+                    if (dato.resumen) {
+                        dato.resumen.ventas = lista.total;
+                        dato.resumen.tickets = lista.cant;
+                        dato.resumen.promedio = lista.cant ? Math.round((lista.total / lista.cant) * 100) / 100 : 0;
+                        if (rango[0] && rango[1]) dato.resumen.dia = rango[0] === rango[1] ? rango[0] : (rango[0] + ' → ' + rango[1]);
+                    }
                 }
             }
             return dato;
@@ -3928,9 +4153,8 @@ const $ = id => document.getElementById(id);
             const activa = document.querySelector('.view.active');
             const name = activa ? activa.id.replace('view-', '') : '';
             const panel = name === 'ticket' && ventasPantalla === 'desglose' ? 'desglose' : name;
-            if (panel !== 'reporte' && panel !== 'ticket') return;
-            const listo = panelesListos.get(claveJefe(panel));
-            if (listo && listo.dato) aplicarDatosJefe(panel, listo.dato, false);
+            if (!panel) return;
+            cargarJefe(panel);
         }
 
         function aplicarDatosJefe(panel, dato, enCurso) {
@@ -3953,15 +4177,16 @@ const $ = id => document.getElementById(id);
                     const medios = c.medios_pago || [];
                     const sumaMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0);
                     const totalMedios = sumaMedios || 1;
+                    pintarChipPeriodo('cajaPeriodo', periodoCaja || 'Hoy');
                     const periodoCajaTxt = c.etiqueta ? `<p class="caja-periodo">${textoJefe(c.etiqueta)}</p>` : '';
                     let html = `${periodoCajaTxt}<div data-pantalla="arqueo" class="arqueo-lista">`;
                     if (medios.length === 0) {
                         html += `<p class="caja-vacio" style="padding:14px;">${(c.etiqueta && !String(c.etiqueta).startsWith('Hoy')) ? 'Sin movimientos de pago en este período.' : 'Sin movimientos de pago ese día.'}</p>`;
                     } else {
-                        medios.forEach((m) => {
-                            const pct = Math.round((m.monto / totalMedios) * 100);
+                        const partes = porcentajesQueCierran(medios.map((m) => Number(m.monto) || 0));
+                        medios.forEach((m, i) => {
                             const tickets = m.tickets + (m.tickets === 1 ? ' ticket' : ' tickets');
-                            html += `<div class="arqueo-fila"><b>${textoJefe(m.medio)}</b><span>${textoJefe(tickets)}</span><span><b>${plataJefe(m.monto)}</b><small class="arqueo-pct">${pct}%</small></span></div>`;
+                            html += `<div class="arqueo-fila"><b>${textoJefe(m.medio)}</b><span>${textoJefe(tickets)}</span><span><b>${plataJefe(m.monto)}</b><small class="arqueo-pct">${partes[i]}%</small></span></div>`;
                         });
                     }
                     html += `<div class="arqueo-pie"><span>Total</span><b>${plataJefe(sumaMedios)}</b></div></div>`;
@@ -3979,7 +4204,8 @@ const $ = id => document.getElementById(id);
                 if (!window.vitrinaPeriodo) window.vitrinaPeriodo = 'Hoy';
                 const perActual = window.vitrinaPeriodo;
 
-                $('reporteDia').textContent = (v && v.es_hoy ? 'Hoy · ' : 'Período · ') + perActual + (dato.actualizado_en ? ' · espejo ' + String(dato.actualizado_en).replace('T', ' ').slice(0, 16) : '');
+                pintarChipPeriodo('reporteDia', perActual);
+                if (v && v.actualizado_en_texto) marcarRed(redCrm.enLinea, v.actualizado_en_texto);
 
                 if (!dato.libro && !v) {
                     $('reporteCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
@@ -3991,7 +4217,7 @@ const $ = id => document.getElementById(id);
                         <div class="vitrina-wrap">
                             <div class="vitrina-banner">
                                 <span>⚠️</span>
-                                <span>${window.__crmDesacoplado ? 'Motor desacoplado / Operando 100% offline' : ('En línea — datos de la tienda al ' + (v.actualizado_en_texto || '—'))}</span>
+                                <span>${textoBannerRed(v && v.actualizado_en_texto)}</span>
                             </div>
 
                             <div class="vitrina-grid">
@@ -4092,7 +4318,7 @@ const $ = id => document.getElementById(id);
                                         <span class="vitrina-card-lbl">${v.inventario_costo.titulo}</span>
                                     </div>
                                     <div class="vitrina-card-val">${v.inventario_costo.texto}</div>
-                                    <div class="vitrina-card-sub">Valuación a costo real</div>
+                                    <div class="vitrina-card-sub">${v.inventario_costo.subtitulo || 'Valuación a costo real'}</div>
                                 </div>
                             </div>
                         </div>`;
@@ -4287,7 +4513,7 @@ const $ = id => document.getElementById(id);
                     ok: dato.tickets_ok || 0,
                     recorte: !!dato.recorte
                 };
-                ticketsAviso = dato.libro ? 'Sin tickets con ese filtro.' : (aviso || 'El libro todavía no llegó.');
+                ticketsAviso = avisoSinTickets(dato.libro !== false);
                 pintarTickets();
                 const refresh = $('btnRefresh');
                 if (refresh && refresh.classList.contains('es-filtro')) {
@@ -4315,17 +4541,15 @@ const $ = id => document.getElementById(id);
             if (refresh) {
                 const caja = name === 'contabilidad';
                 const digital = caja && cajaPantalla === 'digital';
-                const desglose = name === 'ticket' && ventasPantalla === 'desglose';
                 const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja;
                 refresh.classList.toggle('es-filtro', filtrar);
-                if (desglose) refresh.classList.toggle('filtrando', (periodoDesglose || 'Hoy') !== 'Hoy');
-                else if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
+                if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
                 else if (name === 'pedidos') refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
                 else if (name === 'reporte') refresh.classList.toggle('filtrando', (window.vitrinaPeriodo || 'Hoy') !== 'Hoy');
                 else if (digital) refresh.classList.toggle('filtrando', periodoDigital !== 'Semana');
                 else if (caja) refresh.classList.toggle('filtrando', (periodoCaja || 'Hoy') !== 'Hoy');
                 else refresh.classList.remove('filtrando');
-                const etiqueta = name === 'pedidos' ? 'Filtrar proveedor' : ((name === 'ticket' && ventasPantalla === 'desglose') ? 'Filtrar período' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar')));
+                const etiqueta = name === 'pedidos' ? 'Filtrar proveedor' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar'));
                 refresh.setAttribute('aria-label', etiqueta);
                 refresh.title = etiqueta;
                 const icono = refresh.querySelector('svg');
@@ -4402,6 +4626,8 @@ const $ = id => document.getElementById(id);
                 filtroVentas.alcance = 'mes';
                 filtroVentas.historico = false;
                 filtroVentas.fecha = '';
+                filtroVentas.desde = '';
+                filtroVentas.hasta = '';
             }
             if (name === 'contabilidad') {
                 cajaPantalla = 'arqueo';
@@ -4476,19 +4702,7 @@ const $ = id => document.getElementById(id);
             if (btn.classList.contains('es-filtro')) {
                 const vista = document.querySelector('.view.active');
                 const nombre = vista && vista.id.startsWith('view-') ? vista.id.slice(5) : '';
-                if (nombre === 'ticket' && ventasPantalla === 'desglose') abrirFiltroPeriodo({
-                    actual: periodoDesglose || 'Hoy',
-                    desde: periodoDesgloseDesde,
-                    hasta: periodoDesgloseHasta,
-                    alAplicar: (elegido, desde, hasta) => {
-                        periodoDesglose = elegido;
-                        periodoDesgloseDesde = elegido === 'Período' ? desde : '';
-                        periodoDesgloseHasta = elegido === 'Período' ? hasta : '';
-                        marcarEntrada('ticket');
-                        void cargarJefe('desglose');
-                    }
-                });
-                else if (nombre === 'ticket') abrirFiltroVentas();
+                if (nombre === 'ticket') abrirFiltroVentas();
                 else if (nombre === 'reporte') abrirFiltroPeriodo({
                     actual: window.vitrinaPeriodo || 'Hoy',
                     desde: window.vitrinaDesde,
@@ -5716,38 +5930,79 @@ const $ = id => document.getElementById(id);
         setInterval(tickClock, 30000);
 
         // Connection status monitoring
-        function updateConnectionStatus() {
-            const online = navigator.onLine;
+        function textoSync(marca) {
+            const texto = String(marca || '').trim();
+            if (!texto) return '';
+            if (/^\d{2}\/\d{2}( \d{2}:\d{2})?$/.test(texto.slice(0, 14))) return texto.slice(0, 14);
+            const fecha = new Date(texto);
+            if (!Number.isNaN(fecha.getTime())) {
+                const dia = String(fecha.getDate()).padStart(2, '0');
+                const mes = String(fecha.getMonth() + 1).padStart(2, '0');
+                const hora = String(fecha.getHours()).padStart(2, '0');
+                const min = String(fecha.getMinutes()).padStart(2, '0');
+                return dia + '/' + mes + ' ' + hora + ':' + min;
+            }
+            return texto.replace('T', ' ').slice(0, 16);
+        }
+
+        function textoBannerRed(sync) {
+            const marca = sync || redCrm.sync || '—';
+            if (window.__crmDesacoplado || !(navigator.onLine && redCrm.enLinea)) {
+                return 'Modo offline — último dato ' + marca;
+            }
+            return 'En línea — datos de la tienda al ' + marca;
+        }
+
+        function marcarRed(enLinea, sync) {
+            if (typeof enLinea === 'boolean') redCrm.enLinea = enLinea;
+            if (sync) redCrm.sync = sync;
+            pintarRed();
+        }
+
+        function pintarRed() {
+            const enLinea = navigator.onLine && redCrm.enLinea;
+            const sync = redCrm.sync;
+            const horaMatch = String(sync || '').match(/(\d{2}:\d{2})/);
+            const hora = horaMatch ? horaMatch[1] : '';
+            let texto = 'Sin red';
+            let modo = 'offline';
+            if (enLinea) {
+                texto = hora ? ('En línea · Sync ' + hora) : 'En línea';
+                modo = 'online';
+            } else if (sync) {
+                texto = 'Modo offline · Último dato ' + sync;
+                modo = 'reposo';
+            }
             const pill = $('statusPill');
             const mobilePill = $('mobileConnPill');
             const mobileText = $('mobileConnText');
             if (pill) {
-                if (online) {
-                    pill.innerHTML = '<span class="pulse"></span> En línea';
-                    pill.style.background = 'var(--success-muted)';
-                    pill.style.color = 'var(--success)';
-                    pill.style.border = '1px solid rgba(16, 185, 129, 0.2)';
-                } else {
-                    pill.innerHTML = '<span class="pulse" style="background:var(--danger)"></span> Fuera de línea';
-                    pill.style.background = 'var(--danger-muted)';
-                    pill.style.color = 'var(--danger)';
-                    pill.style.border = '1px solid rgba(239, 68, 68, 0.2)';
-                    toast('Sin conexión: mostrando datos del panel local', true);
-                }
+                pill.innerHTML = '<span class="pulse"></span> ' + texto;
+                pill.style.background = modo === 'online' ? 'var(--success-muted)' : (modo === 'reposo' ? '#f1f5f9' : 'var(--danger-muted)');
+                pill.style.color = modo === 'online' ? 'var(--success)' : (modo === 'reposo' ? '#475569' : 'var(--danger)');
+                pill.style.border = '1px solid rgba(15, 23, 42, 0.08)';
             }
             if (mobilePill) {
-                mobilePill.classList.toggle('online', online);
-                mobilePill.classList.toggle('offline', !online);
-                if (mobileText) mobileText.textContent = online ? 'En línea' : 'Sin red';
+                mobilePill.classList.toggle('online', modo === 'online');
+                mobilePill.classList.toggle('reposo', modo === 'reposo');
+                mobilePill.classList.toggle('offline', modo === 'offline');
+                if (mobileText) mobileText.textContent = texto;
             }
         }
+
+        function updateConnectionStatus(avisar) {
+            if (!navigator.onLine) redCrm.enLinea = false;
+            pintarRed();
+            if (avisar && !navigator.onLine) toast('Sin conexión: mostrando el libro guardado en este aparato', true);
+        }
         window.addEventListener('online', () => {
+            redCrm.enLinea = true;
             updateConnectionStatus();
             void sincronizarSolicitudesPendientes();
             if (window.CrmLoader) CrmLoader.initSignalListener();
             void despertarNube().catch(() => {}).finally(() => recargarVistaViva());
         });
-        window.addEventListener('offline', updateConnectionStatus);
+        window.addEventListener('offline', () => updateConnectionStatus(true));
         
         document.getElementById('offlineBadge')?.addEventListener('click', sincronizarSolicitudesPendientes);
         document.getElementById('contaCuerpo')?.addEventListener('click', (ev) => {
@@ -5950,11 +6205,6 @@ const $ = id => document.getElementById(id);
             CrmBus.on('pantallaModulo', (vista, id) => {
                 if (vista === 'ticket') {
                     ventasPantalla = id || 'historial';
-                    if (ventasPantalla === 'desglose') {
-                        periodoDesglose = 'Hoy';
-                        periodoDesgloseDesde = '';
-                        periodoDesgloseHasta = '';
-                    }
                     marcarEntrada('ticket');
                     const abierta = document.querySelector('.view.active');
                     if (abierta && abierta.id === 'view-ticket') {
@@ -6047,6 +6297,26 @@ const $ = id => document.getElementById(id);
 
         async function boot() {
             try {
+                if (window.Nodo) {
+                    Nodo.arrancar();
+                    Nodo.alCambiar((pieza, consulta, dato) => {
+                        if (!dato) return;
+                        if (pieza === 'cartera' && window.CarteraLibro && CarteraLibro.recibir) {
+                            const activa = document.querySelector('.view.active');
+                            if (activa && activa.id === 'view-cartera' && consultaNodo('cartera') === consulta) {
+                                CarteraLibro.recibir(dato);
+                            }
+                            return;
+                        }
+                        const activa = document.querySelector('.view.active');
+                        const name = activa ? activa.id.replace('view-', '') : '';
+                        const panel = name === 'ticket' && ventasPantalla === 'desglose' ? 'desglose' : name;
+                        if (piezaNodo(panel) !== pieza || consultaNodo(panel) !== consulta) return;
+                        aplicarDatosJefe(panel, dato, false);
+                        const syncTxt = (dato.vitrina && dato.vitrina.actualizado_en_texto) || textoSync(dato.actualizado_en);
+                        marcarRed(true, syncTxt);
+                    });
+                }
                 if (window.Espejo) {
                     Espejo.alActualizar(pintarDesdeEspejo);
                     void Espejo.asegurar();

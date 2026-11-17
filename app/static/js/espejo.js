@@ -1,33 +1,64 @@
 /**
- * El libro de Cobro Fácil queda en el aparato.
- * El teléfono, la PC y la tablet leen esa misma copia.
+ * Espejo de Base de Datos Local en PWA - Cobro Fácil CRM
+ * Mantiene una réplica idéntica y reactiva en IndexedDB ('crm-espejo') y memoria.
+ * Permite a la PWA consultar datos al instante (0ms de latencia) sin locks ni colisiones en la nube.
  */
 (function (global) {
-    const ORDEN = ['ventas', 'detalles_ventas', 'clientes', 'productos', 'cuenta_corriente', 'proveedores', 'configuracion', 'gastos', 'movimientos_caja'];
-    const CANCELADAS = { CANCELADA: 1, ANULADA: 1, CANCELADO: 1, ANULADO: 1 };
+    const ORDEN = [
+        'ventas',
+        'detalles_ventas',
+        'clientes',
+        'productos',
+        'cuenta_corriente',
+        'proveedores',
+        'configuracion',
+        'gastos',
+        'movimientos_caja'
+    ];
+    const CANCELADAS = { CANCELADA: 1, ANULADA: 1, CANCELADO: 1, ANULADO: 1, RECHAZADO: 1 };
+    
     let basePromise = null;
-    let memoria = null;
+    let memoria = null; // Apunta a copias.ventas para retrocompatibilidad
+    const copias = {};  // { [tabla]: { sello: string, sucursales: [...] } }
+    let selloGlobal = '';
     let avisos = [];
     let bajando = false;
     let otra = false;
+    let hidratadoPromise = null;
 
+    /**
+     * Abre la base IndexedDB local del espejo.
+     */
     function abrir() {
         if (basePromise) return basePromise;
         basePromise = new Promise((resolve, reject) => {
-            const pedido = indexedDB.open('crm-espejo', 1);
-            pedido.onupgradeneeded = () => {
-                const db = pedido.result;
-                if (!db.objectStoreNames.contains('tablas')) db.createObjectStore('tablas');
-            };
-            pedido.onsuccess = () => resolve(pedido.result);
-            pedido.onerror = () => {
+            if (typeof indexedDB === 'undefined') {
+                return reject(new Error('IndexedDB no soportado'));
+            }
+            try {
+                const pedido = indexedDB.open('crm-espejo', 1);
+                pedido.onupgradeneeded = () => {
+                    const db = pedido.result;
+                    if (!db.objectStoreNames.contains('tablas')) {
+                        db.createObjectStore('tablas');
+                    }
+                };
+                pedido.onsuccess = () => resolve(pedido.result);
+                pedido.onerror = () => {
+                    basePromise = null;
+                    reject(pedido.error);
+                };
+            } catch (err) {
                 basePromise = null;
-                reject(pedido.error);
-            };
+                reject(err);
+            }
         });
         return basePromise;
     }
 
+    /**
+     * Lee una tabla cruda de IndexedDB.
+     */
     function leer(tabla) {
         return abrir().then((db) => new Promise((resolve) => {
             const tx = db.transaction('tablas', 'readonly');
@@ -37,6 +68,9 @@
         })).catch(() => null);
     }
 
+    /**
+     * Guarda una tabla cruda en IndexedDB.
+     */
     function guardar(tabla, libro) {
         return abrir().then((db) => new Promise((resolve) => {
             const tx = db.transaction('tablas', 'readwrite');
@@ -46,11 +80,61 @@
         })).catch(() => {});
     }
 
+    /**
+     * Actualiza la tabla en IndexedDB Y en la memoria reactiva.
+     */
+    async function guardarTabla(tabla, libro, sinAviso) {
+        if (!tabla) return;
+        await guardar(tabla, libro);
+        copias[tabla] = libro;
+        if (libro && libro.sello && libro.sello > selloGlobal) {
+            selloGlobal = libro.sello;
+        }
+        if (tabla === 'ventas') {
+            memoria = libro;
+        }
+        if (!sinAviso) {
+            avisar();
+        }
+    }
+
+    /**
+     * Carga todas las tablas guardadas en IndexedDB hacia la memoria activa.
+     */
+    async function hidratar() {
+        if (hidratadoPromise) return hidratadoPromise;
+        hidratadoPromise = (async () => {
+            for (let i = 0; i < ORDEN.length; i++) {
+                const tabla = ORDEN[i];
+                const libro = await leer(tabla);
+                if (libro) {
+                    copias[tabla] = libro;
+                    if (libro.sello && libro.sello > selloGlobal) {
+                        selloGlobal = libro.sello;
+                    }
+                    if (tabla === 'ventas') {
+                        memoria = libro;
+                    }
+                }
+            }
+            if (copias.ventas || copias.clientes) {
+                avisar();
+            }
+            return copias;
+        })();
+        return hidratadoPromise;
+    }
+
+    /**
+     * Notifica a los suscriptores UI cuando el espejo local se actualizó.
+     */
     function avisar() {
         avisos.forEach((fn) => {
             try { fn(); } catch (e) {}
         });
     }
+
+    // --- Funciones utilitarias de normalización ---
 
     function indiceDe(columnas) {
         const idx = {};
@@ -59,6 +143,7 @@
     }
 
     function tomar(fila, idx, nombres) {
+        if (!fila) return null;
         for (let i = 0; i < nombres.length; i++) {
             const pos = idx[nombres[i]];
             if (pos !== undefined && pos < fila.length) return fila[pos];
@@ -87,36 +172,12 @@
         return iso(new Date());
     }
 
-    function filasVentas(libro, sucursalId) {
-        const salida = [];
-        const vistas = new Set();
-        (libro.sucursales || []).forEach((suc) => {
-            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
-            const idx = indiceDe(suc.columnas);
-            (suc.filas || []).forEach((fila) => {
-                const id = idTexto(tomar(fila, idx, ['id']));
-                const fecha = String(tomar(fila, idx, ['fecha']) || '').split('.')[0].replace('T', ' ');
-                const clave = id + '|' + fecha.slice(0, 19);
-                if (id && vistas.has(clave)) return;
-                if (id) vistas.add(clave);
-                salida.push({
-                    id: id,
-                    fecha: fecha,
-                    dia: diaDe(fecha),
-                    total: Number(tomar(fila, idx, ['total'])) || 0,
-                    pago: String(tomar(fila, idx, ['metodo_pago', 'medio_pago']) || 'Efectivo'),
-                    estado: String(tomar(fila, idx, ['estado']) || ''),
-                    caja: idTexto(tomar(fila, idx, ['caja_id'])) || '1',
-                    cliente: String(tomar(fila, idx, ['cliente_nombre']) || '')
-                });
-            });
-        });
-        return salida;
-    }
-
     function rangoPeriodo(periodo, desde, hasta) {
         const hoy = hoyDe();
         const nombre = periodo || 'Hoy';
+        if (nombre === 'Todas' || nombre === 'Todo' || nombre === 'Histórico' || nombre === 'Historico') {
+            return ['', ''];
+        }
         if (nombre === 'Semana') {
             const base = new Date(hoy + 'T12:00:00');
             const lunes = new Date(base);
@@ -140,6 +201,12 @@
     function rangoVentas(f) {
         const hoy = hoyDe();
         if (!f || f.historico) return ['', ''];
+        if (f.alcance === 'semana') return rangoPeriodo('Semana');
+        if (f.alcance === 'periodo') {
+            const ini = String(f.desde || f.fecha || hoy).slice(0, 10);
+            const fin = String(f.hasta || ini).slice(0, 10);
+            return ini <= fin ? [ini, fin] : [fin, ini];
+        }
         const dia = String(f.fecha || hoy).slice(0, 10) || hoy;
         if (f.alcance === 'mes') {
             const anio = Number(dia.slice(0, 4));
@@ -148,6 +215,63 @@
             return [dia.slice(0, 7) + '-01', dia.slice(0, 7) + '-' + String(ultimo).padStart(2, '0')];
         }
         return [dia, dia];
+    }
+
+    /**
+     * Extrae todas las filas de una tabla como objetos tipados { campo: valor }.
+     */
+    function filasTabla(tabla, sucursalId) {
+        const libro = copias[tabla];
+        if (!libro || !libro.sucursales) return [];
+        const salida = [];
+        libro.sucursales.forEach((suc) => {
+            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            const idx = indiceDe(suc.columnas);
+            (suc.filas || []).forEach((fila) => {
+                const obj = { sucursal_id: suc.sucursal_id, sucursal_nombre: suc.sucursal };
+                (suc.columnas || []).forEach((col) => {
+                    const c = String(col).toLowerCase();
+                    obj[c] = fila[idx[c]];
+                });
+                salida.push(obj);
+            });
+        });
+        return salida;
+    }
+
+    /**
+     * Ventas normalizadas con filtrado por sucursal.
+     */
+    function filasVentas(libro, sucursalId) {
+        const fuente = libro || copias.ventas || memoria;
+        if (!fuente) return [];
+        const salida = [];
+        const vistas = new Set();
+        (fuente.sucursales || []).forEach((suc) => {
+            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            const idx = indiceDe(suc.columnas);
+            (suc.filas || []).forEach((fila) => {
+                const id = idTexto(tomar(fila, idx, ['id']));
+                const fecha = String(tomar(fila, idx, ['fecha']) || '').split('.')[0].replace('T', ' ');
+                const clave = id + '|' + fecha.slice(0, 19);
+                if (id && vistas.has(clave)) return;
+                if (id) vistas.add(clave);
+                salida.push({
+                    id: id,
+                    fecha: fecha,
+                    dia: diaDe(fecha),
+                    total: Number(tomar(fila, idx, ['total'])) || 0,
+                    pago: String(tomar(fila, idx, ['metodo_pago', 'medio_pago']) || 'Efectivo'),
+                    estado: String(tomar(fila, idx, ['estado']) || ''),
+                    caja: idTexto(tomar(fila, idx, ['caja_id'])) || '1',
+                    cliente: String(tomar(fila, idx, ['cliente_nombre']) || ''),
+                    cliente_id: idTexto(tomar(fila, idx, ['cliente_id', 'id_cliente'])),
+                    sucursal_id: suc.sucursal_id,
+                    sucursal_nombre: suc.sucursal
+                });
+            });
+        });
+        return salida;
     }
 
     function elegir(libro, desde, hasta, sucursalId) {
@@ -190,25 +314,434 @@
         };
     }
 
+    /**
+     * Desglose de cortes de carne y productos vendidos.
+     */
+    function desglose(desde, hasta, sucursalId) {
+        const ventasLibro = copias.ventas || memoria;
+        const detalles = copias.detalles_ventas;
+        const productos = copias.productos;
+        if (!ventasLibro || !detalles) return null;
+        const vivas = new Set();
+        filasVentas(ventasLibro, sucursalId).forEach((fila) => {
+            if (!fila.id || !fila.dia) return;
+            if (desde && fila.dia < desde) return;
+            if (hasta && fila.dia > hasta) return;
+            if (CANCELADAS[String(fila.estado || '').trim().toUpperCase()]) return;
+            vivas.add(String(fila.id));
+        });
+        const medidas = {};
+        (productos && productos.sucursales || []).forEach((suc) => {
+            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            const idx = indiceDe(suc.columnas);
+            (suc.filas || []).forEach((fila) => {
+                const pid = idTexto(tomar(fila, idx, ['id']));
+                if (!pid) return;
+                const pesable = String(tomar(fila, idx, ['es_pesable']) || '').toLowerCase();
+                const unidad = String(tomar(fila, idx, ['unidad', 'unidad_medida']) || '').toLowerCase();
+                medidas[pid] = (pesable === '1' || pesable === 'true' || unidad === 'kg' || unidad === 'kilo' || unidad === 'kilos') ? 'kg' : 'un';
+            });
+        });
+        const grupos = {};
+        (detalles.sucursales || []).forEach((suc) => {
+            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            const idx = indiceDe(suc.columnas);
+            (suc.filas || []).forEach((fila) => {
+                const vid = idTexto(tomar(fila, idx, ['id_venta', 'venta_id', 'ticket_id', 'venta']));
+                if (!vivas.has(vid)) return;
+                const nombre = String(tomar(fila, idx, ['nombre_producto', 'nombre', 'producto', 'descripcion', 'corte']) || '').trim();
+                if (!nombre) return;
+                const pid = idTexto(tomar(fila, idx, ['id_producto', 'producto_id']));
+                const medida = medidas[pid] || 'un';
+                const slot = grupos[nombre] || (grupos[nombre] = { nombre: nombre, cantidad: 0, monto: 0, medida: medida });
+                if (medida === 'kg') slot.medida = 'kg';
+                slot.cantidad += Number(tomar(fila, idx, ['cantidad', 'kilos', 'peso', 'cant'])) || 0;
+                slot.monto += Number(tomar(fila, idx, ['subtotal', 'total', 'monto'])) || 0;
+            });
+        });
+        const filas = Object.keys(grupos).map((nombre) => grupos[nombre]).sort((a, b) => b.cantidad - a.cantidad);
+        let kilos = 0;
+        let unidades = 0;
+        let monto = 0;
+        const salida = filas.map((item) => {
+            const cant = Math.round(item.cantidad * 1000) / 1000;
+            const plata = Math.round(item.monto * 100) / 100;
+            monto += plata;
+            if (item.medida === 'kg') kilos += cant;
+            else unidades += cant;
+            return { nombre: item.nombre, cantidad: cant, monto: plata, medida: item.medida };
+        });
+        return {
+            filas: salida,
+            articulos: salida.length,
+            kilos: Math.round(kilos * 1000) / 1000,
+            unidades: Math.round(unidades * 1000) / 1000,
+            monto: Math.round(monto * 100) / 100,
+            tickets: vivas.size,
+            etiqueta: ''
+        };
+    }
+
+    /**
+     * Sucursales descubiertas en el espejo local.
+     */
+    function sucursales() {
+        const vistos = new Map();
+        ORDEN.forEach((tabla) => {
+            const lib = copias[tabla];
+            if (lib && lib.sucursales) {
+                lib.sucursales.forEach((s) => {
+                    const sid = s.sucursal_id != null ? s.sucursal_id : 1;
+                    if (!vistos.has(sid)) {
+                        vistos.set(sid, s.sucursal || ('Sucursal #' + sid));
+                    }
+                });
+            }
+        });
+        if (!vistos.size) {
+            return [{ id: 1, nombre: 'Principal' }];
+        }
+        return Array.from(vistos.entries()).map(([id, nombre]) => ({ id: Number(id), nombre: nombre }));
+    }
+
+    /**
+     * Clientes unificados por DNI según las reglas multi-sucursal.
+     */
+    function clientes(sucursalId) {
+        const filas = filasTabla('clientes', sucursalId);
+        const porDni = new Map();
+        const porNombre = new Map();
+        const salida = [];
+
+        filas.forEach((f) => {
+            const id = idTexto(f.id || f.cliente_id);
+            const nombre = String(f.nombre || f.razon_social || '').trim();
+            const dni = idTexto(f.dni_cuit || f.dni || f.cuit || '');
+            const saldo = Number(f.saldo_actual || f.saldo || f.deuda || f.deuda_actual) || 0;
+            const limite = Number(f.limite_credito || f.limite || f.techo_deuda) || 0;
+            const tipo = String(f.tipo_cliente || f.categoria || 'Minorista');
+            const tel = String(f.telefono || f.celular || '');
+            const dir = String(f.direccion || '');
+            const dias = f.dias !== undefined && f.dias !== null && f.dias !== '' ? Number(f.dias) : null;
+
+            const item = {
+                id: id,
+                pos_id: id,
+                nombre: nombre,
+                dni_cuit: dni,
+                telefono: tel,
+                direccion: dir,
+                saldo_actual: saldo,
+                deuda_pos: saldo,
+                limite_credito: limite,
+                tipo_cliente: tipo,
+                dias: dias,
+                en_riesgo: (limite > 0 && saldo >= limite) || (dias !== null && dias > 30),
+                sucursal_id: f.sucursal_id,
+                sucursal_nombre: f.sucursal_nombre,
+            };
+
+            if (dni) {
+                if (porDni.has(dni)) {
+                    const previo = porDni.get(dni);
+                    if (previo.sucursal_id !== f.sucursal_id) {
+                        previo.saldo_actual += saldo;
+                        previo.deuda_pos += saldo;
+                    }
+                    return;
+                }
+                porDni.set(dni, item);
+            } else if (nombre) {
+                const k = nombre.toLowerCase();
+                if (porNombre.has(k)) {
+                    const previo = porNombre.get(k);
+                    if (previo.sucursal_id !== f.sucursal_id) {
+                        previo.saldo_actual += saldo;
+                        previo.deuda_pos += saldo;
+                    }
+                    return;
+                }
+                porNombre.set(k, item);
+            }
+            salida.push(item);
+        });
+        return salida;
+    }
+
+    /**
+     * Estado consolidado de la cartera de clientes desde el espejo.
+     */
+    function cartera(sucursalId) {
+        const lista = clientes(sucursalId);
+        let totalDeuda = 0;
+        let totalCuentas = 0;
+        lista.forEach((c) => {
+            if (c.saldo_actual > 0) {
+                totalDeuda += c.saldo_actual;
+                totalCuentas += 1;
+            }
+        });
+        const topDeudores = lista
+            .filter((c) => c.saldo_actual > 0)
+            .sort((a, b) => b.saldo_actual - a.saldo_actual)
+            .slice(0, 15);
+
+        return {
+            ok: true,
+            libro: lista.length > 0,
+            panel: 'admin',
+            cartera: {
+                total_deuda: Math.round(totalDeuda * 100) / 100,
+                total_cuentas: totalCuentas,
+                top_deudores: topDeudores,
+                clientes: lista,
+            },
+            sucursales: sucursales(),
+            sucursal_id: sucursalId,
+        };
+    }
+
+    /**
+     * Resumen de caja, gastos y contabilidad calculado localmente.
+     */
+    function contabilidad(periodo, desde, hasta, sucursalId) {
+        const rango = rangoPeriodo(periodo, desde, hasta);
+        const ini = rango[0];
+        const fin = rango[1];
+        const vFilas = elegir(copias.ventas || memoria, ini, fin, sucursalId);
+
+        const porMedio = {};
+        let totalVentas = 0;
+        let tickets = 0;
+        vFilas.forEach((v) => {
+            if (CANCELADAS[String(v.estado || '').toUpperCase()]) return;
+            const medio = v.pago || 'Efectivo';
+            porMedio[medio] = (porMedio[medio] || 0) + v.total;
+            totalVentas += v.total;
+            tickets += 1;
+        });
+
+        const gFilas = filasTabla('gastos', sucursalId);
+        let totalGastos = 0;
+        const detalleGastos = [];
+        gFilas.forEach((g) => {
+            const dia = diaDe(g.fecha);
+            if (ini && dia && dia < ini) return;
+            if (fin && dia && dia > fin) return;
+            const st = String(g.estado || g.status || '').toUpperCase();
+            if (CANCELADAS[st]) return;
+            const m = Number(g.monto) || 0;
+            totalGastos += m;
+            detalleGastos.push({
+                categoria: g.categoria || 'Gasto',
+                detalle: g.descripcion || '',
+                monto: Math.round(m * 100) / 100
+            });
+        });
+
+        const ccFilas = filasTabla('cuenta_corriente', sucursalId);
+        let totalCobros = 0;
+        ccFilas.forEach((c) => {
+            const dia = diaDe(c.fecha);
+            if (ini && dia && dia < ini) return;
+            if (fin && dia && dia > fin) return;
+            const haber = Number(c.haber) || 0;
+            if (haber > 0) totalCobros += haber;
+        });
+
+        const cjFilas = filasTabla('movimientos_caja', sucursalId);
+        const porTipoCaja = {};
+        cjFilas.forEach((c) => {
+            const dia = diaDe(c.fecha);
+            if (ini && dia && dia < ini) return;
+            if (fin && dia && dia > fin) return;
+            const tipo = c.tipo || 'Movimiento';
+            porTipoCaja[tipo] = (porTipoCaja[tipo] || 0) + (Number(c.monto) || 0);
+        });
+
+        const mediosLista = Object.keys(porMedio).map((m) => ({ medio: m, total: Math.round(porMedio[m] * 100) / 100 }));
+        const cajaLista = Object.keys(porTipoCaja).map((t) => ({ tipo: t, monto: Math.round(porTipoCaja[t] * 100) / 100 }));
+
+        return {
+            ok: true,
+            libro: true,
+            panel: 'contabilidad',
+            contabilidad: {
+                ventas: Math.round(totalVentas * 100) / 100,
+                tickets: tickets,
+                medios_pago: mediosLista,
+                cobros: Math.round(totalCobros * 100) / 100,
+                gastos: Math.round(totalGastos * 100) / 100,
+                resultado: Math.round((totalVentas + totalCobros - totalGastos) * 100) / 100,
+                detalle_gastos: detalleGastos.slice(0, 40),
+                caja: cajaLista
+            },
+            sucursales: sucursales(),
+            sucursal_id: sucursalId,
+        };
+    }
+
+    /**
+     * Resumen del Jefe y Dashboard Ejecutivo calculado del espejo local.
+     */
+    function resumenJefe(periodo, desde, hasta, sucursalId) {
+        const rango = rangoPeriodo(periodo, desde, hasta);
+        const ini = rango[0];
+        const fin = rango[1];
+        const vFilas = filasVentas(copias.ventas || memoria, sucursalId);
+
+        const delRango = vFilas.filter((v) => {
+            if (CANCELADAS[String(v.estado || '').toUpperCase()]) return false;
+            if (ini && v.dia && v.dia < ini) return false;
+            if (fin && v.dia && v.dia > fin) return false;
+            return true;
+        });
+        let total = 0;
+        const porMedio = {};
+        delRango.forEach((v) => {
+            total += v.total;
+            porMedio[v.pago] = (porMedio[v.pago] || 0) + v.total;
+        });
+        const pago = Object.keys(porMedio).sort((a, b) => porMedio[b] - porMedio[a])[0] || 'Efectivo';
+        const tickets = delRango.length;
+
+        // Período anterior para variación porcentual
+        let totalAnterior = null;
+        let variacion = null;
+        let antFin = '';
+        if (ini && fin && ini.length >= 10 && fin.length >= 10) {
+            try {
+                const d0 = new Date(ini + 'T12:00:00');
+                const d1 = new Date(fin + 'T12:00:00');
+                const duracion = Math.round((d1 - d0) / 86400000) + 1;
+                const antFinDate = new Date(d0);
+                antFinDate.setDate(antFinDate.getDate() - 1);
+                const antIniDate = new Date(d0);
+                antIniDate.setDate(antIniDate.getDate() - duracion);
+                const antIni = iso(antIniDate);
+                antFin = iso(antFinDate);
+
+                const delAnterior = vFilas.filter((v) => v.dia && antIni <= v.dia && v.dia <= antFin && !CANCELADAS[String(v.estado || '').toUpperCase()]);
+                if (delAnterior.length) {
+                    totalAnterior = delAnterior.reduce((acc, v) => acc + v.total, 0);
+                    if (totalAnterior > 0) {
+                        variacion = Math.round(((total - totalAnterior) / totalAnterior) * 1000) / 10;
+                    }
+                }
+            } catch (_) {}
+        }
+
+        const desgl = desglose(ini, fin, sucursalId);
+        const ranking = (desgl && desgl.filas ? desgl.filas : []).slice(0, 10).map((item) => ({
+            producto: item.nombre,
+            kilos: item.cantidad,
+            monto: item.monto
+        }));
+
+        const porSuc = {};
+        delRango.forEach((v) => {
+            const s = v.sucursal_id || '1';
+            porSuc[s] = (porSuc[s] || 0) + v.total;
+        });
+        const sucLista = sucursales();
+        const desgloseSuc = sucLista.map((s) => ({
+            sucursal_id: s.id,
+            sucursal: s.nombre,
+            ventas: Math.round((porSuc[s.id] || 0) * 100) / 100
+        }));
+
+        return {
+            ok: true,
+            libro: delRango.length > 0 || vFilas.length > 0,
+            panel: 'jefe',
+            resumen: {
+                dia: ini === fin ? ini : (ini + ' → ' + fin),
+                ventas: Math.round(total * 100) / 100,
+                tickets: tickets,
+                promedio: tickets ? Math.round((total / tickets) * 100) / 100 : 0,
+                pago: pago,
+                es_hoy: ini === fin && ini === hoyDe(),
+                dia_anterior: antFin,
+                ventas_anterior: totalAnterior ? Math.round(totalAnterior * 100) / 100 : null,
+                variacion_pct: variacion
+            },
+            ranking_cortes: ranking,
+            desglose_sucursales: desgloseSuc,
+            pulso: { alertas: [] },
+            sucursales: sucLista,
+            sucursal_id: sucursalId
+        };
+    }
+
+    /**
+     * Obtiene el ticket con sus líneas de detalle desde el espejo.
+     */
+    function ticket(id) {
+        const vId = idTexto(id);
+        const vFilas = filasTabla('ventas');
+        const venta = vFilas.find((v) => idTexto(v.id) === vId);
+        if (!venta) return null;
+
+        const dFilas = filasTabla('detalles_ventas');
+        const items = dFilas
+            .filter((d) => idTexto(d.id_venta || d.venta_id || d.ticket_id) === vId)
+            .map((d) => ({
+                producto: d.nombre_producto || d.nombre || d.producto || d.descripcion || 'Artículo',
+                cantidad: Number(d.cantidad || d.kilos || d.peso || d.cant) || 1,
+                precio: Number(d.precio_unitario || d.precio) || 0,
+                subtotal: Number(d.subtotal || d.total || d.monto) || 0
+            }));
+
+        return {
+            ok: true,
+            id: vId,
+            fecha: venta.fecha,
+            total: Number(venta.total) || 0,
+            pago: venta.metodo_pago || venta.medio_pago || 'Efectivo',
+            estado: venta.estado || 'PAGADO',
+            cliente: venta.cliente_nombre || '',
+            items: items
+        };
+    }
+
+    /**
+     * Historial de un cliente desde el espejo.
+     */
+    function historialCliente(posId, dni) {
+        const pid = idTexto(posId);
+        const dniTxt = idTexto(dni);
+        const vFilas = filasTabla('ventas');
+        const cFilas = vFilas
+            .filter((v) => (pid && idTexto(v.cliente_id) === pid) || (dniTxt && idTexto(v.dni_cuit) === dniTxt))
+            .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
+            .slice(0, 50);
+
+        return {
+            ok: true,
+            tickets: cFilas.map((v) => ({
+                id: v.id,
+                fecha: v.fecha,
+                total: Number(v.total) || 0,
+                pago: v.metodo_pago || v.medio_pago || 'Efectivo',
+                estado: v.estado
+            }))
+        };
+    }
+
+    // --- Descarga completa clásica ---
+
     async function bajarTabla(tabla) {
         const res = await fetch('/api/pos/espejo/tabla?tabla=' + encodeURIComponent(tabla));
         if (!res.ok) return null;
         const dato = await res.json();
         if (!dato || !dato.ok) return null;
         const libro = { sello: dato.sello || '', sucursales: dato.sucursales || [] };
-        await guardar(tabla, libro);
-        if (tabla === 'ventas') {
-            memoria = libro;
-            avisar();
-        }
+        await guardarTabla(tabla, libro, false);
         return libro;
     }
 
     async function unaPasada() {
-        if (!memoria) {
-            memoria = await leer('ventas');
-            if (memoria) avisar();
-        }
+        await hidratar();
         if (!navigator.onLine) return;
         const res = await fetch('/api/pos/espejo');
         if (!res.ok) return;
@@ -224,7 +757,7 @@
         });
         for (let i = 0; i < nombres.length; i++) {
             const tabla = nombres[i];
-            const local = tabla === 'ventas' ? (memoria || await leer(tabla)) : await leer(tabla);
+            const local = copias[tabla];
             if (local && local.sello && local.sello === porTabla[tabla]) continue;
             await bajarTabla(tabla);
         }
@@ -247,13 +780,55 @@
         }
     }
 
+    function sello() {
+        if (selloGlobal) return selloGlobal;
+        let maxS = '';
+        Object.values(copias).forEach((c) => {
+            if (c && c.sello && c.sello > maxS) maxS = c.sello;
+        });
+        selloGlobal = maxS;
+        return maxS;
+    }
+
+    function tieneDatos() {
+        return Boolean(
+            (copias.ventas && copias.ventas.sucursales && copias.ventas.sucursales.length) ||
+            (copias.clientes && copias.clientes.sucursales && copias.clientes.sucursales.length)
+        );
+    }
+
+    // Exportar módulo Espejo
     global.Espejo = {
         asegurar: asegurar,
-        ventas: function () { return memoria; },
+        hidratar: hidratar,
+        guardarTabla: guardarTabla,
+        tabla: function (t) { return copias[t] || null; },
+        sello: sello,
+        sellos: function () {
+            const map = {};
+            Object.keys(copias).forEach((t) => { map[t] = copias[t]?.sello || ''; });
+            return map;
+        },
+        tieneDatos: tieneDatos,
+        ventas: function () { return memoria || copias.ventas || null; },
+        filasTabla: filasTabla,
+        sucursales: sucursales,
+        clientes: clientes,
+        cartera: cartera,
+        contabilidad: contabilidad,
+        resumenJefe: resumenJefe,
+        ticket: ticket,
+        historialCliente: historialCliente,
         sumar: sumar,
         listar: listar,
+        desglose: desglose,
         rangoPeriodo: rangoPeriodo,
         rangoVentas: rangoVentas,
-        alActualizar: function (fn) { avisos.push(fn); }
+        alActualizar: function (fn) { avisos.push(fn); },
+        _guardar: guardar,
+        _avisar: avisar,
     };
+
+    // Auto-hidratar al cargar el script
+    hidratar();
 })(window);

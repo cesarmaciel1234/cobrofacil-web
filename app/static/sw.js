@@ -1,5 +1,5 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.5';
+const CACHE_VERSION = 'crm-frigorifico-v4.56';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',
@@ -15,6 +15,8 @@ const SHELL_ASSETS = [
   '/static/js/crm-delete.js',
   '/static/js/crm-backup.js',
   '/static/js/espejo.js',
+  '/static/js/espejo-engine.js',
+  '/static/js/nodo.js',
   '/static/js/app.js',
   '/static/js/modulo-panel.js',
   '/static/js/barra/ventas.js',
@@ -35,6 +37,7 @@ const NETWORK_FIRST_PATHS = [
   '/login',
   '/pos',
   '/static/js/espejo.js',
+  '/static/js/nodo.js',
   '/static/js/app.js',
   '/static/js/modulo-panel.js',
   '/static/js/crm-sync-api.js',
@@ -214,4 +217,30 @@ self.addEventListener('message', (event) => {
   if (event.data === 'OLVIDAR_APP') {
     event.waitUntil(caches.open(CACHE_VERSION).then((cache) => olvidarApp(cache)));
   }
+  if (event.data === 'SYNC_ESPEJO') {
+    event.waitUntil(syncEspejoInBackground());
+  }
 });
+
+async function syncEspejoInBackground() {
+  try {
+    const res = await fetch('/api/pos/espejo/delta?sello=&_=' + Date.now(), {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      console.log('[SW] Sync espejo background:', data);
+    }
+  } catch (err) {
+    console.warn('[SW] Sync espejo background error:', err);
+  }
+}
+
+if ('sync' in self.registration) {
+  self.addEventListener('sync', (event) => {
+    if (event.tag === 'sync-espejo') {
+      event.waitUntil(syncEspejoInBackground());
+    }
+  });
+}

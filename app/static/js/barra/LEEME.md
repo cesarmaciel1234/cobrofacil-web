@@ -8,7 +8,7 @@ barra
 │   ├── alertas
 │   ├── ranking de cortes
 │   └── rendimiento por sucursal
-├── cobros     botón Ventas, historial de tickets
+├── cobros     botón Ventas, historial del período elegido
 ├── caja       arqueo del día
 ├── cartera    tarjetas          página /cartera
 │   ├── sucursal y filtros
