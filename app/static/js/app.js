@@ -3418,6 +3418,9 @@ const $ = id => document.getElementById(id);
         function despertarNube() {
             const corte = new AbortController();
             const reloj = setTimeout(() => corte.abort(), 8000);
+            try {
+                fetch('/api/pos/sync/solicitar?sucursal_id=' + (activeSucursalId || 1), { method: 'POST' }).catch(() => {});
+            } catch (e) {}
             return fetch('/health', { cache: 'no-store', signal: corte.signal })
                 .finally(() => clearTimeout(reloj));
         }
@@ -4762,6 +4765,7 @@ const $ = id => document.getElementById(id);
             if (btn.disabled) return;
             btn.disabled = true;
             btn.classList.add('btn-spinning');
+            fetch('/api/pos/sync/solicitar?sucursal_id=' + (activeSucursalId || 1), { method: 'POST' }).catch(() => {});
             void (async () => {
                 try {
                     const vista = document.querySelector('.view.active');

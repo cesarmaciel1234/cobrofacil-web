@@ -13,6 +13,7 @@ Endpoints para recibir datos del servidor POS:
 - GET /api/pos/sync/logs - Obtener historial de sincronización
 - GET /api/pos/sync/status - Obtener estado de última sincronización
 """
+import time
 from flask import current_app, jsonify, request, session
 
 from app.routes.api import api_bp
@@ -422,6 +423,7 @@ def api_pos_base_tabla():
     if completo and resultado.get("ok"):
         from app.services.signal_bus import broadcast_refresh
 
+        limpiar_solicitud_sync(data.get("sucursal_id") or 1)
         broadcast_refresh(int(session.get("empresa_id") or 1), reason="libro")
     return jsonify(resultado)
 
@@ -577,3 +579,48 @@ def api_pos_sync_status():
     """
     status = get_last_sync_status()
     return jsonify(status)
+
+
+_solicitudes_sync: dict[str, float] = {}
+
+
+def marcar_solicitud_sync(sucursal_id: str | int = 1) -> None:
+    clave = str(sucursal_id or "1").strip()
+    _solicitudes_sync[clave] = time.time()
+
+
+def hay_solicitud_sync_pendiente(sucursal_id: str | int = 1, ventana_seg: float = 900.0) -> bool:
+    clave = str(sucursal_id or "1").strip()
+    t = _solicitudes_sync.get(clave, 0.0)
+    if t and (time.time() - t) <= ventana_seg:
+        return True
+    return False
+
+
+def limpiar_solicitud_sync(sucursal_id: str | int = 1) -> None:
+    clave = str(sucursal_id or "1").strip()
+    _solicitudes_sync.pop(clave, None)
+
+
+@api_bp.route("/pos/sync/solicitar", methods=["POST", "GET"])
+def api_pos_sync_solicitar():
+    """La web o PWA pide al TPV local que despierte y sincronice."""
+    sid = request.args.get("sucursal_id") or (request.get_json(silent=True) or {}).get("sucursal_id") or "1"
+    marcar_solicitud_sync(sid)
+    return jsonify({"ok": True, "mensaje": "Solicitud de sincronización registrada", "sucursal_id": sid})
+
+
+@api_bp.route("/pos/sync/pendiente", methods=["GET"])
+def api_pos_sync_pendiente():
+    """El TPV local consulta si hay una petición de envío pendiente de la web."""
+    sid = request.args.get("sucursal_id") or "1"
+    pendiente = hay_solicitud_sync_pendiente(sid)
+    return jsonify({"ok": True, "pedir_envio": pendiente, "sucursal_id": sid})
+
+
+@api_bp.route("/pos/sync/confirmar", methods=["POST", "GET"])
+def api_pos_sync_confirmar():
+    """El TPV local avisa que ya leyó y revisó la base tras la petición."""
+    sid = request.args.get("sucursal_id") or (request.get_json(silent=True) or {}).get("sucursal_id") or "1"
+    limpiar_solicitud_sync(sid)
+    return jsonify({"ok": True, "mensaje": "Sincronización confirmada", "sucursal_id": sid})

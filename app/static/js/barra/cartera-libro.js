@@ -631,7 +631,12 @@
     window.CarteraLibro = {
         filtroActual() { return currentFilter; },
         filtrar(filtro) { setFilter(filtro || 'all'); },
-        actualizar() { return loadClients(); },
+        actualizar() {
+            try {
+                fetch('/api/pos/sync/solicitar?sucursal_id=' + (sucursalId || '1'), { method: 'POST' }).catch(() => {});
+            } catch (_) {}
+            return loadClients();
+        },
         recibir(dato) { if (dato) aplicarLibro(dato); },
         sucursal(id) {
             sucursalId = (id == null || id === '') ? '' : String(id);
