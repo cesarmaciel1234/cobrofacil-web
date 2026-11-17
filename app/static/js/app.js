@@ -6253,6 +6253,25 @@ const $ = id => document.getElementById(id);
         function marcarVersion() {
             const marca = $('versionTag');
             if (!marca) return;
+            marca.style.cursor = 'pointer';
+            marca.title = 'Toca para forzar actualización';
+            marca.onclick = async () => {
+                if (confirm('¿Forzar actualización de la app y recargar?')) {
+                    if ('serviceWorker' in navigator) {
+                        try {
+                            const regs = await navigator.serviceWorker.getRegistrations();
+                            for (const r of regs) await r.unregister();
+                        } catch (_) {}
+                    }
+                    if ('caches' in window) {
+                        try {
+                            const keys = await caches.keys();
+                            for (const k of keys) await caches.delete(k);
+                        } catch (_) {}
+                    }
+                    window.location.reload(true);
+                }
+            };
             fetch('/health', { cache: 'no-store' })
                 .then((respuesta) => respuesta.ok ? respuesta.json() : null)
                 .then((dato) => {

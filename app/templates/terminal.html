@@ -201,7 +201,16 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/sw.js').catch(err => console.warn('Inline SW registration failed:', err));
+            navigator.serviceWorker.register('/sw.js').then(function(reg) {
+                reg.update();
+            }).catch(function(err) { console.warn('Inline SW registration failed:', err); });
+            var refreshing = false;
+            navigator.serviceWorker.addEventListener('controllerchange', function() {
+                if (!refreshing) {
+                    refreshing = true;
+                    window.location.reload();
+                }
+            });
         }
     </script>
 
@@ -218,16 +227,16 @@
     <script src="/static/js/crm-backup.js?v=3.7"></script>
     <script src="/static/js/barra/ventas.js?v=4"></script>
     <script src="/static/js/barra/cobros.js?v=6"></script>
-    <script src="/static/js/barra/caja.js?v=4"></script>
-    <script src="/static/js/barra/cartera.js?v=2"></script>
-    <script src="/static/js/barra/pedidos.js?v=1"></script>
-    <script src="/static/js/barra/armar.js?v=2"></script>
-    <script src="/static/js/barra/toque.js?v=3"></script>
-    <script src="/static/js/modulo-panel.js?v=5"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=11"></script>
-    <script src="/static/js/espejo.js?v=6"></script>
-    <script src="/static/js/espejo-engine.js?v=3"></script>
-    <script src="/static/js/nodo.js?v=1"></script>
-    <script src="/static/js/app.js?v=4.75"></script>
+    <script src="/static/js/barra/caja.js?v=5"></script>
+    <script src="/static/js/barra/cartera.js?v=3"></script>
+    <script src="/static/js/barra/pedidos.js?v=2"></script>
+    <script src="/static/js/barra/armar.js?v=3"></script>
+    <script src="/static/js/barra/toque.js?v=4"></script>
+    <script src="/static/js/modulo-panel.js?v=6"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=12"></script>
+    <script src="/static/js/espejo.js?v=7"></script>
+    <script src="/static/js/espejo-engine.js?v=4"></script>
+    <script src="/static/js/nodo.js?v=2"></script>
+    <script src="/static/js/app.js?v=4.80"></script>
 </body>
 </html>
