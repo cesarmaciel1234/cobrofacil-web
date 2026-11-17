@@ -18,20 +18,19 @@ from app.services.sync_hub import (
 
 @api_bp.route("/stream")
 def api_stream():
-    """SSE: broadcast aislado por empresa_id de la sesión."""
+    """SSE: broadcast aislado por empresa_id de la sesión compatible con Waitress."""
     empresa_id = int(session.get("empresa_id") or 1)
 
     def generate():
         inbox = subscribe(empresa_id)
         try:
             yield b": connected\n\n"
-            while True:
-                try:
-                    msg = inbox.get(timeout=25)
-                    raw = json.dumps(msg, ensure_ascii=False)
-                    yield f"event: refrescar\ndata: {raw}\n\n".encode("utf-8")
-                except queue.Empty:
-                    yield b": heartbeat\n\n"
+            try:
+                msg = inbox.get(timeout=2)
+                raw = json.dumps(msg, ensure_ascii=False)
+                yield f"event: refrescar\ndata: {raw}\n\n".encode("utf-8")
+            except queue.Empty:
+                yield b": heartbeat\n\n"
         finally:
             unsubscribe(empresa_id, inbox)
 
@@ -40,7 +39,7 @@ def api_stream():
         mimetype="text/event-stream",
         direct_passthrough=True,
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },
