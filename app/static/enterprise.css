@@ -104,7 +104,7 @@ body::before {
     border-right: 1px solid var(--border-subtle);
     display: flex;
     flex-direction: column;
-    z-index: 100;
+    z-index: 600;
     backdrop-filter: blur(16px);
     overflow: hidden;
     box-sizing: border-box;
@@ -1339,7 +1339,7 @@ body {
     position: fixed;
     inset: 0;
     background: rgba(15, 23, 42, 0.45);
-    z-index: 199;
+    z-index: 550 !important;
     opacity: 0;
     transition: opacity 0.25s var(--ease);
     -webkit-tap-highlight-color: transparent;
@@ -1347,9 +1347,18 @@ body {
 .sidebar-backdrop.active {
     display: block;
     opacity: 1;
+    z-index: 550 !important;
 }
 
-/* Panel flotante de métricas: por debajo del sidebar y del backdrop */
+@keyframes pulseShimmer {
+    0%, 100% { opacity: 0.35; }
+    50% { opacity: 0.85; }
+}
+.skeleton-pulse {
+    animation: pulseShimmer 1.4s ease-in-out infinite;
+    color: var(--text-tertiary);
+    font-weight: 700;
+}
 body.sidebar-open .dashboard-bar,
 .dashboard-bar.bar-suppressed {
     display: none !important;

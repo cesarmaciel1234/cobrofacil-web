@@ -19,7 +19,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.42">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.43">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -108,8 +108,23 @@
             </div>
             <div class="view active" id="view-reporte">
                 <p id="reporteDia" class="periodo-chip">Hoy</p>
-                <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">Cargando vitrina de tienda…</div>
+                <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">
+                    <div class="vitrina-wrap">
+                        <div class="vitrina-banner" style="opacity: 0.75;">
+                            <span>⚡</span>
+                            <span>Conectando con el espejo local de la tienda…</span>
+                        </div>
+                        <div class="vitrina-grid">
+                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Tickets del día</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Operaciones registradas</div></div>
+                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Ganancia parcial</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Margen sobre costo</div></div>
+                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Deuda clientes</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Saldo en la calle</div></div>
+                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Pagos clientes</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Cobranzas de cuenta corriente</div></div>
+                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Tickets digitales</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Con ticket · libro de ventas</div></div>
+                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Cancelaciones</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Ventas canceladas</div></div>
+                        </div>
+                    </div>
                 </div>
+            </div>
             <div class="view" id="view-ticket">
                 <p id="ticketPeriodo" class="periodo-chip">Mes</p>
                 <div class="card" id="ticketLista">
@@ -209,10 +224,10 @@
     <script src="/static/js/barra/armar.js?v=2"></script>
     <script src="/static/js/barra/toque.js?v=2"></script>
     <script src="/static/js/modulo-panel.js?v=5"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=9"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=10"></script>
     <script src="/static/js/espejo.js?v=4"></script>
     <script src="/static/js/espejo-engine.js?v=3"></script>
     <script src="/static/js/nodo.js?v=1"></script>
-    <script src="/static/js/app.js?v=4.73"></script>
+    <script src="/static/js/app.js?v=4.74"></script>
 </body>
 </html>

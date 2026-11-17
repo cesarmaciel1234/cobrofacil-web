@@ -1866,7 +1866,8 @@ const $ = id => document.getElementById(id);
         }
 
         function closeClientDrawer() {
-            $('drawerClientOverlay').classList.remove('open');
+            const overlay = $('drawerClientOverlay');
+            if (overlay && overlay.classList) overlay.classList.remove('open');
             selectedClienteId = null;
             // Restaurar topbar al estado normal (igual que volverDesdeClienteDetalle)
             if ($('topbarNormalMode')) $('topbarNormalMode').style.setProperty('display', '', '');
@@ -4007,6 +4008,9 @@ const $ = id => document.getElementById(id);
         }
 
         function arrancarLibroOffline() {
+            if (window.Espejo && Espejo.tieneDatos && Espejo.tieneDatos()) {
+                return; // Con Espejo activo en memoria e IndexedDB, no saturar la red con bloques históricos
+            }
             void completarLibro();
             void precalentarFiltros();
         }
@@ -4223,102 +4227,102 @@ const $ = id => document.getElementById(id);
                             <div class="vitrina-grid">
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.tickets.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.tickets?.titulo || 'Tickets'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.tickets.texto}</div>
+                                    <div class="vitrina-card-val">${v.tickets?.texto || '0'}</div>
                                     <div class="vitrina-card-sub">Operaciones registradas</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.ganancia_parcial.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.ganancia_parcial?.titulo || 'Ganancia parcial'}</span>
                                     </div>
-                                    <div class="vitrina-card-val ${v.ganancia_parcial.valor === null ? 'val-muted' : ''}">
-                                        ${v.ganancia_parcial.texto}
+                                    <div class="vitrina-card-val ${(!v.ganancia_parcial || v.ganancia_parcial.valor === null) ? 'val-muted' : ''}">
+                                        ${v.ganancia_parcial?.texto || '—'}
                                     </div>
-                                    <div class="vitrina-card-sub">${v.ganancia_parcial.subtitulo}</div>
+                                    <div class="vitrina-card-sub">${v.ganancia_parcial?.subtitulo || ''}</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.deuda_clientes.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.deuda_clientes?.titulo || 'Deuda clientes'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.deuda_clientes.texto}</div>
+                                    <div class="vitrina-card-val">${v.deuda_clientes?.texto || '—'}</div>
                                     <div class="vitrina-card-sub">Saldo en la calle</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.pagos_clientes.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.pagos_clientes?.titulo || 'Pagos clientes'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.pagos_clientes.texto}</div>
+                                    <div class="vitrina-card-val">${v.pagos_clientes?.texto || '—'}</div>
                                     <div class="vitrina-card-sub">Cobranzas de cuenta corriente</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.tickets_digitales.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.tickets_digitales?.titulo || 'Tickets digitales'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.tickets_digitales.texto}</div>
-                                    <div class="vitrina-card-sub">${v.tickets_digitales.subtitulo}</div>
+                                    <div class="vitrina-card-val">${v.tickets_digitales?.texto || '—'}</div>
+                                    <div class="vitrina-card-sub">${v.tickets_digitales?.subtitulo || ''}</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.cancelaciones.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.cancelaciones?.titulo || 'Cancelaciones'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.cancelaciones.texto}</div>
+                                    <div class="vitrina-card-val">${v.cancelaciones?.texto || '0'}</div>
                                     <div class="vitrina-card-sub">Ventas canceladas</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.sin_firmar.titulo}</span>
-                                        <span class="vitrina-card-badge badge-amber">${v.sin_firmar.badge}</span>
+                                        <span class="vitrina-card-lbl">${v.sin_firmar?.titulo || 'Sin firmar / F9'}</span>
+                                        ${v.sin_firmar?.badge ? `<span class="vitrina-card-badge badge-amber">${v.sin_firmar.badge}</span>` : ''}
                                     </div>
-                                    <div class="vitrina-card-val">${v.sin_firmar.texto}</div>
+                                    <div class="vitrina-card-val">${v.sin_firmar?.texto || '—'}</div>
                                     <div class="vitrina-card-sub">Tickets sin firma MP</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.mp_sin_ticket.titulo}</span>
-                                        <span class="vitrina-card-badge badge-red">${v.mp_sin_ticket.badge}</span>
+                                        <span class="vitrina-card-lbl">${v.mp_sin_ticket?.titulo || 'MP sin ticket'}</span>
+                                        ${v.mp_sin_ticket?.badge ? `<span class="vitrina-card-badge badge-red">${v.mp_sin_ticket.badge}</span>` : ''}
                                     </div>
-                                    <div class="vitrina-card-val">${v.mp_sin_ticket.texto}</div>
-                                    <div class="vitrina-card-sub">${v.mp_sin_ticket.subtitulo}</div>
+                                    <div class="vitrina-card-val">${v.mp_sin_ticket?.texto || '—'}</div>
+                                    <div class="vitrina-card-sub">${v.mp_sin_ticket?.subtitulo || ''}</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.cliente.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.cliente?.titulo || 'Cliente'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.cliente.texto}</div>
-                                    <div class="vitrina-card-sub">${v.cliente.subtitulo}</div>
+                                    <div class="vitrina-card-val">${v.cliente?.texto || '—'}</div>
+                                    <div class="vitrina-card-sub">${v.cliente?.subtitulo || ''}</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.descuento.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.descuento?.titulo || 'Descuento'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.descuento.texto}</div>
-                                    <div class="vitrina-card-sub">${v.descuento.subtitulo}</div>
+                                    <div class="vitrina-card-val">${v.descuento?.texto || '—'}</div>
+                                    <div class="vitrina-card-sub">${v.descuento?.subtitulo || ''}</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.redondeo.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.redondeo?.titulo || 'Redondeo'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.redondeo.texto}</div>
-                                    <div class="vitrina-card-sub">${v.redondeo.subtitulo}</div>
+                                    <div class="vitrina-card-val">${v.redondeo?.texto || '—'}</div>
+                                    <div class="vitrina-card-sub">${v.redondeo?.subtitulo || ''}</div>
                                 </div>
 
                                 <div class="vitrina-card">
                                     <div class="vitrina-card-top">
-                                        <span class="vitrina-card-lbl">${v.inventario_costo.titulo}</span>
+                                        <span class="vitrina-card-lbl">${v.inventario_costo?.titulo || 'Inventario al costo'}</span>
                                     </div>
-                                    <div class="vitrina-card-val">${v.inventario_costo.texto}</div>
-                                    <div class="vitrina-card-sub">${v.inventario_costo.subtitulo || 'Valuación a costo real'}</div>
+                                    <div class="vitrina-card-val">${v.inventario_costo?.texto || '—'}</div>
+                                    <div class="vitrina-card-sub">${v.inventario_costo?.subtitulo || 'Valuación a costo real'}</div>
                                 </div>
                             </div>
                         </div>`;
@@ -6328,7 +6332,7 @@ const $ = id => document.getElementById(id);
                 cargarSucursalesSelector();
                 $('topbarIcon')?.addEventListener('click', () => abrirSelectorSucursal());
                 await CrmLoader.runBoot();
-                setTimeout(() => arrancarLibroOffline(), 1200);
+                setTimeout(() => arrancarLibroOffline(), 15000);
             } catch (e) {
                 console.error('boot:', e);
                 setLoading(false);
@@ -6347,20 +6351,20 @@ const $ = id => document.getElementById(id);
                     .then(r => r.json())
                     .then(data => {
                         const ww = $('weatherWidget');
-                        if (ww) ww.textContent = Math.round(data.current_weather.temperature) + '°';
+                        if (ww && data && data.current_weather) ww.textContent = Math.round(data.current_weather.temperature) + '°';
                     }).catch(e => console.warn('Clima offline', e));
             }
             try {
-                if ("geolocation" in navigator) {
+                if ("geolocation" in navigator && window.isSecureContext) {
                     navigator.geolocation.getCurrentPosition(
                         pos => fetchW(pos.coords.latitude, pos.coords.longitude),
-                        err => fetchW(-34.61, -58.38)
+                        () => fetchW(-34.61, -58.38),
+                        { timeout: 3000 }
                     );
                 } else {
                     fetchW(-34.61, -58.38);
                 }
-            } catch (e) {
-                console.warn('Geolocation failed', e);
+            } catch (_) {
                 fetchW(-34.61, -58.38);
             }
         }

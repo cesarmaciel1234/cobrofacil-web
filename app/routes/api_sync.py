@@ -24,13 +24,14 @@ def api_stream():
     def generate():
         inbox = subscribe(empresa_id)
         try:
-            yield ": connected\n\n"
+            yield b": connected\n\n"
             while True:
                 try:
                     msg = inbox.get(timeout=25)
-                    yield f"event: refrescar\ndata: {json.dumps(msg, ensure_ascii=False)}\n\n"
+                    raw = json.dumps(msg, ensure_ascii=False)
+                    yield f"event: refrescar\ndata: {raw}\n\n".encode("utf-8")
                 except queue.Empty:
-                    yield ": heartbeat\n\n"
+                    yield b": heartbeat\n\n"
         finally:
             unsubscribe(empresa_id, inbox)
 

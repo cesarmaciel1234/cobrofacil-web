@@ -46,8 +46,18 @@
         return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
+    function repararTexto(str) {
+        if (!str || typeof str !== 'string') return str || '';
+        if (/[\u00C0-\u00FF]/.test(str)) {
+            try {
+                return decodeURIComponent(escape(str));
+            } catch (_) {}
+        }
+        return str;
+    }
+
     function esc(value) {
-        return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+        return String(repararTexto(value ?? '')).replace(/[&<>"']/g, (ch) => ({
             '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
         }[ch]));
     }
