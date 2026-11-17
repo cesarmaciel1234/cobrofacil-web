@@ -1240,6 +1240,12 @@ def _armar_panel(
     if nombre in ("contabilidad", "tesoreria"):
         hoy = datetime.now(_ZONA).date().isoformat()
         pedido = dict(filtro or {})
+        if not pedido.get("periodo") and periodo:
+            pedido["periodo"] = periodo
+        if not pedido.get("desde") and desde:
+            pedido["desde"] = desde
+        if not pedido.get("hasta") and hasta:
+            pedido["hasta"] = hasta
         pedido.setdefault("alcance", "dia")
         pedido.setdefault("metodo", "TODOS")
         if pedido.get("periodo"):

@@ -6,9 +6,25 @@
     <title>Cobro Fácil</title>
     
     <script>
+        // Bloqueo total de zoom (doble toque, pellizco y gestos) para experiencia de app nativa
         document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
         document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
         document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches && e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        document.addEventListener('touchmove', function(e) {
+            if (e.touches && e.touches.length > 1) {
+                e.preventDefault();
+            }
+        }, { passive: false });
+        document.addEventListener('wheel', function(e) {
+            if (e.ctrlKey) {
+                e.preventDefault();
+            }
+        }, { passive: false });
         var _lastTouch = 0;
         document.addEventListener('touchend', function(e) {
             var now = Date.now();
@@ -36,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.45">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.46">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -250,10 +266,10 @@
     <script src="/static/js/barra/armar.js?v=3"></script>
     <script src="/static/js/barra/toque.js?v=4"></script>
     <script src="/static/js/modulo-panel.js?v=6"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=13"></script>
-    <script src="/static/js/espejo.js?v=9"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=14"></script>
+    <script src="/static/js/espejo.js?v=10"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>
     <script src="/static/js/nodo.js?v=3"></script>
-    <script src="/static/js/app.js?v=4.85"></script>
+    <script src="/static/js/app.js?v=4.86"></script>
 </body>
 </html>

@@ -240,12 +240,25 @@
             const respuesta = await fetch(`${API_BASE}/pos/historial?pos_id=${encodeURIComponent(client.pos_id)}&deuda=${encodeURIComponent(deudaVisible(client))}`, { signal: ctl.signal });
             const dato = await respuesta.json();
             if (fichaAbierta !== String(id)) return;
-            librosVistos.set(clave, dato);
-            pintarMovimientos(dato);
+            if (dato && Array.isArray(dato.movimientos) && dato.movimientos.length) {
+                librosVistos.set(clave, dato);
+                pintarMovimientos(dato);
+                return;
+            }
         } catch (error) {
             if (error && error.name === 'AbortError') return;
-            const cuerpo = nodo('fichaCuerpo');
-            if (cuerpo && fichaAbierta === String(id)) cuerpo.innerHTML = '<p class="ficha-nota">No se pudo leer el historial.</p>';
+        }
+        if (window.Espejo && Espejo.historialCliente) {
+            const localHist = Espejo.historialCliente(client.pos_id, client.dni);
+            if (localHist && Array.isArray(localHist.movimientos) && localHist.movimientos.length) {
+                if (fichaAbierta !== String(id)) return;
+                librosVistos.set(clave, localHist);
+                pintarMovimientos(localHist);
+                return;
+            }
+        }
+        if (fichaAbierta === String(id)) {
+            pintarMovimientos({ movimientos: [] });
         }
     }
 
@@ -551,7 +564,7 @@
                     if (window.EspejoEngine && EspejoEngine.syncDelta) {
                         void EspejoEngine.syncDelta();
                     }
-                    return;
+                    if (!navigator.onLine) return;
                 }
             }
 

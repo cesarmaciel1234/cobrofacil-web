@@ -3208,8 +3208,12 @@ const $ = id => document.getElementById(id);
 
                 let html = `<button type="button" class="btn btn-sm ${activeSucursalId === null ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="todas" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">Consolidado (Todas)</button>`;
 
+                const vistas = new Set();
                 sucursales.forEach(s => {
-                    const isAct = String(activeSucursalId) === String(s.id);
+                    const idStr = String(s.id);
+                    if (vistas.has(idStr)) return;
+                    vistas.add(idStr);
+                    const isAct = String(activeSucursalId) === idStr;
                     html += `<button type="button" class="btn btn-sm ${isAct ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="${s.id}" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">📍 ${textoJefe(s.nombre)}</button>`;
                 });
                 cont.innerHTML = html;
@@ -3539,8 +3543,10 @@ const $ = id => document.getElementById(id);
                 if (window.EspejoEngine && EspejoEngine.syncDelta) {
                     void EspejoEngine.syncDelta();
                 }
-                if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
-                return;
+                if (!navigator.onLine) {
+                    if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
+                    return;
+                }
             }
 
             if (window.Nodo && ['reporte', 'contabilidad', 'ticket', 'desglose', 'cartera', 'admin'].includes(panel)) {

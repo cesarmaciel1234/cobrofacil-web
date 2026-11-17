@@ -416,6 +416,25 @@
      */
     function clientes(sucursalId) {
         const filas = filasTabla('clientes', sucursalId);
+        const ccTodas = filasTabla('cuenta_corriente', sucursalId);
+        const hoy = hoyDe();
+        const diasPorCliente = new Map();
+        if (ccTodas.length > 0) {
+            const hoyTs = new Date(hoy + 'T12:00:00').getTime();
+            ccTodas.forEach((cc) => {
+                const cid = idTexto(cc.cliente_id);
+                if (!cid) return;
+                const tipo = String(cc.tipo || '').toUpperCase();
+                if (tipo !== 'CARGO') return;
+                const dia = diaDe(cc.fecha);
+                if (!dia) return;
+                const diaTs = new Date(dia + 'T12:00:00').getTime();
+                const d = Math.max(0, Math.floor((hoyTs - diaTs) / (1000 * 60 * 60 * 24)));
+                if (!diasPorCliente.has(cid) || d < diasPorCliente.get(cid)) {
+                    diasPorCliente.set(cid, d);
+                }
+            });
+        }
         const porDni = new Map();
         const porNombre = new Map();
         const salida = [];
@@ -429,7 +448,11 @@
             const tipo = String(f.tipo_cliente || f.categoria || 'Minorista');
             const tel = String(f.telefono || f.celular || '');
             const dir = String(f.direccion || '');
-            const dias = f.dias !== undefined && f.dias !== null && f.dias !== '' ? Number(f.dias) : null;
+            const diasRaw = f.dias !== undefined && f.dias !== null && f.dias !== '' ? Number(f.dias) : null;
+            const dias = diasRaw !== null ? diasRaw : (saldo > 0 ? (diasPorCliente.get(id) ?? null) : null);
+            const tarifa = String(f.tarifa || '5%');
+            const tasaNum = parseFloat(tarifa) || 5;
+            const mant = f.mantenimiento != null ? Number(f.mantenimiento) : (saldo > 0 && dias != null ? Math.round(saldo * (tasaNum / 100) * (dias / 30) * 100) / 100 : 0);
 
             const item = {
                 id: id,
@@ -449,6 +472,8 @@
                 tipo: tipo,
                 tipo_cliente: tipo,
                 dias: dias,
+                tarifa: tarifa,
+                mantenimiento: mant,
                 en_riesgo: (limite > 0 && saldo >= limite) || (dias !== null && dias > 30),
                 estado: saldo > 0 ? 'Con saldo' : 'Al día',
                 sucursal_id: f.sucursal_id,
@@ -863,26 +888,84 @@
     }
 
     /**
-     * Historial de un cliente desde el espejo.
+     * Historial de un cliente desde el espejo (cuenta corriente y ventas).
      */
     function historialCliente(posId, dni) {
         const pid = idTexto(posId);
         const dniTxt = idTexto(dni);
+        const ccTodas = filasTabla('cuenta_corriente');
+        const ccFilas = ccTodas
+            .filter((cc) => (pid && idTexto(cc.cliente_id) === pid))
+            .sort((a, b) => (String(a.fecha) < String(b.fecha) ? 1 : -1));
+
+        if (ccFilas.length > 0) {
+            const movs = ccFilas.map((cc) => {
+                const tipo = String(cc.tipo || 'CARGO').toUpperCase();
+                const desc = String(cc.descripcion || '');
+                const esInt = desc.toUpperCase().includes('INTERÉS') || desc.toUpperCase().includes('INTERES');
+                return {
+                    id: cc.id,
+                    fecha: String(cc.fecha || '').split('.')[0],
+                    tipo: tipo,
+                    monto: Number(cc.monto) || 0,
+                    saldo: Number(cc.saldo_resultante != null ? cc.saldo_resultante : cc.monto) || 0,
+                    etiqueta: esInt ? 'Interés compensatorio' : (tipo === 'CARGO' ? 'Venta a crédito' : 'Cobro fiado'),
+                    ticket: cc.venta_id ? ('Ticket #' + cc.venta_id) : (desc.match(/Ticket #\d+/i) ? desc.match(/Ticket #\d+/i)[0] : ''),
+                    detalle: desc,
+                    mantenimiento: 0,
+                    dias: null,
+                    es_venta: tipo === 'CARGO' && !esInt,
+                    es_cobro: tipo === 'ABONO',
+                    es_interes: esInt,
+                    borrado: false,
+                    cancelado: false
+                };
+            });
+            return {
+                ok: true,
+                pos_id: posId,
+                movimientos: movs,
+                tickets: movs.map((m) => ({ id: m.id, fecha: m.fecha, total: m.monto, pago: 'Crédito' })),
+                resumen: `${movs.length} movimiento(s) · Espejo local`
+            };
+        }
+
         const vFilas = filasTabla('ventas');
         const cFilas = vFilas
             .filter((v) => (pid && idTexto(v.cliente_id) === pid) || (dniTxt && idTexto(v.dni_cuit) === dniTxt))
             .sort((a, b) => (a.fecha < b.fecha ? 1 : -1))
             .slice(0, 50);
 
+        const movsVentas = cFilas.map((v) => ({
+            id: v.id,
+            fecha: v.fecha,
+            tipo: 'CARGO',
+            monto: Number(v.total) || 0,
+            saldo: Number(v.total) || 0,
+            etiqueta: 'Venta',
+            ticket: 'Ticket #' + v.id,
+            detalle: v.pago || 'Venta',
+            mantenimiento: 0,
+            dias: null,
+            es_venta: true,
+            es_cobro: false,
+            es_interes: false,
+            borrado: false,
+            cancelado: false
+        }));
+
         return {
             ok: true,
+            pos_id: posId,
+            movimientos: movsVentas,
             tickets: cFilas.map((v) => ({
                 id: v.id,
                 fecha: v.fecha,
                 total: Number(v.total) || 0,
                 pago: v.metodo_pago || v.medio_pago || 'Efectivo',
                 estado: v.estado
-            }))
+            })),
+            resumen: `${movsVentas.length} venta(s) · Espejo local`
         };
     }
 
