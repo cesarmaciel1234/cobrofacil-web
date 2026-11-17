@@ -2583,8 +2583,7 @@ const $ = id => document.getElementById(id);
         function etiquetaPeriodoVentas() {
             const f = filtroVentas;
             let base = 'Hoy';
-            if (f.historico) base = 'Todas';
-            else if (f.alcance === 'semana') base = 'Semana';
+            if (f.alcance === 'semana') base = 'Semana';
             else if (f.alcance === 'mes') base = 'Mes';
             else if (f.alcance === 'periodo') {
                 const desde = fechaVisible(f.desde || f.fecha);
@@ -2789,11 +2788,11 @@ const $ = id => document.getElementById(id);
         }
 
         function modoFiltroVentas(f) {
-            if (f.historico) return 'todas';
             if (f.alcance === 'semana') return 'semana';
             if (f.alcance === 'mes') return 'mes';
             if (f.alcance === 'periodo') return 'periodo';
-            return 'hoy';
+            if (f.alcance === 'dia') return 'hoy';
+            return 'mes';
         }
 
         function avisoSinTickets(libroLlego) {
@@ -2828,7 +2827,6 @@ const $ = id => document.getElementById(id);
                     <button type="button" class="filtro-periodo${modo === 'semana' ? ' active' : ''}" data-modo="semana">Semana</button>
                     <button type="button" class="filtro-periodo${modo === 'mes' ? ' active' : ''}" data-modo="mes">Mes</button>
                     <button type="button" class="filtro-periodo${modo === 'periodo' ? ' active' : ''}" data-modo="periodo">Período</button>
-                    <button type="button" class="filtro-periodo${modo === 'todas' ? ' active' : ''}" data-modo="todas">Todas</button>
                 </div>
                 <div class="filtro-horas" id="filtroFechaCampo"${modo === 'periodo' ? '' : ' hidden'}>
                     <label>Desde<input id="filtroFechaDesde" type="text" inputmode="numeric" placeholder="DD/MM/AAAA" maxlength="10" value="${textoJefe(fechaVisible(f.desde || f.fecha || hoyLocal()))}"></label>
@@ -2871,9 +2869,9 @@ const $ = id => document.getElementById(id);
                     filtroVentas = {
                         q: (fondo.querySelector('#filtroQ')?.value || '').trim(),
                         pago: fondo.querySelector('#filtroPago')?.value || 'TODOS',
-                        alcance: elegido === 'todas' ? 'mes' : alcance,
+                        alcance: alcance,
                         fecha: elegido === 'hoy' ? hoyLocal() : (elegido === 'periodo' ? desde : ''),
-                        historico: elegido === 'todas',
+                        historico: false,
                         franja: !!franja,
                         hora_desde: franja ? (fondo.querySelector('#filtroDesde')?.value || '08:00') : '08:00',
                         hora_hasta: franja ? (fondo.querySelector('#filtroHasta')?.value || '21:00') : '21:00',
@@ -6397,7 +6395,7 @@ const $ = id => document.getElementById(id);
                     Espejo.alActualizar(pintarDesdeEspejo);
                     void Espejo.asegurar();
                 }
-                const CRM_CACHE_EPOCH = '2026-11-17-epoch4';
+                const CRM_CACHE_EPOCH = '2026-11-17-epoch5';
                 if (localStorage.getItem('crm_cache_epoch') !== CRM_CACHE_EPOCH) {
                     localStorage.setItem('crm_cache_epoch', CRM_CACHE_EPOCH);
                     localStorage.removeItem('crm_sucursales_cache');
