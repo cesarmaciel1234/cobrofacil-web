@@ -205,6 +205,16 @@ def get_db(empresa_id=None):
                         except Exception:
                             pass
                         conn = pool.getconn()
+                    # Verificar si la conexión de Neon / Render sigue viva o si se durmió por inactividad
+                    try:
+                        with conn.cursor() as test_cur:
+                            test_cur.execute("SELECT 1")
+                    except Exception:
+                        try:
+                            pool.putconn(conn, close=True)
+                        except Exception:
+                            pass
+                        conn = pool.getconn()
                     es_del_pool = True
                     break
                 except Exception:

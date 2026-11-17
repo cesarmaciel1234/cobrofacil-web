@@ -416,8 +416,10 @@ def api_pos_base_tabla():
     if str(data.get("tabla") or "") == "ventas" and data.get("total_filas") not in (None, ""):
         from app.services.pos_base import anotar_carga
 
+        emp_raw = session.get("empresa_id")
+        emp_id = int(emp_raw) if str(emp_raw or "").isdigit() else 1
         anotar_carga(
-            int(session.get("empresa_id") or 1),
+            emp_id,
             int(data.get("enviadas") or 0),
             int(data.get("total_filas") or 0),
             bool(data.get("dia")),
@@ -426,8 +428,10 @@ def api_pos_base_tabla():
     if completo and resultado.get("ok"):
         from app.services.signal_bus import broadcast_refresh
 
+        emp_raw = session.get("empresa_id")
+        emp_id = int(emp_raw) if str(emp_raw or "").isdigit() else 1
         limpiar_solicitud_sync(data.get("sucursal_id") or 1)
-        broadcast_refresh(int(session.get("empresa_id") or 1), reason="libro")
+        broadcast_refresh(emp_id, reason="libro")
     return jsonify(resultado)
 
 
