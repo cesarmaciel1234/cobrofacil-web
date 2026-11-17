@@ -465,12 +465,19 @@ def evaluar_ticket(
         if pago.startswith("MIXTO"):
             if metodo_u == "EFECTIVO":
                 aporte = _num(venta.get("pago_efectivo")) - _num(venta.get("cambio"))
+                if aporte <= 0:
+                    return False, 0.0
             else:
-                if credito and "CLIENTE" not in pago:
+                if credito and "CLIENTE" not in pago and "FIADO" not in pago:
                     return False, 0.0
                 if not credito and "CLIENTE" in pago:
                     return False, 0.0
-                aporte = _num(venta.get("pago_otro"))
+                if not credito and "(" in pago and metodo_u not in pago:
+                    return False, 0.0
+                otro = _num(venta.get("pago_otro"))
+                tot = _num(venta.get("total"))
+                # Si pago_otro excede el total, contiene un número de referencia/código de barras, no un monto
+                aporte = min(otro, tot) if (otro > 0 and tot > 0) else otro
             if aporte <= 0:
                 return False, 0.0
         elif credito:

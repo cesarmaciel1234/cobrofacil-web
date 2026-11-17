@@ -281,19 +281,42 @@
         return salida;
     }
 
-    function elegir(libro, desde, hasta, sucursalId) {
+    function elegir(libro, desde, hasta, sucursalId, filtro) {
+        const f = filtro || {};
+        const q = String(f.q || '').trim().toLowerCase();
+        const p = String(f.pago || 'TODOS').trim().toUpperCase();
+        const franja = !!f.franja;
+        const h0 = franja ? String(f.hora_desde || '00:00') : '';
+        const h1 = franja ? String(f.hora_hasta || '23:59') : '';
+
         return filasVentas(libro, sucursalId).filter((fila) => {
             if (!fila.dia) return false;
             if (desde && fila.dia < desde) return false;
             if (hasta && fila.dia > hasta) return false;
+            if (franja && h0 && h1) {
+                const hora = (fila.fecha || '').slice(11, 16);
+                if (hora && (hora < h0 || hora > h1)) return false;
+            }
+            if (p && p !== 'TODOS') {
+                const fp = String(fila.pago || '').toUpperCase();
+                if (p === 'CRÉDITO' || p === 'CREDITO') {
+                    if (!fp.includes('FIADO') && !fp.includes('CLIENTE') && !fp.includes('CUENTA CORRIENTE')) return false;
+                } else if (!fp.includes(p)) {
+                    return false;
+                }
+            }
+            if (q) {
+                const pool = (String(fila.id || '') + ' ' + String(fila.cliente || '') + ' ' + String(fila.pago || '') + ' ' + String(fila.caja || '')).toLowerCase();
+                if (!pool.includes(q)) return false;
+            }
             return true;
         });
     }
 
-    function sumar(libro, desde, hasta, sucursalId) {
+    function sumar(libro, desde, hasta, sucursalId, filtro) {
         let total = 0;
         let cant = 0;
-        elegir(libro, desde, hasta, sucursalId).forEach((fila) => {
+        elegir(libro, desde, hasta, sucursalId, filtro).forEach((fila) => {
             if (CANCELADAS[String(fila.estado || '').trim().toUpperCase()]) return;
             total += fila.total;
             cant += 1;
@@ -301,9 +324,9 @@
         return { cant: cant, total: Math.round(total * 100) / 100 };
     }
 
-    function listar(libro, desde, hasta, sucursalId) {
-        const filas = elegir(libro, desde, hasta, sucursalId);
-        const suma = sumar(libro, desde, hasta, sucursalId);
+    function listar(libro, desde, hasta, sucursalId, filtro) {
+        const filas = elegir(libro, desde, hasta, sucursalId, filtro);
+        const suma = sumar(libro, desde, hasta, sucursalId, filtro);
         const visibles = filas.slice().sort((a, b) => (a.fecha < b.fecha ? 1 : (a.fecha > b.fecha ? -1 : (a.id < b.id ? 1 : -1))));
         return {
             cant: suma.cant,

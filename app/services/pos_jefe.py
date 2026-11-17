@@ -1098,7 +1098,50 @@ def _armar_panel(
     ini = desde_iso[:10]
     fin = hasta_iso[:10]
     hoy_real = datetime.now(_ZONA).date().isoformat()
-    if nombre in ("ticket", "desglose"):
+    if nombre == "ticket":
+        pedido = dict(filtro or {})
+        if pedido.get("fecha_ini"):
+            ini = str(pedido.get("fecha_ini"))[:10]
+            fin = str(pedido.get("fecha_fin") or ini)[:10]
+        else:
+            ini, fin = rango_fechas(
+                str(pedido.get("alcance") or "dia"),
+                str(pedido.get("fecha") or ""),
+                bool(pedido.get("historico")),
+                hoy_real,
+            )
+        if (
+            str(pedido.get("alcance") or "dia").lower() == "dia"
+            and not pedido.get("historico")
+            and not pedido.get("fecha_ini")
+        ):
+            pedido["fecha_ini"] = ini or hoy_real
+            pedido["fecha_fin"] = fin or hoy_real
+        libro = historial_ventas(sucursal_id, pedido, hoy_real)
+        t_ok = libro.get("tickets_ok", 0)
+        t_fil = libro.get("filtrado", 0.0)
+        return {
+            "ok": True,
+            "libro": libro["libro"],
+            "panel": nombre,
+            "resumen": {
+                "dia": ini or hoy_real,
+                "ventas": t_fil,
+                "tickets": t_ok,
+                "promedio": round(t_fil / t_ok, 2) if t_ok else 0.0,
+                "pago": "",
+                "es_hoy": (ini == hoy_real),
+            },
+            "tickets": libro["tickets"],
+            "filtrado": t_fil,
+            "tickets_ok": t_ok,
+            "cajas": libro["cajas"],
+            "recorte": libro["recorte"],
+            "sucursales": sucursales_disp,
+            "sucursal_id": sucursal_id,
+        }
+
+    if nombre == "desglose":
         pedido = dict(filtro or {})
         if pedido.get("fecha_ini"):
             ini = str(pedido.get("fecha_ini"))[:10]

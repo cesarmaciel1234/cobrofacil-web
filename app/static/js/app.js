@@ -2582,15 +2582,23 @@ const $ = id => document.getElementById(id);
 
         function etiquetaPeriodoVentas() {
             const f = filtroVentas;
-            if (f.historico) return 'Todas';
-            if (f.alcance === 'semana') return 'Semana';
-            if (f.alcance === 'mes') return 'Mes';
-            if (f.alcance === 'periodo') {
+            let base = 'Hoy';
+            if (f.historico) base = 'Todas';
+            else if (f.alcance === 'semana') base = 'Semana';
+            else if (f.alcance === 'mes') base = 'Mes';
+            else if (f.alcance === 'periodo') {
                 const desde = fechaVisible(f.desde || f.fecha);
                 const hasta = fechaVisible(f.hasta || f.desde || f.fecha);
-                return desde && hasta && desde !== hasta ? (desde + ' → ' + hasta) : (desde || 'Período');
+                base = desde && hasta && desde !== hasta ? (desde + ' → ' + hasta) : (desde || 'Período');
             }
-            return 'Hoy';
+            if (f.pago && f.pago !== 'TODOS') {
+                const rotulos = { EFECTIVO: 'Efectivo', TARJETA: 'Tarjeta', TRANSFERENCIA: 'Transferencia', QR: 'QR', MIXTO: 'Mixto', 'CRÉDITO': 'Crédito', REDONDEO: 'Redondeo', RECARGO: 'Recargo' };
+                base += ' · ' + (rotulos[f.pago] || f.pago);
+            }
+            if (f.q) {
+                base += ' · "' + f.q + '"';
+            }
+            return base;
         }
 
         function pintarChipPeriodo(id, texto) {
@@ -2690,8 +2698,9 @@ const $ = id => document.getElementById(id);
             pintarChipPeriodo('ticketPeriodo', periodoTxt);
             if (suma) {
                 const extra = ticketsResumen.recorte ? ' · los 400 más nuevos' : '';
+                const cantTxt = ticketsResumen.ok === 1 ? '1 ticket' : (ticketsResumen.ok + ' tickets');
                 suma.textContent = (ticketsEnPantalla.length || ticketsResumen.ok)
-                    ? (periodoTxt + ' · ' + plataJefe(ticketsResumen.total) + ' · ' + ticketsResumen.ok + ' tickets' + extra)
+                    ? (periodoTxt + ' · ' + plataJefe(ticketsResumen.total) + ' · ' + cantTxt + extra)
                     : (periodoTxt + ' · $0,00');
             }
             cuerpo.innerHTML = ticketsEnPantalla.length
@@ -3160,12 +3169,16 @@ const $ = id => document.getElementById(id);
         }
 
         async function abrirSelectorSucursal() {
-            if (!sucursalesConocidas.length) {
-                try {
-                    const data = await fetch('/api/pos/sucursales').then((r) => r.json());
-                    sucursalesConocidas = data.sucursales || [];
-                } catch (_) {}
-            }
+            try {
+                const data = await fetch('/api/pos/sucursales').then((r) => r.json());
+                if (data && Array.isArray(data.sucursales)) {
+                    sucursalesConocidas = data.sucursales;
+                    try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursalesConocidas)); } catch (_) {}
+                    if (activeSucursalId != null && !sucursalesConocidas.some((s) => String(s.id) === String(activeSucursalId))) {
+                        aplicarSucursal(null);
+                    }
+                }
+            } catch (_) {}
             document.getElementById('sucursalSheet')?.remove();
             const actual = activeSucursalId == null ? '' : String(activeSucursalId);
             const opciones = [{ id: '', nombre: 'Todas' }].concat(
@@ -3508,7 +3521,7 @@ const $ = id => document.getElementById(id);
                         datoEspejo = Espejo.resumenJefe(window.vitrinaPeriodo, window.vitrinaDesde, window.vitrinaHasta, activeSucursalId);
                     } else if (panel === 'ticket') {
                         const rango = Espejo.rangoVentas(filtroVentas);
-                        const lista = Espejo.listar(null, rango[0], rango[1], activeSucursalId);
+                        const lista = Espejo.listar(null, rango[0], rango[1], activeSucursalId, filtroVentas);
                         datoEspejo = {
                             ok: true, libro: true, panel: 'ticket',
                             filtrado: lista.total, tickets_ok: lista.cant,
@@ -4146,7 +4159,7 @@ const $ = id => document.getElementById(id);
                     }
                 }
                 if (panel === 'ticket') {
-                    const lista = Espejo.listar(libro, rango[0], rango[1], activeSucursalId);
+                    const lista = Espejo.listar(libro, rango[0], rango[1], activeSucursalId, filtroVentas);
                     const serverTiene = (dato.tickets || []).length > 0;
                     if (serverMasNuevo && serverTiene) return dato;
                     if (!lista.cant && serverTiene) return dato;
