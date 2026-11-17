@@ -931,6 +931,8 @@ def consolidar_sucursales(conn) -> None:
                 """
             )
             conn.execute("DELETE FROM pos_base WHERE sucursal_id = 1 AND LOWER(TRIM(COALESCE(sucursal_nombre, ''))) = 'maciel'")
+            conn.execute("DELETE FROM clientes WHERE sucursal_id = 1")
+            conn.execute("DELETE FROM pos_novedad WHERE sucursal_id = 1")
             if hasattr(conn, "commit"):
                 conn.commit()
     except Exception as exc:

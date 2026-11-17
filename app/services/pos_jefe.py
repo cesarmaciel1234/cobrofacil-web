@@ -661,6 +661,16 @@ def _nombres_en_crm() -> dict[str, dict]:
 def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
     columnas, filas = filas_de("clientes", sucursal_id)
     if filas:
+        if sucursal_id is None:
+            sucs_activas = {int(s["id"]) for s in listar_sucursales() if s.get("id") is not None}
+            if sucs_activas:
+                idx = _indice(columnas)
+                idx_suc = idx.get("sucursal_id")
+                if idx_suc is not None:
+                    filas = [
+                        f for f in filas
+                        if idx_suc >= len(f) or f[idx_suc] in (None, "") or int(float(f[idx_suc])) in sucs_activas
+                    ]
         return unir_clientes(columnas, filas)
     col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
     if not col_cc:

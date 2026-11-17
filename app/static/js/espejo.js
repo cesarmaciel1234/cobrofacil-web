@@ -80,6 +80,22 @@
         })).catch(() => {});
     }
 
+    async function limpiarTodo() {
+        copias = {};
+        memoria = null;
+        selloGlobal = '';
+        try {
+            const db = await abrir();
+            const tx = db.transaction('tablas', 'readwrite');
+            tx.objectStore('tablas').clear();
+            await new Promise((resolve) => {
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => resolve();
+            });
+        } catch (_) {}
+        avisar();
+    }
+
     /**
      * Actualiza la tabla en IndexedDB Y en la memoria reactiva.
      */
@@ -157,7 +173,41 @@
         return /^\d+\.0$/.test(texto) ? texto.slice(0, -2) : texto;
     }
 
+    let sucursalesValidas = null;
+
+    function fijarSucursales(lista) {
+        if (!Array.isArray(lista)) return;
+        const sids = new Set(lista.map((s) => Number(s.id != null ? s.id : s.sucursal_id)).filter((id) => !isNaN(id) && id > 0));
+        sucursalesValidas = sids;
+        void purgarSucursalesObsoletas(sids);
+    }
+
+    async function purgarSucursalesObsoletas(sids) {
+        if (!sids || !sids.size) return;
+        let cambio = false;
+        for (let i = 0; i < ORDEN.length; i++) {
+            const tabla = ORDEN[i];
+            const libro = copias[tabla];
+            if (libro && Array.isArray(libro.sucursales)) {
+                const prevCount = libro.sucursales.length;
+                libro.sucursales = libro.sucursales.filter((s) => {
+                    const sid = Number(s.sucursal_id);
+                    return isNaN(sid) || sid <= 0 || sids.has(sid);
+                });
+                if (libro.sucursales.length !== prevCount) {
+                    cambio = true;
+                    await guardarTabla(tabla, libro, true).catch(() => {});
+                }
+            }
+        }
+        if (cambio) avisar();
+    }
+
     function coincideSucursal(sucId, filtro) {
+        const sid = Number(sucId);
+        if (sucursalesValidas && sucursalesValidas.size && !isNaN(sid) && sid > 0 && !sucursalesValidas.has(sid)) {
+            return false;
+        }
         if (filtro === null || filtro === undefined) return true;
         const f = String(filtro).trim().toLowerCase();
         if (!f || f === 'todas' || f === 'todos' || f === 'todas las sucursales') return true;
@@ -503,13 +553,22 @@
                 sucursal_nombre: f.sucursal_nombre,
             };
 
+            if (sucursalesValidas && sucursalesValidas.size && f.sucursal_id != null) {
+                const fsid = Number(f.sucursal_id);
+                if (!isNaN(fsid) && fsid > 0 && !sucursalesValidas.has(fsid)) return;
+            }
+
             if (dni) {
                 if (porDni.has(dni)) {
                     const previo = porDni.get(dni);
                     if (previo.sucursal_id !== f.sucursal_id) {
-                        previo.saldo_actual += saldo;
-                        previo.deuda_pos += saldo;
-                        previo.deuda += saldo;
+                        const distinto = previo.saldo_actual !== saldo;
+                        if (distinto) {
+                            previo.saldo_actual += saldo;
+                            previo.deuda_pos += saldo;
+                            previo.deuda += saldo;
+                            previo.mantenimiento = Math.round((previo.mantenimiento + mant) * 100) / 100;
+                        }
                     }
                     return;
                 }
@@ -519,9 +578,13 @@
                 if (porNombre.has(k)) {
                     const previo = porNombre.get(k);
                     if (previo.sucursal_id !== f.sucursal_id) {
-                        previo.saldo_actual += saldo;
-                        previo.deuda_pos += saldo;
-                        previo.deuda += saldo;
+                        const distinto = previo.saldo_actual !== saldo;
+                        if (distinto) {
+                            previo.saldo_actual += saldo;
+                            previo.deuda_pos += saldo;
+                            previo.deuda += saldo;
+                            previo.mantenimiento = Math.round((previo.mantenimiento + mant) * 100) / 100;
+                        }
                     }
                     return;
                 }
@@ -1077,6 +1140,9 @@
         ventas: function () { return memoria || copias.ventas || null; },
         filasTabla: filasTabla,
         sucursales: sucursales,
+        fijarSucursales: fijarSucursales,
+        purgar: purgarSucursalesObsoletas,
+        limpiarTodo: limpiarTodo,
         clientes: clientes,
         cartera: cartera,
         contabilidad: contabilidad,

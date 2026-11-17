@@ -266,10 +266,12 @@
         const borrar = [];
         for (let i = 0; i < localStorage.length; i += 1) {
             const clave = localStorage.key(i);
-            if (clave && (clave.indexOf('crm-jefe:') === 0 || clave === 'crm-cartera-app')) borrar.push(clave);
+            if (clave && (clave.indexOf('crm-jefe:') === 0 || clave === 'crm-cartera-app' || clave === 'crm_sucursales_cache')) borrar.push(clave);
         }
         borrar.forEach((clave) => localStorage.removeItem(clave));
         try { sessionStorage.removeItem('crm-cartera-app'); } catch (_) {}
+        try { indexedDB.deleteDatabase('crm-espejo'); } catch (_) {}
+        try { indexedDB.deleteDatabase('crm-nodo'); } catch (_) {}
     }
 
     async function finishBootInBackground(hadCacheOnStart) {

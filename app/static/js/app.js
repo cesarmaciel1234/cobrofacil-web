@@ -3174,6 +3174,9 @@ const $ = id => document.getElementById(id);
                 if (data && Array.isArray(data.sucursales)) {
                     sucursalesConocidas = data.sucursales;
                     try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursalesConocidas)); } catch (_) {}
+                    if (window.Espejo && Espejo.fijarSucursales) {
+                        Espejo.fijarSucursales(sucursalesConocidas);
+                    }
                     if (activeSucursalId != null && !sucursalesConocidas.some((s) => String(s.id) === String(activeSucursalId))) {
                         aplicarSucursal(null);
                     }
@@ -3212,6 +3215,9 @@ const $ = id => document.getElementById(id);
                 const sucursales = data.sucursales || [];
                 sucursalesConocidas = sucursales;
                 try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursales)); } catch (_) {}
+                if (window.Espejo && Espejo.fijarSucursales) {
+                    Espejo.fijarSucursales(sucursalesConocidas);
+                }
                 if (activeSucursalId != null && !sucursales.some((s) => String(s.id) === String(activeSucursalId))) {
                     aplicarSucursal(null);
                 }
@@ -6390,6 +6396,21 @@ const $ = id => document.getElementById(id);
                 if (window.Espejo) {
                     Espejo.alActualizar(pintarDesdeEspejo);
                     void Espejo.asegurar();
+                }
+                const CRM_CACHE_EPOCH = '2026-11-17-epoch4';
+                if (localStorage.getItem('crm_cache_epoch') !== CRM_CACHE_EPOCH) {
+                    localStorage.setItem('crm_cache_epoch', CRM_CACHE_EPOCH);
+                    localStorage.removeItem('crm_sucursales_cache');
+                    localStorage.removeItem('crm-cartera-app');
+                    for (let k of Object.keys(localStorage)) {
+                        if (k.startsWith('crm_jefe_') || k.startsWith('crm_paneles_') || k.startsWith('nodo_')) {
+                            localStorage.removeItem(k);
+                        }
+                    }
+                    if (window.Espejo && Espejo.limpiarTodo) {
+                        try { await Espejo.limpiarTodo(); } catch (_) {}
+                    }
+                    try { indexedDB.deleteDatabase('crm-nodo'); } catch (_) {}
                 }
                 marcarVersion();
                 wireCrmModules();
