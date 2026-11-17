@@ -697,8 +697,11 @@
         const desgl = desglose(ini, fin, sucursalId);
         const ranking = (desgl && desgl.filas ? desgl.filas : []).slice(0, 10).map((item) => ({
             producto: item.nombre,
-            kilos: item.cantidad,
-            monto: item.monto
+            cantidad: Number(item.cantidad) || 0,
+            kilos: Number(item.cantidad) || 0,
+            total: Number(item.monto) || 0,
+            monto: Number(item.monto) || 0,
+            operaciones: item.tickets || 1
         }));
 
         const porSuc = {};

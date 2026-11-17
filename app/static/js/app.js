@@ -4386,9 +4386,9 @@ const $ = id => document.getElementById(id);
                                     <span style="display:inline-block; width:24px; height:24px; line-height:24px; border-radius:50%; background:${badgeColor}; color:${textColor}; font-size:11px; font-weight:800;">${idx + 1}</span>
                                 </td>
                                 <td style="padding:10px 14px; font-weight:700; color:#1e293b;">${textoJefe(item.producto)}</td>
-                                <td style="padding:10px 14px; text-align:right; font-weight:600; color:#475569;">${item.cantidad.toLocaleString('es-AR')} kg</td>
-                                <td style="padding:10px 14px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(item.total)}</td>
-                                <td style="padding:10px 14px; text-align:right; color:#64748b;">${item.operaciones}</td>
+                                <td style="padding:10px 14px; text-align:right; font-weight:600; color:#475569;">${(Number(item.cantidad != null ? item.cantidad : item.kilos) || 0).toLocaleString('es-AR')} kg</td>
+                                <td style="padding:10px 14px; text-align:right; font-weight:800; color:#0f172a;">${plataJefe(item.total != null ? item.total : item.monto)}</td>
+                                <td style="padding:10px 14px; text-align:right; color:#64748b;">${item.operaciones != null ? item.operaciones : (item.tickets || '—')}</td>
                             </tr>`;
                         });
                         html += `</tbody></table></div></div>`;
