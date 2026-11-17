@@ -568,11 +568,14 @@ def api_pos_carga():
     total = int(dato.get("total") or 0)
     if total < subidos:
         total = subidos
+    progreso_texto = dato.get("progreso_texto") or (f"{subidos}/{total}" if total > 0 else "")
     return jsonify({
         "ok": True,
-        "visible": total > 0 and subidos < total,
+        "visible": True,
+        "completo": total > 0 and subidos >= total,
         "subidos": subidos,
         "total": total,
+        "progreso_texto": progreso_texto,
         "dia": bool(dato.get("dia")),
     })
 

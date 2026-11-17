@@ -4246,7 +4246,7 @@ const $ = id => document.getElementById(id);
                         <div class="vitrina-wrap">
                             <div class="vitrina-banner">
                                 <span>⚠️</span>
-                                <span>${textoBannerRed(v && v.actualizado_en_texto)}</span>
+                                <span>${textoBannerRed(v && v.actualizado_en_texto, v && (v.progreso_carga || (v.carga && v.carga.progreso_texto)))}</span>
                             </div>
 
                             <div class="vitrina-grid">
@@ -5975,12 +5975,13 @@ const $ = id => document.getElementById(id);
             return texto.replace('T', ' ').slice(0, 16);
         }
 
-        function textoBannerRed(sync) {
+        function textoBannerRed(sync, progreso) {
             const marca = sync || redCrm.sync || '—';
+            const extra = progreso ? ' (Ventas: ' + progreso + ')' : '';
             if (window.__crmDesacoplado || !(navigator.onLine && redCrm.enLinea)) {
-                return 'Modo offline — último dato ' + marca;
+                return 'Modo offline — último dato ' + marca + extra;
             }
-            return 'En línea — datos de la tienda al ' + marca;
+            return 'En línea — datos de la tienda al ' + marca + extra;
         }
 
         function marcarRed(enLinea, sync) {
@@ -6327,12 +6328,15 @@ const $ = id => document.getElementById(id);
                     const pct = total > 0 ? Math.max(2, Math.min(100, Math.round((subidos / total) * 100))) : 0;
                     caja.hidden = false;
                     if (texto) {
-                        texto.textContent = dato.dia
-                            ? 'El día ya está. El resto sigue cargando.'
-                            : 'Subiendo la venta del día.';
+                        if (dato.completo || (total > 0 && subidos >= total)) {
+                            texto.textContent = 'Ventas al día (' + subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR') + ')';
+                        } else {
+                            texto.textContent = (dato.dia ? 'Sincronizando' : 'Subiendo ventas') +
+                                ' (' + subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR') + ')';
+                        }
                     }
                     if (cuenta) {
-                        cuenta.textContent = subidos.toLocaleString('es-AR') + ' de ' + total.toLocaleString('es-AR');
+                        cuenta.textContent = subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR');
                     }
                     if (barra) barra.style.width = pct + '%';
                 } catch (e) {

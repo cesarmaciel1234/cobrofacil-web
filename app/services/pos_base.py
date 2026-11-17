@@ -51,14 +51,38 @@ def anotar_carga(empresa_id: int, enviadas: int, total: int, dia: bool) -> None:
     """El día entra primero. Acá queda cuánto del libro ya llegó, para la barra de arriba."""
     with _carga_lock:
         previa = _carga.get(int(empresa_id)) or {}
+        sub_n = max(int(enviadas or 0), int(previa.get("subidos") or 0))
+        tot_n = max(int(total or 0), int(previa.get("total") or 0))
+        if tot_n < sub_n:
+            tot_n = sub_n
         _carga[int(empresa_id)] = {
-            "subidos": max(int(enviadas or 0), int(previa.get("subidos") or 0)),
-            "total": max(int(total or 0), int(previa.get("total") or 0)),
+            "subidos": sub_n,
+            "total": tot_n,
+            "progreso_texto": f"{sub_n}/{tot_n}" if tot_n > 0 else f"{sub_n}",
             "dia": bool(dia) or bool(previa.get("dia")),
         }
 
 
 def leer_carga(empresa_id: int) -> dict:
+    with _carga_lock:
+        dato = _carga.get(int(empresa_id))
+        if dato and int(dato.get("total") or 0) > 0:
+            return dict(dato)
+    # Si Render reinició o no hay dato en memoria, consultar la base
+    try:
+        with get_db() as conn:
+            ensure_tenant_migrations(conn)
+            row = conn.execute("SELECT COALESCE(SUM(cantidad), 0) AS total_ventas FROM pos_base WHERE tabla = 'ventas'").fetchone()
+            subidos = int(row["total_ventas"] or 0) if row else 0
+            if subidos > 0:
+                return {
+                    "subidos": subidos,
+                    "total": subidos,
+                    "progreso_texto": f"{subidos}/{subidos}",
+                    "dia": True,
+                }
+    except Exception:
+        pass
     with _carga_lock:
         dato = _carga.get(int(empresa_id))
         return dict(dato) if dato else {}
@@ -874,32 +898,26 @@ def ultima_carga(sucursal_id: int | None = None) -> str | None:
 
 
 def consolidar_sucursales(conn) -> None:
-    """Unifica terminales registradas con el hostname del equipo (ej: DESKTOP-... con Maciel)."""
+    """Unifica terminales registradas con el hostname del equipo si se duplicó el nodo."""
     try:
-        row = conn.execute(
-            """
-            SELECT sucursal_nombre
-            FROM pos_base
-            WHERE sucursal_nombre IS NOT NULL
-              AND sucursal_nombre != ''
-              AND SUBSTR(UPPER(sucursal_nombre), 1, 8) != 'DESKTOP-'
-              AND SUBSTR(UPPER(sucursal_nombre), 1, 7) != 'LAPTOP-'
-            LIMIT 1
-            """
-        ).fetchone()
-        nombre_oficial = str(row[0]).strip() if (row and row[0]) else "Maciel"
-
-        conn.execute(
-            """
-            UPDATE pos_base
-            SET sucursal_nombre = ?
-            WHERE SUBSTR(UPPER(sucursal_nombre), 1, 8) = 'DESKTOP-'
-               OR SUBSTR(UPPER(sucursal_nombre), 1, 7) = 'LAPTOP-'
-            """,
-            (nombre_oficial,),
-        )
-        if hasattr(conn, "commit"):
-            conn.commit()
+        row_maciel = conn.execute("SELECT 1 FROM pos_base WHERE sucursal_id = 1 AND LOWER(TRIM(COALESCE(sucursal_nombre, ''))) = 'maciel' LIMIT 1").fetchone()
+        row_nodo2 = conn.execute("SELECT 1 FROM pos_base WHERE sucursal_id = 2 AND LOWER(COALESCE(sucursal_nombre, '')) LIKE '%desktop%' LIMIT 1").fetchone()
+        if row_maciel and row_nodo2:
+            conn.execute(
+                """
+                UPDATE pos_base p1
+                SET sucursal_id = 2, sucursal_nombre = 'maciel - DESKTOP-7Q2Q4VD'
+                WHERE p1.sucursal_id = 1
+                  AND LOWER(TRIM(COALESCE(p1.sucursal_nombre, ''))) = 'maciel'
+                  AND NOT EXISTS (
+                      SELECT 1 FROM pos_base p2
+                      WHERE p2.sucursal_id = 2 AND p2.tabla = p1.tabla AND p2.parte = p1.parte
+                  )
+                """
+            )
+            conn.execute("DELETE FROM pos_base WHERE sucursal_id = 1 AND LOWER(TRIM(COALESCE(sucursal_nombre, ''))) = 'maciel'")
+            if hasattr(conn, "commit"):
+                conn.commit()
     except Exception as exc:
         logger.warning("consolidar_sucursales: %s", exc)
 
@@ -926,8 +944,8 @@ def listar_sucursales() -> list[dict]:
     for r in rows:
         sid = int(r["sucursal_id"])
         nom = str(r["sucursal_nombre"] or "").strip()
-        if not nom or nom.upper().startswith("DESKTOP-"):
-            nom = "Maciel"
+        if not nom:
+            nom = f"Sucursal #{sid}"
         suc_map[sid] = nom
 
     salida = [{"id": sid, "nombre": nom} for sid, nom in sorted(suc_map.items())]

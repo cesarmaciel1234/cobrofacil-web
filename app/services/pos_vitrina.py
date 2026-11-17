@@ -333,6 +333,17 @@ def calcular_vitrina(
         except Exception:
             marca_texto = str(ult_carga)[:16].replace("T", " ")
 
+    from flask import has_request_context, session
+    from app.services.pos_base import leer_carga
+    emp_id = 1
+    if has_request_context():
+        try:
+            emp_id = int(session.get("empresa_id") or 1)
+        except Exception:
+            emp_id = 1
+    carga = leer_carga(emp_id)
+    progreso_carga = str(carga.get("progreso_texto") or "").strip()
+
     return {
         "saludo": saludo_jefe(),
         "periodo": nombre_periodo,
@@ -340,6 +351,8 @@ def calcular_vitrina(
         "desde": desde_iso,
         "hasta": hasta_iso,
         "actualizado_en_texto": marca_texto,
+        "progreso_carga": progreso_carga,
+        "carga": carga,
         # 12 Tarjetas de Vitrina:
         "ganancia_parcial": {
             "titulo": "Ganancia parcial" if es_hoy else "Ganancia",

@@ -76,7 +76,7 @@
 html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    touch-action: pan-x pan-y;
+    touch-action: manipulation;
     -webkit-text-size-adjust: 100%;
     text-size-adjust: 100%;
     overscroll-behavior-y: none;
@@ -90,7 +90,7 @@ body {
     font-size: 13px;
     line-height: 1.5;
     min-height: 100vh;
-    touch-action: pan-x pan-y;
+    touch-action: manipulation;
     overscroll-behavior-y: none;
     -webkit-tap-highlight-color: transparent;
 }
