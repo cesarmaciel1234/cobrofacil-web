@@ -43,7 +43,7 @@
     function formatPos(amount) {
         const n = Number(amount) || 0;
         const sign = n < 0 ? '-' : '';
-        return sign + '$' + Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        return sign + '$' + Math.abs(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
     function repararTexto(str) {

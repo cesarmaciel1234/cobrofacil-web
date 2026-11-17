@@ -6553,6 +6553,17 @@ const $ = id => document.getElementById(id);
                     }).catch(e => console.warn('Clima offline', e));
             }
             try {
+                if (document.featurePolicy && typeof document.featurePolicy.allowsFeature === 'function' && !document.featurePolicy.allowsFeature('geolocation')) {
+                    fetchW(-34.61, -58.38);
+                    return;
+                }
+                if (navigator.permissions && navigator.permissions.query) {
+                    const status = await navigator.permissions.query({ name: 'geolocation' }).catch(() => null);
+                    if (status && status.state === 'denied') {
+                        fetchW(-34.61, -58.38);
+                        return;
+                    }
+                }
                 if ("geolocation" in navigator && window.isSecureContext) {
                     navigator.geolocation.getCurrentPosition(
                         pos => fetchW(pos.coords.latitude, pos.coords.longitude),

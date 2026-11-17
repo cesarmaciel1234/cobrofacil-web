@@ -41,7 +41,13 @@
         const btn = ev.target.closest('.pwa-nav-btn');
         if (!btn || !bar.contains(btn)) return;
         const nombre = btn.dataset.pwaView;
-        if (!nombre || nombre === vistaActual()) return;
+        if (!nombre) return;
+        if (nombre === vistaActual()) {
+            if (nombre === 'reporte' && window.CrmBus && window.CrmBus.get('switchView')) {
+                window.CrmBus.emit('switchView', 'reporte');
+            }
+            return;
+        }
         pintar(nombre);
         cargar(nombre);
     });
