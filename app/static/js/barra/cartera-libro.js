@@ -569,24 +569,24 @@
         }
     }
 
-    nodo('searchInput').addEventListener('input', () => filterClients());
-    caja.querySelector('.resumen').addEventListener('click', (event) => {
+    nodo('searchInput')?.addEventListener('input', () => filterClients());
+    caja?.querySelector('.resumen')?.addEventListener('click', (event) => {
         const button = event.target.closest('button');
         if (!button || !button.dataset.filter) return;
         setFilter(button.dataset.filter === currentFilter ? 'all' : button.dataset.filter);
     });
-    nodo('cards').addEventListener('click', (event) => {
+    nodo('cards')?.addEventListener('click', (event) => {
         const card = event.target.closest('.debt-card');
         if (!card) return;
         const marca = '#c=' + encodeURIComponent(card.dataset.id);
         pintarFicha(card.dataset.id);
         if (location.hash !== marca) location.hash = marca;
     });
-    nodo('ficha').addEventListener('click', (event) => {
+    nodo('ficha')?.addEventListener('click', (event) => {
         const mov = event.target.closest('[data-mov]');
         if (mov) abrirMovimiento(Number(mov.dataset.mov));
     });
-    nodo('sheetHost').addEventListener('click', (event) => {
+    nodo('sheetHost')?.addEventListener('click', (event) => {
         const ticket = event.target.closest('[data-ticket]');
         if (ticket) {
             verTicket(ticket.dataset.ticket);
@@ -595,7 +595,7 @@
         if (event.target.closest('[data-guardar]')) guardarPerfilAbierto();
         else if (event.target.closest('[data-close]')) cerrarMovimiento();
     });
-    nodo('btnPerfil').addEventListener('click', () => abrirPerfil());
+    nodo('btnPerfil')?.addEventListener('click', () => abrirPerfil());
     window.addEventListener('hashchange', () => {
         if (!vistaActiva()) return;
         const abierto = clienteDelHash();

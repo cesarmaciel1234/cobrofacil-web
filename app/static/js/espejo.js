@@ -157,6 +157,13 @@
         return /^\d+\.0$/.test(texto) ? texto.slice(0, -2) : texto;
     }
 
+    function coincideSucursal(sucId, filtro) {
+        if (filtro === null || filtro === undefined) return true;
+        const f = String(filtro).trim().toLowerCase();
+        if (!f || f === 'todas' || f === 'todos' || f === 'todas las sucursales') return true;
+        return String(sucId).trim() === String(filtro).trim();
+    }
+
     function diaDe(fecha) {
         const texto = String(fecha || '').replace('T', ' ').trim();
         return texto.length >= 10 && texto[4] === '-' ? texto.slice(0, 10) : '';
@@ -225,7 +232,7 @@
         if (!libro || !libro.sucursales) return [];
         const salida = [];
         libro.sucursales.forEach((suc) => {
-            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            if (!coincideSucursal(suc.sucursal_id, sucursalId)) return;
             const idx = indiceDe(suc.columnas);
             (suc.filas || []).forEach((fila) => {
                 const obj = { sucursal_id: suc.sucursal_id, sucursal_nombre: suc.sucursal };
@@ -248,7 +255,7 @@
         const salida = [];
         const vistas = new Set();
         (fuente.sucursales || []).forEach((suc) => {
-            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            if (!coincideSucursal(suc.sucursal_id, sucursalId)) return;
             const idx = indiceDe(suc.columnas);
             (suc.filas || []).forEach((fila) => {
                 const id = idTexto(tomar(fila, idx, ['id']));
@@ -332,7 +339,7 @@
         });
         const medidas = {};
         (productos && productos.sucursales || []).forEach((suc) => {
-            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            if (!coincideSucursal(suc.sucursal_id, sucursalId)) return;
             const idx = indiceDe(suc.columnas);
             (suc.filas || []).forEach((fila) => {
                 const pid = idTexto(tomar(fila, idx, ['id']));
@@ -344,7 +351,7 @@
         });
         const grupos = {};
         (detalles.sucursales || []).forEach((suc) => {
-            if (sucursalId !== null && sucursalId !== undefined && String(suc.sucursal_id) !== String(sucursalId)) return;
+            if (!coincideSucursal(suc.sucursal_id, sucursalId)) return;
             const idx = indiceDe(suc.columnas);
             (suc.filas || []).forEach((fila) => {
                 const vid = idTexto(tomar(fila, idx, ['id_venta', 'venta_id', 'ticket_id', 'venta']));

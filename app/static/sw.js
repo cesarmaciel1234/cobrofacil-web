@@ -1,5 +1,5 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.58';
+const CACHE_VERSION = 'crm-frigorifico-v4.59';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',
@@ -23,6 +23,8 @@ const SHELL_ASSETS = [
   '/static/js/barra/cobros.js',
   '/static/js/barra/caja.js',
   '/static/js/barra/cartera.js',
+  '/static/js/barra/cartera-libro.js',
+  '/static/js/barra/toque.js',
   '/static/js/barra/pedidos.js',
   '/static/js/barra/armar.js',
   '/static/vendor/dexie.min.js',
