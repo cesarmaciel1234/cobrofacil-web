@@ -82,6 +82,9 @@ class PostgresCursorWrapper:
     def execute(self, query, vars=None):
         if is_postgres():
             query = query.replace("?", "%s")
+            # En queries, escapar % literales para que psycopg2 no los confunda con parámetros
+            if vars is not None:
+                query = re.sub(r"%(?!s)", "%%", query)
             # En queries, cambiar sqlite datetime por CURRENT_TIMESTAMP (postgres)
             query = query.replace("datetime('now', 'localtime')", "CURRENT_TIMESTAMP::varchar")
             query = query.replace("date('now', 'localtime')", "CURRENT_DATE::varchar")

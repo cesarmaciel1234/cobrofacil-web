@@ -451,16 +451,16 @@ def _bloques_por_dia(columnas: list, filas: list) -> list[tuple[str | None, list
 def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None) -> str | None:
     """Una sucursal que ya tiene nombre se queda con ese. No abre otra por un texto distinto."""
     texto = (pedido or "").strip() or None
-    if texto and texto.upper().startswith("DESKTOP-"):
+    if texto and (texto.upper().startswith("DESKTOP-") or texto.upper().startswith("LAPTOP-")):
         texto = None
-    if sid is None or sid == 2:
-        sid = 1
+    if sid is None:
+        return texto or "Maciel"
     filas = conn.execute(
         """
         SELECT DISTINCT sucursal_nombre
         FROM pos_base
         WHERE sucursal_id = ? AND sucursal_nombre IS NOT NULL AND TRIM(sucursal_nombre) <> ''
-          AND UPPER(sucursal_nombre) NOT LIKE 'DESKTOP-%'
+          AND UPPER(SUBSTR(sucursal_nombre, 1, 8)) <> 'DESKTOP-'
         """,
         (int(sid),),
     ).fetchall()

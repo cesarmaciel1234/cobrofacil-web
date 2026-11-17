@@ -408,6 +408,9 @@ def api_pos_base_tabla():
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
+    except Exception as e:
+        current_app.logger.exception("Error en api_pos_base_tabla: %s", e)
+        return jsonify({"error": f"Fallo al guardar {data.get('tabla')}: {str(e)}"}), 500
     parte = int(data.get("parte") or 1)
     partes = int(data.get("partes") or 1)
     if str(data.get("tabla") or "") == "ventas" and data.get("total_filas") not in (None, ""):
