@@ -905,7 +905,7 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
         transform: translateX(-105%);
         transition: transform 0.28s var(--ease);
         box-shadow: var(--shadow-lg);
-        z-index: 500;
+        z-index: 700 !important;
         width: 50vw;
     }
     .nav-item svg {
@@ -915,8 +915,8 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
         max-height: 20px !important;
         flex: 0 0 20px !important;
     }
-    .sidebar.open { transform: translateX(0); z-index: 500; }
-    .sidebar-backdrop { z-index: 499; }
+    .sidebar.open { transform: translateX(0); z-index: 700 !important; }
+    .sidebar-backdrop { z-index: 550 !important; }
     .main { margin-left: 0; }
     .menu-toggle { display: inline-flex !important; }
     .status-pill, .breadcrumb, .topbar-sub, .clock { display: none !important; }
