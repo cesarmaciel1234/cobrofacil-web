@@ -4179,7 +4179,7 @@ const $ = id => document.getElementById(id);
                     $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
                     const medios = c.medios_pago || [];
-                    const sumaMedios = medios.reduce((acc, m) => acc + (m.monto || 0), 0);
+                    const sumaMedios = medios.reduce((acc, m) => acc + (Number(m.monto != null ? m.monto : m.total) || 0), 0);
                     const totalMedios = sumaMedios || 1;
                     pintarChipPeriodo('cajaPeriodo', periodoCaja || 'Hoy');
                     const periodoCajaTxt = c.etiqueta ? `<p class="caja-periodo">${textoJefe(c.etiqueta)}</p>` : '';
@@ -4187,10 +4187,13 @@ const $ = id => document.getElementById(id);
                     if (medios.length === 0) {
                         html += `<p class="caja-vacio" style="padding:14px;">${(c.etiqueta && !String(c.etiqueta).startsWith('Hoy')) ? 'Sin movimientos de pago en este período.' : 'Sin movimientos de pago ese día.'}</p>`;
                     } else {
-                        const partes = porcentajesQueCierran(medios.map((m) => Number(m.monto) || 0));
+                        const montos = medios.map((m) => Number(m.monto != null ? m.monto : m.total) || 0);
+                        const partes = porcentajesQueCierran(montos);
                         medios.forEach((m, i) => {
-                            const tickets = m.tickets + (m.tickets === 1 ? ' ticket' : ' tickets');
-                            html += `<div class="arqueo-fila"><b>${textoJefe(m.medio)}</b><span>${textoJefe(tickets)}</span><span><b>${plataJefe(m.monto)}</b><small class="arqueo-pct">${partes[i]}%</small></span></div>`;
+                            const cant = Number(m.tickets) || 0;
+                            const tickets = cant + (cant === 1 ? ' ticket' : ' tickets');
+                            const monto = montos[i];
+                            html += `<div class="arqueo-fila"><b>${textoJefe(m.medio)}</b><span>${textoJefe(tickets)}</span><span><b>${plataJefe(monto)}</b><small class="arqueo-pct">${partes[i]}%</small></span></div>`;
                         });
                     }
                     html += `<div class="arqueo-pie"><span>Total</span><b>${plataJefe(sumaMedios)}</b></div></div>`;

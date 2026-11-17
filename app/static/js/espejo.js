@@ -516,7 +516,9 @@
         vFilas.forEach((v) => {
             if (CANCELADAS[String(v.estado || '').toUpperCase()]) return;
             const medio = v.pago || 'Efectivo';
-            porMedio[medio] = (porMedio[medio] || 0) + v.total;
+            if (!porMedio[medio]) porMedio[medio] = { monto: 0, tickets: 0 };
+            porMedio[medio].monto += v.total;
+            porMedio[medio].tickets += 1;
             totalVentas += v.total;
             tickets += 1;
         });
@@ -559,7 +561,12 @@
             porTipoCaja[tipo] = (porTipoCaja[tipo] || 0) + (Number(c.monto) || 0);
         });
 
-        const mediosLista = Object.keys(porMedio).map((m) => ({ medio: m, total: Math.round(porMedio[m] * 100) / 100 }));
+        const mediosLista = Object.keys(porMedio).map((m) => ({
+            medio: m,
+            monto: Math.round(porMedio[m].monto * 100) / 100,
+            total: Math.round(porMedio[m].monto * 100) / 100,
+            tickets: porMedio[m].tickets || 0
+        })).sort((a, b) => b.monto - a.monto);
         const cajaLista = Object.keys(porTipoCaja).map((t) => ({ tipo: t, monto: Math.round(porTipoCaja[t] * 100) / 100 }));
 
         return {
