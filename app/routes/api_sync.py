@@ -38,6 +38,7 @@ def api_stream():
     return Response(
         generate(),
         mimetype="text/event-stream",
+        direct_passthrough=True,
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
