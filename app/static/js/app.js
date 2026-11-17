@@ -6319,21 +6319,25 @@ const $ = id => document.getElementById(id);
                     const res = await fetch('/api/pos/carga', { cache: 'no-store' });
                     if (!res.ok) return;
                     const dato = await res.json();
-                    if (!dato.visible) {
+                    const subidos = Number(dato.subidos) || 0;
+                    const total = Number(dato.total) || subidos;
+                    const completo = dato.completo || (total > 0 && subidos >= total);
+                    if (!dato.visible || !dato.cargando || completo) {
+                        if (completo && !window.__avisoSyncCompleto && total > 0) {
+                            window.__avisoSyncCompleto = true;
+                            if (typeof toast === 'function') {
+                                toast('Sincronización completa: ventas al día (' + subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR') + ')');
+                            }
+                        }
                         caja.hidden = true;
                         return;
                     }
-                    const subidos = Number(dato.subidos) || 0;
-                    const total = Number(dato.total) || subidos;
+                    window.__avisoSyncCompleto = false;
                     const pct = total > 0 ? Math.max(2, Math.min(100, Math.round((subidos / total) * 100))) : 0;
                     caja.hidden = false;
                     if (texto) {
-                        if (dato.completo || (total > 0 && subidos >= total)) {
-                            texto.textContent = 'Ventas al día (' + subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR') + ')';
-                        } else {
-                            texto.textContent = (dato.dia ? 'Sincronizando' : 'Subiendo ventas') +
-                                ' (' + subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR') + ')';
-                        }
+                        texto.textContent = (dato.dia ? 'Sincronizando' : 'Subiendo ventas') +
+                            ' (' + subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR') + ')';
                     }
                     if (cuenta) {
                         cuenta.textContent = subidos.toLocaleString('es-AR') + ' / ' + total.toLocaleString('es-AR');

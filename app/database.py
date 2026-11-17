@@ -585,8 +585,24 @@ def _run_migrations(conn):
             columnas_base = {row[1] for row in conn.execute("PRAGMA table_info(pos_base)")}
         if "dia" not in columnas_base:
             conn.execute("ALTER TABLE pos_base ADD COLUMN dia TEXT")
+        if "empresa_id" not in columnas_base:
+            conn.execute("ALTER TABLE pos_base ADD COLUMN empresa_id INTEGER NOT NULL DEFAULT 1")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_pos_base_dia ON pos_base(tabla, dia)"
+        )
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pos_base_empresa ON pos_base(empresa_id, tabla, sucursal_id)"
+        )
+
+    if _table_exists(conn, "pos_novedad"):
+        if is_pg:
+            columnas_nov = _pg_column_names(conn, "pos_novedad")
+        else:
+            columnas_nov = {row[1] for row in conn.execute("PRAGMA table_info(pos_novedad)")}
+        if "empresa_id" not in columnas_nov:
+            conn.execute("ALTER TABLE pos_novedad ADD COLUMN empresa_id INTEGER NOT NULL DEFAULT 1")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_pos_novedad_empresa ON pos_novedad(empresa_id, tabla, actualizado_en)"
         )
     conn.executescript(
         """
@@ -925,6 +941,7 @@ def _run_migrations(conn):
         CREATE INDEX IF NOT EXISTS idx_pos_sync_log_status ON pos_sync_log(status);
         CREATE TABLE IF NOT EXISTS pos_base (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            empresa_id INTEGER NOT NULL DEFAULT 1,
             sucursal_id INTEGER,
             sucursal_nombre TEXT,
             tabla TEXT NOT NULL,
@@ -935,11 +952,12 @@ def _run_migrations(conn):
             actualizado_en TEXT
         );
         CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
-            ON pos_base(COALESCE(sucursal_id, 0), tabla, parte);
+            ON pos_base(empresa_id, COALESCE(sucursal_id, 0), tabla, parte);
         CREATE INDEX IF NOT EXISTS idx_pos_base_tabla
-            ON pos_base(tabla, sucursal_id);
+            ON pos_base(empresa_id, tabla, sucursal_id);
         CREATE TABLE IF NOT EXISTS pos_novedad (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            empresa_id INTEGER NOT NULL DEFAULT 1,
             sucursal_id INTEGER,
             tabla TEXT NOT NULL,
             fila_id TEXT,

@@ -63,16 +63,17 @@ def anotar_carga(empresa_id: int, enviadas: int, total: int, dia: bool) -> None:
         }
 
 
-def leer_carga(empresa_id: int) -> dict:
+def leer_carga(empresa_id: int | None = None) -> dict:
+    eid = _empresa_activa(empresa_id)
     with _carga_lock:
-        dato = _carga.get(int(empresa_id))
+        dato = _carga.get(int(eid))
         if dato and int(dato.get("total") or 0) > 0:
             return dict(dato)
     # Si Render reinició o no hay dato en memoria, consultar la base
     try:
-        with get_db() as conn:
+        with get_db(eid) as conn:
             ensure_tenant_migrations(conn)
-            row = conn.execute("SELECT COALESCE(SUM(cantidad), 0) AS total_ventas FROM pos_base WHERE tabla = 'ventas'").fetchone()
+            row = conn.execute("SELECT COALESCE(SUM(cantidad), 0) AS total_ventas FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas'", (eid,)).fetchone()
             subidos = int(row["total_ventas"] or 0) if row else 0
             if subidos > 0:
                 return {
@@ -84,7 +85,7 @@ def leer_carga(empresa_id: int) -> dict:
     except Exception:
         pass
     with _carga_lock:
-        dato = _carga.get(int(empresa_id))
+        dato = _carga.get(int(eid))
         return dict(dato) if dato else {}
 
 
@@ -425,16 +426,16 @@ def _sin_copias(tabla: str, columnas: list, filas: list) -> list:
     return salida
 
 
-def _leer_crudo(conn, tabla: str, sid: int | None) -> tuple[list, list]:
+def _leer_crudo(conn, tabla: str, sid: int | None, eid: int = 1) -> tuple[list, list]:
     if sid is None:
         partes = conn.execute(
-            "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL ORDER BY parte",
-            (tabla,),
+            "SELECT columnas, filas FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id IS NULL ORDER BY parte",
+            (eid, tabla),
         ).fetchall()
     else:
         partes = conn.execute(
-            "SELECT columnas, filas FROM pos_base WHERE tabla = ? AND sucursal_id = ? ORDER BY parte",
-            (tabla, sid),
+            "SELECT columnas, filas FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ? ORDER BY parte",
+            (eid, tabla, sid),
         ).fetchall()
     if not partes:
         return [], []
@@ -445,11 +446,11 @@ def _leer_crudo(conn, tabla: str, sid: int | None) -> tuple[list, list]:
     return columnas, filas
 
 
-def _borrar_partes(conn, tabla: str, sid: int | None) -> None:
+def _borrar_partes(conn, tabla: str, sid: int | None, eid: int = 1) -> None:
     if sid is None:
-        conn.execute("DELETE FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL", (tabla,))
+        conn.execute("DELETE FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id IS NULL", (eid, tabla))
     else:
-        conn.execute("DELETE FROM pos_base WHERE tabla = ? AND sucursal_id = ?", (tabla, sid))
+        conn.execute("DELETE FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ?", (eid, tabla, sid))
 
 
 def _bloques_por_dia(columnas: list, filas: list) -> list[tuple[str | None, list]]:
@@ -472,7 +473,7 @@ def _bloques_por_dia(columnas: list, filas: list) -> list[tuple[str | None, list
     return bloques or [(None, [])]
 
 
-def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None) -> str | None:
+def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None, eid: int = 1) -> str | None:
     """Una sucursal que ya tiene nombre se queda con ese. No abre otra por un texto distinto."""
     texto = (pedido or "").strip() or None
     if texto and (texto.upper().startswith("DESKTOP-") or texto.upper().startswith("LAPTOP-")):
@@ -483,10 +484,10 @@ def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None) -> str | Non
         """
         SELECT DISTINCT sucursal_nombre
         FROM pos_base
-        WHERE sucursal_id = ? AND sucursal_nombre IS NOT NULL AND TRIM(sucursal_nombre) <> ''
+        WHERE empresa_id = ? AND sucursal_id = ? AND sucursal_nombre IS NOT NULL AND TRIM(sucursal_nombre) <> ''
           AND UPPER(SUBSTR(sucursal_nombre, 1, 8)) <> 'DESKTOP-'
         """,
-        (int(sid),),
+        (eid, int(sid)),
     ).fetchall()
     nombres = []
     for fila in filas:
@@ -498,17 +499,18 @@ def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None) -> str | Non
     return texto or "Maciel"
 
 
-def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | None, columnas: list, filas: list, ahora: str) -> None:
-    sucursal_nombre = _nombre_que_ya_tiene(conn, sid, sucursal_nombre)
-    _borrar_partes(conn, tabla, sid)
+def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | None, columnas: list, filas: list, ahora: str, eid: int = 1) -> None:
+    sucursal_nombre = _nombre_que_ya_tiene(conn, sid, sucursal_nombre, eid=eid)
+    _borrar_partes(conn, tabla, sid, eid=eid)
     for numero, (dia, bloque) in enumerate(_bloques_por_dia(columnas, filas), start=1):
         conn.execute(
             """
             INSERT INTO pos_base
-            (sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                eid,
                 sid,
                 (sucursal_nombre or "").strip() or None,
                 tabla,
@@ -522,14 +524,15 @@ def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | N
         )
 
 
-def _anotar_novedad(conn, sid: int | None, tabla: str, columnas: list, fila: list | None, fila_id: str, baja: bool, ahora: str) -> None:
+def _anotar_novedad(conn, sid: int | None, tabla: str, columnas: list, fila: list | None, fila_id: str, baja: bool, ahora: str, eid: int = 1) -> None:
     conn.execute(
         """
         INSERT INTO pos_novedad
-        (sucursal_id, tabla, fila_id, columnas, filas, baja, actualizado_en)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
+        (empresa_id, sucursal_id, tabla, fila_id, columnas, filas, baja, actualizado_en)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
+            eid,
             sid,
             tabla,
             fila_id,
@@ -541,35 +544,36 @@ def _anotar_novedad(conn, sid: int | None, tabla: str, columnas: list, fila: lis
     )
 
 
-def novedades_desde(desde: str | None, sucursal_id: int | None = None) -> dict[str, Any]:
+def novedades_desde(desde: str | None, sucursal_id: int | None = None, empresa_id: int | None = None) -> dict[str, Any]:
     """Filas que llegaron después de la marca. Sin marca, no manda el libro."""
     ahora = _utc_now()
     if not desde:
         return {"ok": True, "cantidad": 0, "filas": [], "actualizado_en": ahora}
+    eid = _empresa_activa(empresa_id)
     sid = _sucursal_id(sucursal_id)
-    with get_db() as conn:
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         if sid is None:
             rows = conn.execute(
                 """
                 SELECT tabla, fila_id, columnas, filas, baja, actualizado_en
                 FROM pos_novedad
-                WHERE actualizado_en > ?
+                WHERE empresa_id = ? AND actualizado_en > ?
                 ORDER BY actualizado_en, id
                 LIMIT 500
                 """,
-                (desde,),
+                (eid, desde),
             ).fetchall()
         else:
             rows = conn.execute(
                 """
                 SELECT tabla, fila_id, columnas, filas, baja, actualizado_en
                 FROM pos_novedad
-                WHERE actualizado_en > ? AND (sucursal_id = ? OR sucursal_id IS NULL)
+                WHERE empresa_id = ? AND actualizado_en > ? AND (sucursal_id = ? OR sucursal_id IS NULL)
                 ORDER BY actualizado_en, id
                 LIMIT 500
                 """,
-                (desde, sid),
+                (eid, desde, sid),
             ).fetchall()
     marca = desde
     filas = []
@@ -596,6 +600,7 @@ def guardar_parte(
     sucursal_nombre: str | None = None,
     modo: str = "reemplazo",
     bajas: list | None = None,
+    empresa_id: int | None = None,
 ) -> dict[str, Any]:
     if not _TABLA.match(tabla or ""):
         raise ValueError("Nombre de tabla inválido")
@@ -605,6 +610,7 @@ def guardar_parte(
     partes = int(partes or 1)
     if parte < 1 or partes < 1 or parte > partes:
         raise ValueError("Parte de tabla inválida")
+    eid = _empresa_activa(empresa_id)
     sid = _sucursal_id(sucursal_id)
     limpias = []
     for fila in filas:
@@ -615,43 +621,44 @@ def guardar_parte(
             for col, valor in zip(columnas, fila)
         ])
     modo_txt = "delta" if str(modo or "reemplazo") == "delta" else "reemplazo"
-    with get_db() as conn:
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         limpias = _omitir_copias(conn, tabla, columnas, limpias, sid, modo_txt, parte)
     if modo_txt == "delta":
-        return _guardar_delta(tabla, columnas, limpias, sid, sucursal_nombre, list(bajas or []))
-    with get_db() as conn:
+        return _guardar_delta(tabla, columnas, limpias, sid, sucursal_nombre, list(bajas or []), eid=eid)
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
-        sucursal_nombre = _nombre_que_ya_tiene(conn, sid, sucursal_nombre)
+        sucursal_nombre = _nombre_que_ya_tiene(conn, sid, sucursal_nombre, eid=eid)
         if parte == 1:
             if sid is None:
                 conn.execute(
-                    "DELETE FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL",
-                    (tabla,),
+                    "DELETE FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id IS NULL",
+                    (eid, tabla),
                 )
             else:
                 conn.execute(
-                    "DELETE FROM pos_base WHERE tabla = ? AND sucursal_id = ?",
-                    (tabla, sid),
+                    "DELETE FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ?",
+                    (eid, tabla, sid),
                 )
         else:
             if sid is None:
                 conn.execute(
-                    "DELETE FROM pos_base WHERE tabla = ? AND sucursal_id IS NULL AND parte = ?",
-                    (tabla, parte),
+                    "DELETE FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id IS NULL AND parte = ?",
+                    (eid, tabla, parte),
                 )
             else:
                 conn.execute(
-                    "DELETE FROM pos_base WHERE tabla = ? AND sucursal_id = ? AND parte = ?",
-                    (tabla, sid, parte),
+                    "DELETE FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ? AND parte = ?",
+                    (eid, tabla, sid, parte),
                 )
         conn.execute(
             """
             INSERT INTO pos_base
-            (sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
+                eid,
                 sid,
                 (sucursal_nombre or "").strip() or None,
                 tabla,
@@ -667,13 +674,13 @@ def guardar_parte(
     return {"ok": True, "tabla": tabla, "parte": parte, "filas": len(limpias)}
 
 
-def _guardar_delta(tabla: str, columnas: list, limpias: list, sid: int | None, sucursal_nombre: str | None, bajas: list) -> dict[str, Any]:
+def _guardar_delta(tabla: str, columnas: list, limpias: list, sid: int | None, sucursal_nombre: str | None, bajas: list, eid: int = 1) -> dict[str, Any]:
     """Mete las filas nuevas en la copia. No borra el resto del libro."""
     ahora = _utc_now()
     idx = _indice_id(columnas)
-    with get_db() as conn:
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
-        previas_col, previas = _leer_crudo(conn, tabla, sid)
+        previas_col, previas = _leer_crudo(conn, tabla, sid, eid=eid)
         if previas_col and previas_col != columnas:
             previas_col, previas = columnas, []
         if not previas_col:
@@ -690,7 +697,7 @@ def _guardar_delta(tabla: str, columnas: list, limpias: list, sid: int | None, s
         elif not limpias and not bajas:
             return {"ok": True, "tabla": tabla, "parte": 1, "filas": 0, "modo": "delta"}
         else:
-            _escribir_partes(conn, tabla, sid, sucursal_nombre, columnas, limpias, ahora)
+            _escribir_partes(conn, tabla, sid, sucursal_nombre, columnas, limpias, ahora, eid=eid)
             _olvidar_tabla(tabla)
             return {"ok": True, "tabla": tabla, "parte": 1, "filas": len(limpias), "modo": "reemplazo"}
         tocadas = 0
@@ -701,34 +708,37 @@ def _guardar_delta(tabla: str, columnas: list, limpias: list, sid: int | None, s
             if clave not in por_id:
                 orden.append(clave)
             por_id[clave] = fila
-            _anotar_novedad(conn, sid, tabla, columnas, fila, clave, False, ahora)
+            _anotar_novedad(conn, sid, tabla, columnas, fila, clave, False, ahora, eid=eid)
             tocadas += 1
         for baja in bajas:
             clave = str(baja)
             if clave in por_id:
                 del por_id[clave]
                 orden = [item for item in orden if item != clave]
-                _anotar_novedad(conn, sid, tabla, columnas, None, clave, True, ahora)
+                _anotar_novedad(conn, sid, tabla, columnas, None, clave, True, ahora, eid=eid)
                 tocadas += 1
         finales = [por_id[clave] for clave in orden if clave in por_id]
-        _escribir_partes(conn, tabla, sid, sucursal_nombre, previas_col, finales, ahora)
+        _escribir_partes(conn, tabla, sid, sucursal_nombre, previas_col, finales, ahora, eid=eid)
         corte = datetime.now(timezone.utc).timestamp() - 48 * 3600
-        conn.execute("DELETE FROM pos_novedad WHERE actualizado_en < ?", (datetime.fromtimestamp(corte, timezone.utc).isoformat(),))
+        conn.execute("DELETE FROM pos_novedad WHERE empresa_id = ? AND actualizado_en < ?", (eid, datetime.fromtimestamp(corte, timezone.utc).isoformat(),))
     _olvidar_tabla(tabla)
     return {"ok": True, "tabla": tabla, "parte": 1, "filas": tocadas, "modo": "delta"}
 
 
-def indice_espejo() -> dict[str, Any]:
+def indice_espejo(empresa_id: int | None = None) -> dict[str, Any]:
     """Sello de cada tabla. El teléfono, la PC y la tablet bajan solo la que cambió."""
-    with get_db() as conn:
+    eid = _empresa_activa(empresa_id)
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         rows = conn.execute(
             """
             SELECT tabla, sucursal_id, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n
             FROM pos_base
+            WHERE empresa_id = ?
             GROUP BY tabla, sucursal_id
             ORDER BY tabla
-            """
+            """,
+            (eid,),
         ).fetchall()
     sello = ""
     tablas = []
@@ -745,19 +755,20 @@ def indice_espejo() -> dict[str, Any]:
     return {"ok": True, "sello": sello, "tablas": tablas}
 
 
-def tabla_espejo(tabla: str) -> dict[str, Any]:
+def tabla_espejo(tabla: str, empresa_id: int | None = None) -> dict[str, Any]:
     """Una tabla del libro, junta, para guardarla en el aparato."""
     if not _TABLA.match(tabla or ""):
         raise ValueError("Nombre de tabla inválido")
-    with get_db() as conn:
+    eid = _empresa_activa(empresa_id)
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         partes = conn.execute(
             """
             SELECT sucursal_id, sucursal_nombre, columnas, filas, actualizado_en
-            FROM pos_base WHERE tabla = ?
+            FROM pos_base WHERE empresa_id = ? AND tabla = ?
             ORDER BY sucursal_id, parte
             """,
-            (tabla,),
+            (eid, tabla),
         ).fetchall()
     grupos: dict[Any, dict] = {}
     orden: list[Any] = []
@@ -847,17 +858,20 @@ def delta_espejo(sello_desde: str = "") -> dict[str, Any]:
     }
 
 
-def resumen_base() -> list[dict]:
-    with get_db() as conn:
+def resumen_base(empresa_id: int | None = None) -> list[dict]:
+    eid = _empresa_activa(empresa_id)
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         rows = conn.execute(
             """
             SELECT tabla, sucursal_id, sucursal_nombre,
                    SUM(cantidad) AS cantidad, MAX(actualizado_en) AS actualizado_en
             FROM pos_base
+            WHERE empresa_id = ?
             GROUP BY tabla, sucursal_id, sucursal_nombre
             ORDER BY tabla
-            """
+            """,
+            (eid,),
         ).fetchall()
     return [
         {
@@ -871,9 +885,10 @@ def resumen_base() -> list[dict]:
     ]
 
 
-def ultima_carga(sucursal_id: int | None = None) -> str | None:
+def ultima_carga(sucursal_id: int | None = None, empresa_id: int | None = None) -> str | None:
     """Cuándo llegó el último trozo del libro a la nube."""
-    ambito = _ambito_cache()
+    eid = _empresa_activa(empresa_id)
+    ambito = _ambito_cache(eid)
     sid = int(sucursal_id) if sucursal_id is not None else None
     with _cache_lock:
         marcas = [
@@ -883,14 +898,14 @@ def ultima_carga(sucursal_id: int | None = None) -> str | None:
         ]
     if marcas:
         return max(marcas)
-    with get_db() as conn:
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         if sucursal_id is None:
-            row = conn.execute("SELECT MAX(actualizado_en) AS marca FROM pos_base").fetchone()
+            row = conn.execute("SELECT MAX(actualizado_en) AS marca FROM pos_base WHERE empresa_id = ?", (eid,)).fetchone()
         else:
             row = conn.execute(
-                "SELECT MAX(actualizado_en) AS marca FROM pos_base WHERE sucursal_id = ?",
-                (int(sucursal_id),),
+                "SELECT MAX(actualizado_en) AS marca FROM pos_base WHERE empresa_id = ? AND sucursal_id = ?",
+                (eid, int(sucursal_id)),
             ).fetchone()
     if not row:
         return None
@@ -922,23 +937,45 @@ def consolidar_sucursales(conn) -> None:
         logger.warning("consolidar_sucursales: %s", exc)
 
 
-def listar_sucursales() -> list[dict]:
-    ambito = _ambito_cache()
+def _empresa_activa(empresa_id: int | None = None) -> int:
+    if empresa_id is not None and int(empresa_id) > 0:
+        return int(empresa_id)
+    try:
+        from flask import has_request_context, session, request
+        if has_request_context():
+            eid = session.get("empresa_id")
+            if eid and int(eid) > 0:
+                return int(eid)
+            hdr = request.headers.get("X-Empresa-ID") or request.headers.get("X-Company-ID")
+            if hdr and hdr.isdigit():
+                return int(hdr)
+            arg = request.args.get("empresa_id") or request.args.get("company_id")
+            if arg and arg.isdigit():
+                return int(arg)
+    except Exception:
+        pass
+    return 1
+
+
+def listar_sucursales(empresa_id: int | None = None) -> list[dict]:
+    eid = _empresa_activa(empresa_id)
+    ambito = _ambito_cache(eid)
     ahora = time.monotonic()
     with _cache_lock:
         hit = _sucursales_mem.get(ambito)
         if hit and _vigente(hit[0], ahora, ambito):
             return hit[1]
-    with get_db() as conn:
+    with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         consolidar_sucursales(conn)
         rows = conn.execute(
             """
             SELECT DISTINCT sucursal_id, sucursal_nombre
             FROM pos_base
-            WHERE sucursal_id IS NOT NULL
+            WHERE empresa_id = ? AND sucursal_id IS NOT NULL
             ORDER BY sucursal_id
-            """
+            """,
+            (eid,),
         ).fetchall()
     suc_map = {}
     for r in rows:
@@ -949,27 +986,18 @@ def listar_sucursales() -> list[dict]:
         suc_map[sid] = nom
 
     salida = [{"id": sid, "nombre": nom} for sid, nom in sorted(suc_map.items())]
-    if not salida:
-        salida = [{"id": 1, "nombre": "Maciel"}]
     with _cache_lock:
         _sucursales_mem[ambito] = (time.monotonic(), salida)
     return salida
 
 
-def _ambito_cache() -> str:
+def _ambito_cache(empresa_id: int | None = None) -> str:
     """La copia en memoria no se mezcla entre empresas ni entre bases de prueba."""
     from app.config import Config
-
+    eid = _empresa_activa(empresa_id)
     if Config.DATABASE_URL and not Config.TESTING:
-        try:
-            from flask import has_request_context, session
-
-            if has_request_context():
-                return "pg:" + str(int(session.get("empresa_id") or 1))
-        except Exception:
-            pass
-        return "pg:0"
-    return "sqlite:" + str(Config.DB_PATH)
+        return f"pg:{eid}"
+    return f"sqlite:{eid}:{Config.DB_PATH}"
 
 
 def _dia_texto(valor) -> str:
@@ -1024,13 +1052,14 @@ def _olvidar_tabla(tabla: str) -> None:
             pass
 
 
-def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None) -> tuple:
+def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None, empresa_id: int | None = None) -> tuple:
     """Marca barata de las tablas. Si no cambió, la cartera armada sigue sirviendo."""
     pedidas = [tabla for tabla in tablas if _TABLA.match(tabla or "")]
     if not pedidas:
         return ()
+    eid = _empresa_activa(empresa_id)
     sid = int(sucursal_id) if sucursal_id is not None else None
-    ambito = _ambito_cache()
+    ambito = _ambito_cache(eid)
     ahora = time.monotonic()
 
     # Si ya están en caché en memoria dentro del TTL, devolver sus sellos sin consultar la DB
@@ -1048,31 +1077,32 @@ def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None) -> tuple:
             return tuple(sellos_mem)
 
     marcas = ", ".join("?" for _ in pedidas)
-    with get_db() as conn:
+    with get_db(eid) as conn:
         if sid is not None:
             rows = conn.execute(
-                f"SELECT tabla, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla IN ({marcas}) AND sucursal_id = ? GROUP BY tabla",
-                (*pedidas, sid),
+                f"SELECT tabla, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE empresa_id = ? AND tabla IN ({marcas}) AND sucursal_id = ? GROUP BY tabla",
+                (eid, *pedidas, sid),
             ).fetchall()
         else:
             rows = conn.execute(
-                f"SELECT tabla, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla IN ({marcas}) GROUP BY tabla",
-                pedidas,
+                f"SELECT tabla, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE empresa_id = ? AND tabla IN ({marcas}) GROUP BY tabla",
+                (eid, *pedidas),
             ).fetchall()
     por_tabla = {row["tabla"]: (row["marca"], int(row["n"] or 0)) for row in rows}
     return tuple(por_tabla.get(tabla, (None, 0)) for tabla in pedidas)
 
 
-def _sello(conn, tabla: str, sucursal_id: int | None) -> tuple:
+def _sello(conn, tabla: str, sucursal_id: int | None, empresa_id: int | None = None) -> tuple:
+    eid = _empresa_activa(empresa_id)
     if sucursal_id is not None:
         row = conn.execute(
-            "SELECT MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla = ? AND sucursal_id = ?",
-            (tabla, int(sucursal_id)),
+            "SELECT MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ?",
+            (eid, tabla, int(sucursal_id)),
         ).fetchone()
     else:
         row = conn.execute(
-            "SELECT MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE tabla = ?",
-            (tabla,),
+            "SELECT MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE empresa_id = ? AND tabla = ?",
+            (eid, tabla),
         ).fetchone()
     if not row:
         return (None, 0)
@@ -1125,12 +1155,12 @@ def _sello_combinado(por_sid: dict) -> tuple:
     return (marca, cantidad)
 
 
-def _sellos_tablas(conn, tablas: list[str]) -> dict[str, dict]:
+def _sellos_tablas(conn, tablas: list[str], eid: int = 1) -> dict[str, dict]:
     marcas = ", ".join("?" for _ in tablas)
     rows = conn.execute(
         f"SELECT tabla, sucursal_id, MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n "
-        f"FROM pos_base WHERE tabla IN ({marcas}) GROUP BY tabla, sucursal_id",
-        tuple(tablas),
+        f"FROM pos_base WHERE empresa_id = ? AND tabla IN ({marcas}) GROUP BY tabla, sucursal_id",
+        (eid, *tablas),
     ).fetchall()
     salida: dict[str, dict] = {tabla: {} for tabla in tablas}
     for row in rows:
@@ -1203,10 +1233,12 @@ def preparar_vista(
     desde: str,
     hasta: str,
     desplazar_hoy: bool = False,
+    empresa_id: int | None = None,
 ) -> str:
     """Una sola lectura trae el día y los catálogos. Devuelve el día que quedó."""
+    eid = _empresa_activa(empresa_id)
     sid = int(sucursal_id) if sucursal_id is not None else None
-    ambito = _ambito_cache()
+    ambito = _ambito_cache(eid)
     ahora = time.monotonic()
     dia_tablas = list(_TABLAS_DIA)
     completas = (
@@ -1215,38 +1247,38 @@ def preparar_vista(
     )
     marcas = ", ".join("?" for _ in dia_tablas)
     suc = "" if sid is None else " AND sucursal_id = ?"
-    with get_db() as conn:
+    with get_db(eid) as conn:
         if desplazar_hoy:
             if sid is None:
                 partes = conn.execute(
                     "WITH elegido AS ("
                     " SELECT COALESCE("
-                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND dia = ?),"
-                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND dia IS NOT NULL AND dia <> '')) AS dia)"
+                    " (SELECT MAX(dia) FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND dia = ?),"
+                    " (SELECT MAX(dia) FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND dia IS NOT NULL AND dia <> '')) AS dia)"
                     " SELECT p.tabla, p.sucursal_id, p.sucursal_nombre, p.columnas, p.filas,"
                     " p.cantidad, p.actualizado_en, p.parte, e.dia AS dia_elegido"
                     " FROM pos_base p, elegido e"
-                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
+                    " WHERE p.empresa_id = ? AND (((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
                     " AND (p.dia = e.dia OR p.dia IS NULL OR p.dia = ''))"
-                    " OR p.tabla IN ('clientes', 'productos', 'configuracion'))"
+                    " OR p.tabla IN ('clientes', 'productos', 'configuracion')))"
                     " ORDER BY p.tabla, p.sucursal_id, p.parte",
-                    (desde,),
+                    (eid, desde, eid, eid),
                 ).fetchall()
             else:
                 partes = conn.execute(
                     "WITH elegido AS ("
                     " SELECT COALESCE("
-                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia = ?),"
-                    " (SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia IS NOT NULL AND dia <> '')) AS dia)"
+                    " (SELECT MAX(dia) FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND sucursal_id = ? AND dia = ?),"
+                    " (SELECT MAX(dia) FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND sucursal_id = ? AND dia IS NOT NULL AND dia <> '')) AS dia)"
                     " SELECT p.tabla, p.sucursal_id, p.sucursal_nombre, p.columnas, p.filas,"
                     " p.cantidad, p.actualizado_en, p.parte, e.dia AS dia_elegido"
                     " FROM pos_base p, elegido e"
-                    " WHERE ((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
+                    " WHERE p.empresa_id = ? AND (((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
                     " AND (p.dia = e.dia OR p.dia IS NULL OR p.dia = ''))"
-                    " OR p.tabla IN ('clientes', 'productos', 'configuracion'))"
+                    " OR p.tabla IN ('clientes', 'productos', 'configuracion')))"
                     " AND p.sucursal_id = ?"
                     " ORDER BY p.tabla, p.sucursal_id, p.parte",
-                    (sid, desde, sid, sid),
+                    (eid, sid, desde, eid, sid, eid, sid),
                 ).fetchall()
             elegido_dia = partes[0]["dia_elegido"] if partes else ""
             dia_real = str(elegido_dia or desde)
@@ -1254,14 +1286,14 @@ def preparar_vista(
             dia_real = desde
             partes = conn.execute(
                 "SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en, parte "
-                f"FROM pos_base WHERE tabla IN ({marcas}) AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = ''){suc} "
+                f"FROM pos_base WHERE empresa_id = ? AND tabla IN ({marcas}) AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = ''){suc} "
                 "ORDER BY tabla, sucursal_id, parte",
-                tuple([*dia_tablas, desde, hasta, *(([sid]) if sid is not None else [])]),
+                tuple([eid, *dia_tablas, desde, hasta, *(([sid]) if sid is not None else [])]),
             ).fetchall()
             partes += conn.execute(
                 "SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en, parte "
-                f"FROM pos_base WHERE tabla IN ('clientes', 'productos', 'configuracion'){suc}",
-                tuple(([sid]) if sid is not None else []),
+                f"FROM pos_base WHERE empresa_id = ? AND tabla IN ('clientes', 'productos', 'configuracion'){suc}",
+                tuple([eid, *(([sid]) if sid is not None else [])]),
             ).fetchall()
     por_tabla: dict[str, list] = {}
     for parte in partes:
@@ -1294,67 +1326,71 @@ def preparar_vista(
     return dia_real
 
 
-def ultimo_dia_ventas(sucursal_id: int | None = None) -> str:
+def ultimo_dia_ventas(sucursal_id: int | None = None, empresa_id: int | None = None) -> str:
     """El día más nuevo que ya está guardado, sin bajar los tickets."""
+    eid = _empresa_activa(empresa_id)
     try:
-        with get_db() as conn:
+        with get_db(eid) as conn:
             if sucursal_id is None:
                 fila = conn.execute(
-                    "SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND dia IS NOT NULL AND dia <> ''"
+                    "SELECT MAX(dia) FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND dia IS NOT NULL AND dia <> ''",
+                    (eid,),
                 ).fetchone()
             else:
                 fila = conn.execute(
-                    "SELECT MAX(dia) FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia IS NOT NULL AND dia <> ''",
-                    (int(sucursal_id),),
+                    "SELECT MAX(dia) FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND sucursal_id = ? AND dia IS NOT NULL AND dia <> ''",
+                    (eid, int(sucursal_id)),
                 ).fetchone()
     except Exception:
         return ""
     return str(fila[0] or "") if fila else ""
 
 
-def hay_dia_ventas(dia: str, sucursal_id: int | None = None) -> bool:
+def hay_dia_ventas(dia: str, sucursal_id: int | None = None, empresa_id: int | None = None) -> bool:
     if not dia:
         return False
+    eid = _empresa_activa(empresa_id)
     try:
-        with get_db() as conn:
+        with get_db(eid) as conn:
             if sucursal_id is None:
                 fila = conn.execute(
-                    "SELECT 1 FROM pos_base WHERE tabla = 'ventas' AND dia = ? LIMIT 1",
-                    (dia,),
+                    "SELECT 1 FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND dia = ? LIMIT 1",
+                    (eid, dia),
                 ).fetchone()
             else:
                 fila = conn.execute(
-                    "SELECT 1 FROM pos_base WHERE tabla = 'ventas' AND sucursal_id = ? AND dia = ? LIMIT 1",
-                    (int(sucursal_id), dia),
+                    "SELECT 1 FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND sucursal_id = ? AND dia = ? LIMIT 1",
+                    (eid, int(sucursal_id), dia),
                 ).fetchone()
     except Exception:
         return False
     return fila is not None
 
 
-def _filas_del_rango(tabla: str, sucursal_id: int | None, desde: str, hasta: str) -> tuple[list[str], list[list]]:
+def _filas_del_rango(tabla: str, sucursal_id: int | None, desde: str, hasta: str, empresa_id: int | None = None) -> tuple[list[str], list[list]]:
+    eid = _empresa_activa(empresa_id)
     sid = int(sucursal_id) if sucursal_id is not None else None
-    ambito = _ambito_cache()
+    ambito = _ambito_cache(eid)
     ahora = time.monotonic()
     clave = (ambito, tabla, sid, desde, hasta)
     with _cache_lock:
         hit = _cache_dia.get(clave)
         if hit and _vigente(hit[0], ahora, ambito):
             return hit[1], hit[2]
-    with get_db() as conn:
+    with get_db(eid) as conn:
         if sid is None:
             partes = conn.execute(
                 "SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                "FROM pos_base WHERE tabla = ? AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
+                "FROM pos_base WHERE empresa_id = ? AND tabla = ? AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
                 "ORDER BY sucursal_id, parte",
-                (tabla, desde, hasta),
+                (eid, tabla, desde, hasta),
             ).fetchall()
         else:
             partes = conn.execute(
                 "SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                "FROM pos_base WHERE tabla = ? AND sucursal_id = ? AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
+                "FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ? AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
                 "ORDER BY parte",
-                (tabla, sid, desde, hasta),
+                (eid, tabla, sid, desde, hasta),
             ).fetchall()
     columnas, filas = _armar_filas(partes)
     filas = _recortar_dias(columnas, filas, desde, hasta)
@@ -1379,22 +1415,23 @@ def _filas_sucursal(columnas: list, filas: list, sid: int) -> tuple[list, list]:
     return columnas, salida
 
 
-def hay_tabla(tabla: str, sucursal_id: int | None = None) -> bool:
+def hay_tabla(tabla: str, sucursal_id: int | None = None, empresa_id: int | None = None) -> bool:
     """La tabla existe en el libro, aunque el período pedido no tenga filas."""
     if not _TABLA.match(tabla or ""):
         return False
+    eid = _empresa_activa(empresa_id)
     sid = int(sucursal_id) if sucursal_id is not None else None
     try:
-        with get_db() as conn:
+        with get_db(eid) as conn:
             if sid is None:
                 fila = conn.execute(
-                    "SELECT 1 FROM pos_base WHERE tabla = ? LIMIT 1",
-                    (tabla,),
+                    "SELECT 1 FROM pos_base WHERE empresa_id = ? AND tabla = ? LIMIT 1",
+                    (eid, tabla),
                 ).fetchone()
             else:
                 fila = conn.execute(
-                    "SELECT 1 FROM pos_base WHERE tabla = ? AND sucursal_id = ? LIMIT 1",
-                    (tabla, sid),
+                    "SELECT 1 FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ? LIMIT 1",
+                    (eid, tabla, sid),
                 ).fetchone()
     except Exception:
         return False
@@ -1406,13 +1443,15 @@ def filas_de(
     sucursal_id: int | None = None,
     desde: str | None = None,
     hasta: str | None = None,
+    empresa_id: int | None = None,
 ) -> tuple[list[str], list[list]]:
     if not _TABLA.match(tabla or ""):
         return [], []
+    eid = _empresa_activa(empresa_id)
     if desde and hasta and tabla in _TABLAS_DIA:
-        return _filas_del_rango(tabla, sucursal_id, desde[:10], hasta[:10])
+        return _filas_del_rango(tabla, sucursal_id, desde[:10], hasta[:10], empresa_id=eid)
     sid = int(sucursal_id) if sucursal_id is not None else None
-    ambito = _ambito_cache()
+    ambito = _ambito_cache(eid)
     ahora = time.monotonic()
     with _cache_lock:
         hit = _cache.get((ambito, tabla, sid))
@@ -1421,7 +1460,7 @@ def filas_de(
         base = _cache.get((ambito, tabla, None))
         if sid is not None and not hit and base and _vigente(base[0], ahora, ambito):
             return _filas_sucursal(base[2], base[3], sid)
-    precargar_tablas((tabla,), sucursal_id=sid)
+    precargar_tablas((tabla,), sucursal_id=sid, empresa_id=eid)
     with _cache_lock:
         hit = _cache.get((ambito, tabla, sid))
         if hit:
@@ -1429,7 +1468,11 @@ def filas_de(
     return [], []
 
 
-def precargar_tablas(tablas: tuple[str, ...] | list[str], sucursal_id: int | None = None) -> None:
+def precargar_tablas(
+    tablas: tuple[str, ...] | list[str],
+    sucursal_id: int | None = None,
+    empresa_id: int | None = None,
+) -> None:
     """Una lectura del libro alcanza para Todas y para cada sucursal.
 
     Si el sello no cambió, no se vuelven a bajar las filas.
@@ -1437,24 +1480,25 @@ def precargar_tablas(tablas: tuple[str, ...] | list[str], sucursal_id: int | Non
     pedidas = [t for t in tablas if _TABLA.match(t or "")]
     if not pedidas:
         return
+    eid = _empresa_activa(empresa_id)
     sid = int(sucursal_id) if sucursal_id is not None else None
-    ambito = _ambito_cache()
+    ambito = _ambito_cache(eid)
     ahora = time.monotonic()
 
     faltantes = [tabla for tabla in pedidas if not _libro_fresco(ambito, tabla, sid, ahora)]
     if not faltantes:
         return
 
-    with get_db() as conn:
-        sellos = _sellos_tablas(conn, faltantes)
+    with get_db(eid) as conn:
+        sellos = _sellos_tablas(conn, faltantes, eid=eid)
         bajar = [tabla for tabla in faltantes if not _tabla_vigente(ambito, tabla, sellos.get(tabla, {}), ahora)]
         partes = []
         if bajar:
             marcas = ", ".join("?" for _ in bajar)
             partes = conn.execute(
                 f"SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                f"FROM pos_base WHERE tabla IN ({marcas}) ORDER BY tabla, sucursal_id, parte",
-                tuple(bajar),
+                f"FROM pos_base WHERE empresa_id = ? AND tabla IN ({marcas}) ORDER BY tabla, sucursal_id, parte",
+                (eid, *bajar),
             ).fetchall()
 
     if not bajar:

@@ -394,6 +394,8 @@ def api_pos_base_tabla():
     from app.services.pos_base import guardar_parte
 
     data = request.get_json(silent=True) or {}
+    emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.headers.get("X-Company-ID") or data.get("empresa_id")
+    emp_id = int(emp_raw) if str(emp_raw or "").isdigit() else 1
     try:
         resultado = guardar_parte(
             str(data.get("tabla") or ""),
@@ -405,6 +407,7 @@ def api_pos_base_tabla():
             data.get("sucursal") or data.get("sucursal_nombre"),
             str(data.get("modo") or "reemplazo"),
             data.get("bajas") or [],
+            empresa_id=emp_id,
         )
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
@@ -416,8 +419,6 @@ def api_pos_base_tabla():
     if str(data.get("tabla") or "") == "ventas" and data.get("total_filas") not in (None, ""):
         from app.services.pos_base import anotar_carga
 
-        emp_raw = session.get("empresa_id")
-        emp_id = int(emp_raw) if str(emp_raw or "").isdigit() else 1
         anotar_carga(
             emp_id,
             int(data.get("enviadas") or 0),
@@ -428,8 +429,6 @@ def api_pos_base_tabla():
     if completo and resultado.get("ok"):
         from app.services.signal_bus import broadcast_refresh
 
-        emp_raw = session.get("empresa_id")
-        emp_id = int(emp_raw) if str(emp_raw or "").isdigit() else 1
         limpiar_solicitud_sync(data.get("sucursal_id") or 1)
         broadcast_refresh(emp_id, reason="libro")
     return jsonify(resultado)
@@ -555,7 +554,8 @@ def api_pos_sucursales():
     """Lista de sucursales activas registradas en la base espejo."""
     from app.services.pos_base import listar_sucursales
 
-    return jsonify({"ok": True, "sucursales": listar_sucursales()})
+    emp_id = int(session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.args.get("empresa_id") or 1)
+    return jsonify({"ok": True, "sucursales": listar_sucursales(empresa_id=emp_id)})
 
 
 @api_bp.route("/pos/carga", methods=["GET"])
@@ -563,15 +563,18 @@ def api_pos_carga():
     """Barra de arriba: el día ya entró y el resto del libro sigue llegando."""
     from app.services.pos_base import leer_carga
 
-    dato = leer_carga(int(session.get("empresa_id") or 1))
+    emp_id = int(session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.args.get("empresa_id") or 1)
+    dato = leer_carga(emp_id)
     subidos = int(dato.get("subidos") or 0)
     total = int(dato.get("total") or 0)
     if total < subidos:
         total = subidos
+    cargando = total > 0 and subidos < total
     progreso_texto = dato.get("progreso_texto") or (f"{subidos}/{total}" if total > 0 else "")
     return jsonify({
         "ok": True,
-        "visible": True,
+        "visible": cargando,
+        "cargando": cargando,
         "completo": total > 0 and subidos >= total,
         "subidos": subidos,
         "total": total,
