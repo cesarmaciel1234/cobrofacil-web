@@ -2,8 +2,25 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Cobro Fácil</title>
+    
+    <script>
+        document.addEventListener('gesturestart', function(e) { e.preventDefault(); }, { passive: false });
+        document.addEventListener('gesturechange', function(e) { e.preventDefault(); }, { passive: false });
+        document.addEventListener('gestureend', function(e) { e.preventDefault(); }, { passive: false });
+        var _lastTouch = 0;
+        document.addEventListener('touchend', function(e) {
+            var now = Date.now();
+            if (now - _lastTouch <= 300) {
+                var t = (e.target && e.target.tagName) || '';
+                if (t !== 'INPUT' && t !== 'TEXTAREA') {
+                    e.preventDefault();
+                }
+            }
+            _lastTouch = now;
+        }, { passive: false });
+    </script>
     
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#2563eb">
@@ -19,7 +36,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.43">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.45">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -234,9 +251,9 @@
     <script src="/static/js/barra/toque.js?v=4"></script>
     <script src="/static/js/modulo-panel.js?v=6"></script>
     <script src="/static/js/barra/cartera-libro.js?v=13"></script>
-    <script src="/static/js/espejo.js?v=8"></script>
+    <script src="/static/js/espejo.js?v=9"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>
     <script src="/static/js/nodo.js?v=3"></script>
-    <script src="/static/js/app.js?v=4.81"></script>
+    <script src="/static/js/app.js?v=4.85"></script>
 </body>
 </html>

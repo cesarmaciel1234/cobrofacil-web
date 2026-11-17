@@ -73,7 +73,15 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    touch-action: pan-x pan-y;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+}
 
 body {
     font-family: var(--font);
@@ -82,6 +90,13 @@ body {
     font-size: 13px;
     line-height: 1.5;
     min-height: 100vh;
+    touch-action: pan-x pan-y;
+    overscroll-behavior-y: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+button, a, input, select, textarea, .pwa-nav-btn, .clickable, .herramienta-btn, .filtro-periodo, .sucursal-pill {
+    touch-action: manipulation;
 }
 
 body::before {

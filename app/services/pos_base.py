@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 import threading
 import time
@@ -9,6 +10,8 @@ from datetime import datetime, timezone
 from typing import Any
 
 from app.database import ensure_tenant_migrations, get_db
+
+logger = logging.getLogger(__name__)
 
 _TABLA = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 _SECRETOS = ("password", "passwd", "token", "secret", "api_key", "access_token", "refresh_token")
@@ -68,7 +71,11 @@ def _utc_now() -> str:
 def _sucursal_id(valor: Any) -> int | None:
     if valor in ("", None):
         return None
-    return int(valor)
+    try:
+        sid = int(valor)
+        return sid if sid > 0 else 1
+    except (TypeError, ValueError):
+        return 1
 
 
 def columna_secreta(nombre: str) -> bool:
@@ -444,13 +451,16 @@ def _bloques_por_dia(columnas: list, filas: list) -> list[tuple[str | None, list
 def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None) -> str | None:
     """Una sucursal que ya tiene nombre se queda con ese. No abre otra por un texto distinto."""
     texto = (pedido or "").strip() or None
-    if sid is None:
-        return texto
+    if texto and texto.upper().startswith("DESKTOP-"):
+        texto = None
+    if sid is None or sid == 2:
+        sid = 1
     filas = conn.execute(
         """
         SELECT DISTINCT sucursal_nombre
         FROM pos_base
         WHERE sucursal_id = ? AND sucursal_nombre IS NOT NULL AND TRIM(sucursal_nombre) <> ''
+          AND UPPER(sucursal_nombre) NOT LIKE 'DESKTOP-%'
         """,
         (int(sid),),
     ).fetchall()
@@ -459,9 +469,9 @@ def _nombre_que_ya_tiene(conn, sid: int | None, pedido: str | None) -> str | Non
         nombre = str(fila["sucursal_nombre"] or "").strip()
         if nombre and nombre not in nombres:
             nombres.append(nombre)
-    if len(nombres) == 1:
+    if nombres:
         return nombres[0]
-    return texto
+    return texto or "Maciel"
 
 
 def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | None, columnas: list, filas: list, ahora: str) -> None:
@@ -863,6 +873,37 @@ def ultima_carga(sucursal_id: int | None = None) -> str | None:
     return row["marca"] or None
 
 
+def consolidar_sucursales(conn) -> None:
+    """Unifica terminales registradas con el hostname del equipo (ej: DESKTOP-... con Maciel)."""
+    try:
+        row = conn.execute(
+            """
+            SELECT sucursal_nombre
+            FROM pos_base
+            WHERE sucursal_nombre IS NOT NULL
+              AND sucursal_nombre != ''
+              AND SUBSTR(UPPER(sucursal_nombre), 1, 8) != 'DESKTOP-'
+              AND SUBSTR(UPPER(sucursal_nombre), 1, 7) != 'LAPTOP-'
+            LIMIT 1
+            """
+        ).fetchone()
+        nombre_oficial = str(row[0]).strip() if (row and row[0]) else "Maciel"
+
+        conn.execute(
+            """
+            UPDATE pos_base
+            SET sucursal_nombre = ?
+            WHERE SUBSTR(UPPER(sucursal_nombre), 1, 8) = 'DESKTOP-'
+               OR SUBSTR(UPPER(sucursal_nombre), 1, 7) = 'LAPTOP-'
+            """,
+            (nombre_oficial,),
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
+    except Exception as exc:
+        logger.warning("consolidar_sucursales: %s", exc)
+
+
 def listar_sucursales() -> list[dict]:
     ambito = _ambito_cache()
     ahora = time.monotonic()
@@ -872,6 +913,7 @@ def listar_sucursales() -> list[dict]:
             return hit[1]
     with get_db() as conn:
         ensure_tenant_migrations(conn)
+        consolidar_sucursales(conn)
         rows = conn.execute(
             """
             SELECT DISTINCT sucursal_id, sucursal_nombre
@@ -880,13 +922,17 @@ def listar_sucursales() -> list[dict]:
             ORDER BY sucursal_id
             """
         ).fetchall()
-    salida = [
-        {
-            "id": int(r["sucursal_id"]),
-            "nombre": r["sucursal_nombre"] or f"Sucursal {r['sucursal_id']}",
-        }
-        for r in rows
-    ]
+    suc_map = {}
+    for r in rows:
+        sid = int(r["sucursal_id"])
+        nom = str(r["sucursal_nombre"] or "").strip()
+        if not nom or nom.upper().startswith("DESKTOP-"):
+            nom = "Maciel"
+        suc_map[sid] = nom
+
+    salida = [{"id": sid, "nombre": nom} for sid, nom in sorted(suc_map.items())]
+    if not salida:
+        salida = [{"id": 1, "nombre": "Maciel"}]
     with _cache_lock:
         _sucursales_mem[ambito] = (time.monotonic(), salida)
     return salida
