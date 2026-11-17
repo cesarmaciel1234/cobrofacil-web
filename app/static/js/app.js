@@ -1947,11 +1947,11 @@ const $ = id => document.getElementById(id);
                 <div class="drawer-row"><span class="lbl">Registrado</span><span class="val">${e.created_at || '—'}</span></div>
             `;
             $('drawerPagar').style.display = (e.tiene_cuotas && !e.completa) ? 'inline-flex' : 'none';
-            $('drawerOverlay').classList.add('open');
+            $('drawerOverlay')?.classList.add('open');
         }
 
         function closeDrawer() {
-            $('drawerOverlay').classList.remove('open');
+            $('drawerOverlay')?.classList.remove('open');
             selectedDeuda = null;
         }
 
