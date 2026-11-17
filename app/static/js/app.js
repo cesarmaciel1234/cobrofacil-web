@@ -2688,29 +2688,139 @@ const $ = id => document.getElementById(id);
             cuerpo.innerHTML = `<p class="desglose-fecha">${textoJefe(libro.etiqueta || '')}</p><div class="desglose-lista">${lista}</div><div class="desglose-pie"><span>${textoJefe(pieDesglose(libro))}</span><b>${plataJefe(libro.monto)}</b></div>`;
         }
 
-        function pintarTickets() {
-            mostrarPantallaVentas();
-            const cuerpo = $('ticketCuerpo');
+        function htmlFilaTicket(t) {
+            const cancel = String(t.estado || '').toUpperCase().startsWith('CANCELAD');
+            const dia = (t.fecha || '').slice(0, 10);
+            const hora = (t.fecha || '').slice(11, 16);
+            const cuando = (dia && dia !== hoyLocal()) ? (fechaVisible(dia) + ' ' + hora) : hora;
+            return `<tr class="ticket-fila${cancel ? ' ticket-cancel' : ''}" data-ticket="${textoJefe(t.id)}"><td>${textoJefe(cuando)}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(cancel ? 'Cancelada' : (t.pago || '—'))}</td><td>${plataJefe(t.total)}</td></tr>`;
+        }
+
+        function actualizarResumenTickets() {
             const suma = $('ticketFiltro');
-            if (!cuerpo) return;
+            if (!suma) return;
             const periodoTxt = etiquetaPeriodoVentas();
             pintarChipPeriodo('ticketPeriodo', periodoTxt);
-            if (suma) {
-                const extra = ticketsResumen.recorte ? ' · los 400 más nuevos' : '';
-                const cantTxt = ticketsResumen.ok === 1 ? '1 ticket' : (ticketsResumen.ok + ' tickets');
-                suma.textContent = (ticketsEnPantalla.length || ticketsResumen.ok)
-                    ? (periodoTxt + ' · ' + plataJefe(ticketsResumen.total) + ' · ' + cantTxt + extra)
-                    : (periodoTxt + ' · $0,00');
+            const totalOk = ticketsResumen.ok || ticketsEnPantalla.length;
+            const cantTxt = totalOk === 1 ? '1 ticket' : (totalOk.toLocaleString('es-AR') + ' tickets');
+            const viendo = ticketsEnPantalla.length;
+            const progreso = (viendo < totalOk && ticketsTieneMas)
+                ? ` · viendo ${viendo.toLocaleString('es-AR')} de ${cantTxt}`
+                : ` · ${cantTxt}`;
+            suma.textContent = (ticketsEnPantalla.length || ticketsResumen.ok)
+                ? (periodoTxt + ' · ' + plataJefe(ticketsResumen.total) + progreso)
+                : (periodoTxt + ' · $0,00');
+        }
+
+        let ticketsCargandoMas = false;
+        let ticketsTieneMas = false;
+
+        function asegurarSentinel() {
+            const cuerpo = $('ticketCuerpo');
+            if (!cuerpo) return;
+            $('ticketScrollSentinel')?.remove();
+            if (!ticketsTieneMas) return;
+            const totalOk = ticketsResumen.ok || 0;
+            const quedan = Math.max(0, totalOk - ticketsEnPantalla.length);
+            const tr = document.createElement('tr');
+            tr.id = 'ticketScrollSentinel';
+            tr.innerHTML = `<td colspan="4" style="text-align:center; padding:16px 12px; color:#64748b; font-size:13px; font-weight:600; cursor:pointer;" onclick="void window.cargarSiguientePaginaTickets()">
+                <div style="display:inline-flex; align-items:center; gap:8px;">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12l7 7 7-7"/></svg>
+                    <span>Cargar más tickets ${quedan > 0 ? ('(quedan ' + quedan.toLocaleString('es-AR') + ')') : ''}</span>
+                </div>
+            </td>`;
+            cuerpo.appendChild(tr);
+        }
+
+        window.cargarSiguientePaginaTickets = async function() {
+            if (ticketsCargandoMas || !ticketsTieneMas) return;
+            if (moduloActual !== 'ticket' || ventasPantalla === 'desglose') return;
+            ticketsCargandoMas = true;
+            const offset = ticketsEnPantalla.length;
+            const tr = $('ticketScrollSentinel');
+            if (tr) {
+                tr.innerHTML = `<td colspan="4" style="text-align:center; padding:16px 12px; color:#0284c7; font-size:13px; font-weight:600;">
+                    <div style="display:inline-flex; align-items:center; gap:8px;">
+                        <span class="spinner" style="display:inline-block; width:14px; height:14px; border:2px solid #94a3b8; border-top-color:#0284c7; border-radius:50%; animation:spin 0.8s linear infinite;"></span>
+                        <span>Cargando otros 400 tickets…</span>
+                    </div>
+                </td>`;
             }
-            cuerpo.innerHTML = ticketsEnPantalla.length
-                ? ticketsEnPantalla.map((t) => {
-                    const cancel = String(t.estado || '').toUpperCase().startsWith('CANCELAD');
-                    const dia = (t.fecha || '').slice(0, 10);
-                    const hora = (t.fecha || '').slice(11, 16);
-                    const cuando = (dia && dia !== hoyLocal()) ? (fechaVisible(dia) + ' ' + hora) : hora;
-                    return `<tr class="ticket-fila${cancel ? ' ticket-cancel' : ''}" data-ticket="${textoJefe(t.id)}"><td>${textoJefe(cuando)}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(cancel ? 'Cancelada' : (t.pago || '—'))}</td><td>${plataJefe(t.total)}</td></tr>`;
-                }).join('')
-                : `<tr><td colspan="4">${textoJefe(ticketsAviso || 'Sin tickets con ese filtro.')}</td></tr>`;
+            try {
+                let nuevos = [];
+                let mas = false;
+                if (window.Espejo && Espejo.tieneDatos && Espejo.tieneDatos()) {
+                    const rango = Espejo.rangoVentas(filtroVentas);
+                    const lista = Espejo.listar(null, rango[0], rango[1], activeSucursalId, filtroVentas, offset, 400);
+                    if (lista && Array.isArray(lista.tickets)) {
+                        nuevos = lista.tickets;
+                        mas = !!lista.hay_mas || (nuevos.length === 400 && (offset + nuevos.length) < lista.cant);
+                    }
+                }
+                if (!nuevos.length && navigator.onLine) {
+                    let url = '/api/pos/jefe?panel=ticket' + queryFiltroVentas() + '&offset=' + offset + '&limite=400';
+                    if (activeSucursalId !== null && activeSucursalId !== undefined) {
+                        url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
+                    }
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const dato = await res.json();
+                        if (dato && Array.isArray(dato.tickets)) {
+                            nuevos = dato.tickets;
+                            mas = !!dato.hay_mas || (nuevos.length === 400 && (offset + nuevos.length) < (dato.tickets_ok || 0));
+                        }
+                    }
+                }
+                if (nuevos.length > 0) {
+                    const conocidos = new Set(ticketsEnPantalla.map(t => String(t.id)));
+                    const paraAgregar = nuevos.filter(t => !conocidos.has(String(t.id)));
+                    if (paraAgregar.length > 0) {
+                        ticketsEnPantalla.push(...paraAgregar);
+                        const cuerpo = $('ticketCuerpo');
+                        if (cuerpo) {
+                            $('ticketScrollSentinel')?.remove();
+                            cuerpo.insertAdjacentHTML('beforeend', paraAgregar.map(htmlFilaTicket).join(''));
+                        }
+                    }
+                    ticketsTieneMas = mas && (ticketsEnPantalla.length < ticketsResumen.ok);
+                } else {
+                    ticketsTieneMas = false;
+                }
+            } catch (err) {
+                console.warn('[Ventas] Error cargando página de tickets:', err);
+            } finally {
+                ticketsCargandoMas = false;
+                $('ticketScrollSentinel')?.remove();
+                actualizarResumenTickets();
+                asegurarSentinel();
+            }
+        };
+
+        function verificarScrollTickets() {
+            if (moduloActual !== 'ticket' || ventasPantalla === 'desglose') return;
+            if (!ticketsTieneMas || ticketsCargandoMas) return;
+            const scrollPos = window.innerHeight + window.scrollY;
+            const threshold = (document.documentElement.scrollHeight || document.body.scrollHeight) - 600;
+            if (scrollPos >= threshold) {
+                void window.cargarSiguientePaginaTickets();
+            }
+        }
+        window.addEventListener('scroll', verificarScrollTickets, { passive: true });
+
+        function pintarTickets(acumular) {
+            mostrarPantallaVentas();
+            const cuerpo = $('ticketCuerpo');
+            if (!cuerpo) return;
+            actualizarResumenTickets();
+            if (!acumular) {
+                if (ticketsEnPantalla.length) {
+                    cuerpo.innerHTML = ticketsEnPantalla.map(htmlFilaTicket).join('');
+                } else {
+                    cuerpo.innerHTML = `<tr><td colspan="4">${textoJefe(ticketsAviso || 'Sin tickets con ese filtro.')}</td></tr>`;
+                }
+            }
+            asegurarSentinel();
         }
 
         function cerrarTicket() {
@@ -3530,6 +3640,7 @@ const $ = id => document.getElementById(id);
                             ok: true, libro: true, panel: 'ticket',
                             filtrado: lista.total, tickets_ok: lista.cant,
                             tickets: lista.tickets, recorte: lista.recorte,
+                            hay_mas: lista.hay_mas,
                             resumen: {
                                 ventas: lista.total, tickets: lista.cant,
                                 promedio: lista.cant ? Math.round(lista.total / lista.cant * 100) / 100 : 0,
@@ -4171,6 +4282,7 @@ const $ = id => document.getElementById(id);
                     dato.tickets_ok = lista.cant;
                     dato.tickets = lista.tickets;
                     dato.recorte = lista.recorte;
+                    dato.hay_mas = lista.hay_mas;
                     dato.libro = true;
                     if (dato.resumen) {
                         dato.resumen.ventas = lista.total;
@@ -4559,8 +4671,9 @@ const $ = id => document.getElementById(id);
                     ok: dato.tickets_ok || 0,
                     recorte: !!dato.recorte
                 };
+                ticketsTieneMas = !!dato.hay_mas || (ticketsEnPantalla.length === 400 && ticketsEnPantalla.length < ticketsResumen.ok);
                 ticketsAviso = avisoSinTickets(dato.libro !== false);
-                pintarTickets();
+                pintarTickets(false);
                 const refresh = $('btnRefresh');
                 if (refresh && refresh.classList.contains('es-filtro')) {
                     refresh.classList.toggle('filtrando', filtroVentasActivo());
@@ -6395,7 +6508,7 @@ const $ = id => document.getElementById(id);
                     Espejo.alActualizar(pintarDesdeEspejo);
                     void Espejo.asegurar();
                 }
-                const CRM_CACHE_EPOCH = '2026-11-17-epoch5';
+                const CRM_CACHE_EPOCH = '2026-11-17-epoch6';
                 if (localStorage.getItem('crm_cache_epoch') !== CRM_CACHE_EPOCH) {
                     localStorage.setItem('crm_cache_epoch', CRM_CACHE_EPOCH);
                     localStorage.removeItem('crm_sucursales_cache');

@@ -587,8 +587,10 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             slot["tickets"] += 1
         elegidas.append(venta)
     elegidas.sort(key=lambda item: (item["fecha"], item["id"]), reverse=True)
-    recorte = len(elegidas) > _TOPE_LISTA
-    visibles = elegidas[:_TOPE_LISTA]
+    offset = max(0, int(pedido.get("offset") or 0))
+    limite = max(1, int(pedido.get("limite") or _TOPE_LISTA))
+    recorte = len(elegidas) > (offset + limite)
+    visibles = elegidas[offset : offset + limite]
     return {
         "libro": True,
         "tickets": [
@@ -615,6 +617,9 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             reverse=True,
         ),
         "recorte": recorte,
+        "hay_mas": recorte,
+        "offset": offset,
+        "limite": limite,
     }
 
 

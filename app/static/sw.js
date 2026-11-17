@@ -1,5 +1,5 @@
 /* Master Total PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.91';
+const CACHE_VERSION = 'crm-frigorifico-v4.92';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',

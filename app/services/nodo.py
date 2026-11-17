@@ -42,6 +42,8 @@ def filtro_de(pieza: str, valores: dict | None) -> dict | None:
         "hora_desde": datos.get("hora_desde") or "00:00",
         "hora_hasta": datos.get("hora_hasta") or "23:59",
         "caja": datos.get("caja") or "",
+        "offset": int(datos.get("offset") or 0),
+        "limite": int(datos.get("limite") or 400),
     }
     if datos.get("periodo"):
         filtro["periodo"] = datos.get("periodo")

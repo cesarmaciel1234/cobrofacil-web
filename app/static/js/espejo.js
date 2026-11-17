@@ -374,15 +374,21 @@
         return { cant: cant, total: Math.round(total * 100) / 100 };
     }
 
-    function listar(libro, desde, hasta, sucursalId, filtro) {
+    function listar(libro, desde, hasta, sucursalId, filtro, offset, limite) {
+        const off = Number(offset) || 0;
+        const lim = Number(limite) || 400;
         const filas = elegir(libro, desde, hasta, sucursalId, filtro);
         const suma = sumar(libro, desde, hasta, sucursalId, filtro);
         const visibles = filas.slice().sort((a, b) => (a.fecha < b.fecha ? 1 : (a.fecha > b.fecha ? -1 : (a.id < b.id ? 1 : -1))));
+        const slice = visibles.slice(off, off + lim);
         return {
             cant: suma.cant,
             total: suma.total,
-            recorte: visibles.length > 400,
-            tickets: visibles.slice(0, 400).map((fila) => ({
+            recorte: visibles.length > (off + lim),
+            hay_mas: visibles.length > (off + lim),
+            offset: off,
+            limite: lim,
+            tickets: slice.map((fila) => ({
                 id: fila.id,
                 fecha: fila.fecha,
                 total: Math.round(fila.total * 100) / 100,

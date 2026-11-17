@@ -531,6 +531,8 @@ def api_pos_jefe():
             "hora_desde": request.args.get("hora_desde") or "00:00",
             "hora_hasta": request.args.get("hora_hasta") or "23:59",
             "caja": request.args.get("caja") or "",
+            "offset": request.args.get("offset", type=int) or 0,
+            "limite": request.args.get("limite", type=int) or 400,
         }
         if nombre == "contabilidad" and request.args.get("periodo"):
             filtro["periodo"] = request.args.get("periodo")

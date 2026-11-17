@@ -1147,6 +1147,9 @@ def _armar_panel(
             "tickets_ok": t_ok,
             "cajas": libro["cajas"],
             "recorte": libro["recorte"],
+            "hay_mas": libro.get("hay_mas", False),
+            "offset": libro.get("offset", 0),
+            "limite": libro.get("limite", 400),
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }
@@ -1249,6 +1252,9 @@ def _armar_panel(
             "tickets_ok": libro["tickets_ok"],
             "cajas": libro["cajas"],
             "recorte": libro["recorte"],
+            "hay_mas": libro.get("hay_mas", False),
+            "offset": libro.get("offset", 0),
+            "limite": libro.get("limite", 400),
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }
