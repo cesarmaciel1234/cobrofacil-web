@@ -25,8 +25,8 @@ Controla la barra inferior fija de cinco botones de la PWA móvil y desktop de *
 | **`ventas.js`** | Paginación y visualización del historial de tickets. Se coordina con `pos_historial.py` y `cargarSiguientePaginaTickets()` para carga progresiva de a 400 tickets. |
 | **`cobros.js`** | Submódulo de historial de cobros transaccionales y conciliación de caja. |
 | **`caja.js`** | Arqueo de medios de pago del día (Efectivo, QR MercadoPago, Fiado, Tarjeta) con porcentajes sobre el total recaudado. |
-| **`cartera.js`** | Panel general de cuentas corrientes: métricas de saldo en la calle, clientes en riesgo, cobros del mes y búsqueda de clientes. |
-| **`cartera-libro.js`** | Libro mayor detallado por cliente: historial de compras, pagos, saldo acumulado y cálculo en tiempo real de interés/CFR formateado en pesos argentinos (`es-AR`). Incorpora `AbortController` para cancelación preventiva de consultas desfasadas. |
+| **`cartera.js`** | Módulo de Cartera y definición de herramientas en el Sidebar/Drawer (`Tarjetas de clientes`, `Historial de cargos`, `Historial de cobros`, `Auditoría de cartera`), además de chips de filtro (`Todos`, `Con deuda`, `Riesgo`, `Al día`, `Express`, `30+`, `60+`, `90+`). |
+| **`cartera-libro.js`** | Controlador integral de la Cartera de Clientes. Gestiona la vista de tarjetas y fichas individuales, la Planilla de Cargos (ventas a crédito, cargos manuales, filtros de período y estado vivo/borrado/cancelado), la Planilla de Cobros (recibos COB-, medios de pago, id digital y quién cobró) y la Auditoría de Cartera (libro de eventos, control de integridad y cuadre de saldos). Incorpora `AbortController` y renderizado seguro con debounce. |
 | **`pedidos.js`** | Gestión de reposición de mercadería, cálculo de kilos sugeridos por producto con stock negativo y filtrado por proveedor. |
 
 ---

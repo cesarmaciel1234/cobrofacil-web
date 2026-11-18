@@ -108,6 +108,9 @@ def resolver_rango(
         fin = hoy.replace(day=ultimo_dia)
         return f"{inicio.isoformat()} 00:00:00", f"{fin.isoformat()} 23:59:59", "Mes"
 
+    if p in ("todas", "todo", "todos", "historico", "historica"):
+        return "1970-01-01 00:00:00", "2099-12-31 23:59:59", "Todas"
+
     if p in ("año", "anio", "año actual"):
         return f"{hoy.year}-01-01 00:00:00", f"{hoy.year}-12-31 23:59:59", "Año"
 

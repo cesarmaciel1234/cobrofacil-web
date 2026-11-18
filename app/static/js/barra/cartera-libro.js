@@ -141,12 +141,19 @@
     function mostrarLista() {
         const lista = nodo('carteraLista');
         const ficha = nodo('ficha');
+        const cargos = nodo('carteraCargos');
+        const cobros = nodo('carteraCobros');
+        const auditoria = nodo('carteraAuditoria');
         if (lista) lista.hidden = false;
         if (ficha) {
             ficha.hidden = true;
             ficha.innerHTML = '';
         }
+        if (cargos) cargos.hidden = true;
+        if (cobros) cobros.hidden = true;
+        if (auditoria) auditoria.hidden = true;
         fichaAbierta = '';
+        pantallaActual = 'clientes';
         libroAbierto = [];
         cerrarMovimiento();
         ponerMarca(marcaEmpresa);
@@ -594,6 +601,253 @@
         }
     }
 
+    let pantallaActual = 'clientes';
+    let periodoCargos = 'Mes';
+    let estadoCargos = 'todos';
+    let textoCargos = '';
+    let timerCargos = null;
+
+    let periodoCobros = 'Mes';
+    let medioCobros = 'todos';
+    let textoCobros = '';
+    let timerCobros = null;
+
+    let accionAuditoria = 'todas';
+    let textoAuditoria = '';
+    let timerAuditoria = null;
+
+    function cambiarPantalla(id) {
+        pantallaActual = id || 'clientes';
+        const lista = nodo('carteraLista');
+        const ficha = nodo('ficha');
+        const cargos = nodo('carteraCargos');
+        const cobros = nodo('carteraCobros');
+        const auditoria = nodo('carteraAuditoria');
+
+        if (pantallaActual === 'clientes') {
+            mostrarLista();
+            return;
+        }
+
+        if (lista) lista.hidden = true;
+        if (ficha) { ficha.hidden = true; ficha.innerHTML = ''; }
+        if (cargos) cargos.hidden = (pantallaActual !== 'cargos');
+        if (cobros) cobros.hidden = (pantallaActual !== 'cobros');
+        if (auditoria) auditoria.hidden = (pantallaActual !== 'auditoria');
+
+        marcarAtras(true);
+        if (pantallaActual === 'cargos') {
+            ponerMarca('Historial de cargos');
+            cargarCargos();
+        } else if (pantallaActual === 'cobros') {
+            ponerMarca('Historial de cobros');
+            cargarCobros();
+        } else if (pantallaActual === 'auditoria') {
+            ponerMarca('Auditoría de cartera');
+            cargarAuditoria();
+        }
+    }
+
+    async function cargarCargos() {
+        const cuerpo = nodo('cuerpoCargos');
+        const pie = nodo('pieCargos');
+        if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">Cargando planilla de cargos…</td></tr>';
+        try {
+            let url = `${API_BASE}/pos/jefe?panel=cargos&periodo=${encodeURIComponent(periodoCargos)}`;
+            if (estadoCargos && estadoCargos !== 'todos') url += `&estado=${encodeURIComponent(estadoCargos)}`;
+            if (textoCargos) url += `&q=${encodeURIComponent(textoCargos)}`;
+            if (sucursalId) url += `&sucursal_id=${encodeURIComponent(sucursalId)}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('cargos');
+            const data = await res.json();
+            renderCargos(data.cargos || [], data.resumen || {});
+        } catch (e) {
+            if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:#ef4444;">No se pudo cargar la planilla de cargos.</td></tr>';
+        }
+    }
+
+    function renderCargos(filas, resumen) {
+        const cuerpo = nodo('cuerpoCargos');
+        const pie = nodo('pieCargos');
+        if (!cuerpo) return;
+        if (!filas.length) {
+            cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:28px; color:var(--text-muted);">No se encontraron cargos para este filtro.</td></tr>';
+            if (pie) pie.innerHTML = '<span>0 cargos</span>';
+            return;
+        }
+
+        cuerpo.innerHTML = filas.map(f => {
+            const inactivo = f.estado_clave === 'borrado' || f.estado_clave === 'cancelado';
+            const estiloFila = inactivo ? 'opacity:0.6; text-decoration:line-through;' : '';
+            const colorMonto = inactivo ? 'var(--text-muted)' : '#dc2626';
+            const colorEstado = f.estado_clave === 'vivo' ? 'background:rgba(220,38,38,0.15); color:#f87171;' : (f.estado_clave === 'borrado' ? 'background:rgba(217,119,6,0.15); color:#fbbf24;' : 'background:rgba(100,116,139,0.2); color:#94a3b8;');
+            const ticketHtml = f.venta_id ? `<span style="color:#3b82f6; font-weight:700;">#${esc(f.venta_id)}</span>` : esc(f.ticket);
+
+            return `<tr style="${estiloFila}">
+                <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">${esc(f.fecha)}</td>
+                <td style="white-space:nowrap;">${ticketHtml}</td>
+                <td style="font-weight:700;">${esc(f.nombre)}</td>
+                <td style="font-size:12px; color:var(--text-muted);">${esc(f.dni || '—')}</td>
+                <td style="text-align:right; font-weight:800; color:${colorMonto}; white-space:nowrap;">${formatPos(f.monto)}</td>
+                <td style="font-size:12px;">${esc(f.origen)}</td>
+                <td><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${colorEstado}">${esc(f.estado)}</span></td>
+                <td style="text-align:right; font-size:13px; font-weight:600; white-space:nowrap;">${formatPos(f.saldo)}</td>
+                <td style="font-size:12px; color:var(--text-muted); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(f.descripcion)}">${esc(f.descripcion)}</td>
+            </tr>`;
+        }).join('');
+
+        if (pie) {
+            let partes = [`${filas.length} cargos · Vivos: ${formatPos(resumen.total_vivos || 0)}`];
+            if (resumen.total_borrados) partes.push(`Borrados: ${formatPos(resumen.total_borrados)}`);
+            if (resumen.total_cancelados) partes.push(`Cancelados: ${formatPos(resumen.total_cancelados)}`);
+            pie.innerHTML = `<span>${partes.join(' &nbsp;·&nbsp; ')}</span>`;
+        }
+    }
+
+    async function cargarCobros() {
+        const cuerpo = nodo('cuerpoCobros');
+        const pie = nodo('pieCobros');
+        if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:var(--text-muted);">Cargando planilla de cobros…</td></tr>';
+        try {
+            let url = `${API_BASE}/pos/jefe?panel=cobros&periodo=${encodeURIComponent(periodoCobros)}`;
+            if (medioCobros && medioCobros !== 'todos') url += `&medio=${encodeURIComponent(medioCobros)}`;
+            if (textoCobros) url += `&q=${encodeURIComponent(textoCobros)}`;
+            if (sucursalId) url += `&sucursal_id=${encodeURIComponent(sucursalId)}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('cobros');
+            const data = await res.json();
+            renderCobros(data.cobros || [], data.resumen || {});
+        } catch (e) {
+            if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:#ef4444;">No se pudo cargar la planilla de cobros.</td></tr>';
+        }
+    }
+
+    function renderCobros(filas, resumen) {
+        const cuerpo = nodo('cuerpoCobros');
+        const pie = nodo('pieCobros');
+        if (!cuerpo) return;
+        if (!filas.length) {
+            cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:28px; color:var(--text-muted);">No se encontraron cobros para este filtro.</td></tr>';
+            if (pie) pie.innerHTML = '<span>0 cobros</span>';
+            return;
+        }
+
+        cuerpo.innerHTML = filas.map(f => {
+            const colorMedio = f.digital ? 'background:rgba(59,130,246,0.15); color:#60a5fa;' : 'background:rgba(16,185,129,0.15); color:#34d399;';
+
+            return `<tr>
+                <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">${esc(f.fecha)}</td>
+                <td style="white-space:nowrap; font-weight:800; color:#3b82f6;">${esc(f.ticket_cobro)}</td>
+                <td style="font-weight:700;">${esc(f.nombre)}</td>
+                <td style="font-size:12px; color:var(--text-muted);">${esc(f.dni || '—')}</td>
+                <td style="text-align:right; font-weight:800; color:#059669; white-space:nowrap;">${formatPos(f.monto)}</td>
+                <td><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${colorMedio}">${esc(f.medio)}</span></td>
+                <td style="font-size:12px; color:var(--text-muted);">${esc(f.detalle)}</td>
+                <td style="font-size:12px;">${esc(f.perfil)}</td>
+                <td style="font-size:12px; color:var(--text-muted);">${esc(f.quien)}</td>
+                <td style="text-align:right; font-size:13px; font-weight:600; white-space:nowrap;">${formatPos(f.saldo)}</td>
+            </tr>`;
+        }).join('');
+
+        if (pie) {
+            let partes = [`${filas.length} cobros · Total cobrado: ${formatPos(resumen.monto_cobrado || 0)}`];
+            if (resumen.desglose_medios) {
+                const subMedios = Object.entries(resumen.desglose_medios).map(([k, v]) => `${k}: ${formatPos(v)}`);
+                if (subMedios.length) partes.push(`(${subMedios.join(', ')})`);
+            }
+            pie.innerHTML = `<span>${partes.join(' &nbsp;·&nbsp; ')}</span>`;
+        }
+    }
+
+    async function cargarAuditoria() {
+        const cuerpo = nodo('cuerpoAuditoria');
+        const barra = nodo('barraCuadreCartera');
+        const pie = nodo('pieAuditoria');
+        if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:var(--text-muted);">Cargando auditoría de clientes…</td></tr>';
+        try {
+            let url = `${API_BASE}/pos/jefe?panel=auditoria_cartera`;
+            if (accionAuditoria && accionAuditoria !== 'todas') url += `&accion=${encodeURIComponent(accionAuditoria)}`;
+            if (textoAuditoria) url += `&q=${encodeURIComponent(textoAuditoria)}`;
+            if (sucursalId) url += `&sucursal_id=${encodeURIComponent(sucursalId)}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error('auditoria');
+            const data = await res.json();
+            renderAuditoria(data.auditoria || [], data.resumen || {});
+        } catch (e) {
+            if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:#ef4444;">No se pudo cargar la auditoría.</td></tr>';
+        }
+    }
+
+    function renderAuditoria(filas, resumen) {
+        const cuerpo = nodo('cuerpoAuditoria');
+        const barra = nodo('barraCuadreCartera');
+        const pie = nodo('pieAuditoria');
+        if (!cuerpo) return;
+
+        if (barra) {
+            const cuadreOk = resumen.cuadre_ok;
+            const diffTxt = resumen.cuadre_diferencia != null ? formatPos(Math.abs(resumen.cuadre_diferencia)) : '$0';
+            barra.innerHTML = `
+                <div>
+                    <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Deuda Activa Clientes</span>
+                    <div style="font-size:1.15rem; font-weight:900; color:#3b82f6;">${formatPos(resumen.total_deuda_clientes || 0)}</div>
+                </div>
+                <div>
+                    <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Cargos Vivos</span>
+                    <div style="font-size:1.15rem; font-weight:900; color:#dc2626;">${formatPos(resumen.cargos_vivos || 0)}</div>
+                </div>
+                <div>
+                    <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Abonos / Pagos</span>
+                    <div style="font-size:1.15rem; font-weight:900; color:#059669;">${formatPos(resumen.abonos_totales || 0)}</div>
+                </div>
+                <div>
+                    <span style="font-size:11px; text-transform:uppercase; color:var(--text-muted); font-weight:700;">Control Integridad</span>
+                    <div style="font-size:0.95rem; font-weight:800; color:${cuadreOk ? '#10b981' : '#f59e0b'};">
+                        ${cuadreOk ? '✅ Cuadre de saldos 100% íntegro' : 'ℹ Diferencia histórica: ' + diffTxt}
+                    </div>
+                </div>
+            `;
+        }
+
+        if (!filas.length) {
+            cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:28px; color:var(--text-muted);">No se encontraron eventos de auditoría para este filtro.</td></tr>';
+            if (pie) pie.innerHTML = '<span>0 eventos</span>';
+            return;
+        }
+
+        const TONO = {
+            'Alta': 'background:rgba(4,120,87,0.18); color:#34d399;',
+            'Cargo': 'background:rgba(185,28,28,0.18); color:#f87171;',
+            'Abono': 'background:rgba(29,78,216,0.18); color:#60a5fa;',
+            'Borrado': 'background:rgba(71,85,105,0.25); color:#94a3b8;',
+            'Anulación': 'background:rgba(71,85,105,0.25); color:#94a3b8;',
+            'Unido': 'background:rgba(180,83,9,0.2); color:#fbbf24;',
+            'Límite': 'background:rgba(2,132,199,0.18); color:#38bdf8;',
+            'Edición': 'background:rgba(2,132,199,0.18); color:#38bdf8;',
+            'Suspendido': 'background:rgba(153,27,27,0.2); color:#fca5a5;',
+        };
+
+        cuerpo.innerHTML = filas.map(f => {
+            const estiloBadge = TONO[f.accion] || 'background:rgba(255,255,255,0.1); color:#cbd5e1;';
+            return `<tr>
+                <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">${esc(f.fecha)}</td>
+                <td><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${estiloBadge}">${esc(f.accion)}</span></td>
+                <td style="font-weight:700;">${esc(f.cliente)}</td>
+                <td style="font-size:12px; color:#3b82f6; font-weight:700;">${esc(f.referencia)}</td>
+                <td style="font-size:12px;">${esc(f.medio)}</td>
+                <td style="font-size:12px; color:var(--text-muted);">${esc(f.id_pago)}</td>
+                <td style="font-size:12px;">${esc(f.usuario)}</td>
+                <td style="font-size:12px; color:var(--text-muted);">${esc(f.pc)}${f.caja ? ' (caja ' + esc(f.caja) + ')' : ''}</td>
+                <td style="font-size:12px; color:var(--text-muted); white-space:nowrap;">${esc(f.llegada)}</td>
+                <td style="font-size:12px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(f.detalle)}">${esc(f.detalle)}</td>
+            </tr>`;
+        }).join('');
+
+        if (pie) {
+            pie.innerHTML = `<span>${filas.length} eventos registrados</span>`;
+        }
+    }
+
     nodo('searchInput')?.addEventListener('input', () => filterClients());
     caja?.querySelector('.resumen')?.addEventListener('click', (event) => {
         const button = event.target.closest('button');
@@ -621,6 +875,75 @@
         else if (event.target.closest('[data-close]')) cerrarMovimiento();
     });
     nodo('btnPerfil')?.addEventListener('click', () => abrirPerfil());
+
+    // Listeners para Cargos
+    nodo('carteraCargos')?.querySelectorAll('[data-periodo-cargos]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            nodo('carteraCargos').querySelectorAll('[data-periodo-cargos]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            periodoCargos = btn.dataset.periodoCargos || 'Mes';
+            cargarCargos();
+        });
+    });
+    nodo('filtroEstadoCargos')?.addEventListener('change', (ev) => {
+        estadoCargos = ev.target.value;
+        cargarCargos();
+    });
+    nodo('buscarCargos')?.addEventListener('input', (ev) => {
+        clearTimeout(timerCargos);
+        timerCargos = setTimeout(() => {
+            textoCargos = ev.target.value.trim();
+            cargarCargos();
+        }, 220);
+    });
+    nodo('btnVolverCarteraCargos')?.addEventListener('click', () => cambiarPantalla('clientes'));
+
+    // Listeners para Cobros
+    nodo('carteraCobros')?.querySelectorAll('[data-periodo-cobros]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            nodo('carteraCobros').querySelectorAll('[data-periodo-cobros]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            periodoCobros = btn.dataset.periodoCobros || 'Mes';
+            cargarCobros();
+        });
+    });
+    nodo('filtroMedioCobros')?.addEventListener('change', (ev) => {
+        medioCobros = ev.target.value;
+        cargarCobros();
+    });
+    nodo('buscarCobros')?.addEventListener('input', (ev) => {
+        clearTimeout(timerCobros);
+        timerCobros = setTimeout(() => {
+            textoCobros = ev.target.value.trim();
+            cargarCobros();
+        }, 220);
+    });
+    nodo('btnVolverCarteraCobros')?.addEventListener('click', () => cambiarPantalla('clientes'));
+
+    // Listeners para Auditoría
+    nodo('carteraAuditoria')?.querySelectorAll('[data-accion-auditoria]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            nodo('carteraAuditoria').querySelectorAll('[data-accion-auditoria]').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            accionAuditoria = btn.dataset.accionAuditoria || 'todas';
+            cargarAuditoria();
+        });
+    });
+    nodo('buscarAuditoria')?.addEventListener('input', (ev) => {
+        clearTimeout(timerAuditoria);
+        timerAuditoria = setTimeout(() => {
+            textoAuditoria = ev.target.value.trim();
+            cargarAuditoria();
+        }, 220);
+    });
+    nodo('btnVolverCarteraAuditoria')?.addEventListener('click', () => cambiarPantalla('clientes'));
+
+    // Click en la tarjeta de COBROS del resumen superior
+    nodo('goCobros')?.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        cambiarPantalla('cobros');
+    });
+
     window.addEventListener('hashchange', () => {
         if (!vistaActiva()) return;
         const abierto = clienteDelHash();
@@ -629,6 +952,8 @@
     });
 
     window.CarteraLibro = {
+        pantallaActual() { return pantallaActual; },
+        cambiarPantalla(id) { cambiarPantalla(id); },
         filtroActual() { return currentFilter; },
         filtrar(filtro) { setFilter(filtro || 'all'); },
         actualizar() {
@@ -644,6 +969,9 @@
                 const previo = localStorage.getItem(claveCacheCartera());
                 if (previo) aplicarLibro(JSON.parse(previo));
             } catch (_) {}
+            if (pantallaActual === 'cargos') return cargarCargos();
+            if (pantallaActual === 'cobros') return cargarCobros();
+            if (pantallaActual === 'auditoria') return cargarAuditoria();
             return loadClients();
         },
         entrar(id) {
@@ -661,6 +989,10 @@
             cerrarMovimiento();
         },
         atras() {
+            if (pantallaActual !== 'clientes') {
+                cambiarPantalla('clientes');
+                return true;
+            }
             const ficha = nodo('ficha');
             if (!vistaActiva() || !ficha || ficha.hidden) return false;
             if (location.hash) history.replaceState(null, '', location.pathname + location.search);

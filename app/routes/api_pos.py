@@ -519,7 +519,7 @@ def api_pos_jefe():
     desde = request.args.get("desde")
     hasta = request.args.get("hasta")
     filtro = None
-    if nombre in ("ticket", "contabilidad", "desglose"):
+    if nombre in ("ticket", "contabilidad", "desglose", "cargos", "cobros", "auditoria", "auditoria_cartera"):
         filtro = {
             "texto": request.args.get("q") or "",
             "metodo": request.args.get("pago") or "TODOS",
@@ -533,15 +533,19 @@ def api_pos_jefe():
             "caja": request.args.get("caja") or "",
             "offset": request.args.get("offset", type=int) or 0,
             "limite": request.args.get("limite", type=int) or 400,
+            "estado": request.args.get("estado") or "",
+            "medio": request.args.get("medio") or "",
+            "accion": request.args.get("accion") or "",
         }
-        if nombre == "contabilidad" and request.args.get("periodo"):
+        if request.args.get("periodo"):
             filtro["periodo"] = request.args.get("periodo")
             filtro["desde"] = request.args.get("desde") or ""
             filtro["hasta"] = request.args.get("hasta") or ""
     if nombre not in (
         "reporte", "jefe", "vitrina", "contabilidad", "admin", "cartera", "clientes",
         "digitales", "cobros_digitales", "pedidos", "abastecimiento",
-        "proveedor", "promedio", "ticket", "desglose"
+        "proveedor", "promedio", "ticket", "desglose",
+        "cargos", "cobros", "auditoria", "auditoria_cartera"
     ):
         return jsonify({"error": "Panel desconocido"}), 400
     try:

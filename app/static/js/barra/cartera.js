@@ -7,6 +7,10 @@ window.BarraModulos.push({
     vista: 'cartera',
     pantalla: 'Tarjetas de clientes',
     herramientas: [
+        { id: 'clientes', titulo: 'Tarjetas de clientes', tipo: 'pantalla' },
+        { id: 'cargos', titulo: 'Historial de cargos', tipo: 'pantalla' },
+        { id: 'cobros', titulo: 'Historial de cobros', tipo: 'pantalla' },
+        { id: 'auditoria', titulo: 'Auditoría de cartera', tipo: 'pantalla' },
         { id: 'all', titulo: 'Todos', tipo: 'filtro', filtro: 'all' },
         { id: 'saldo', titulo: 'Con deuda', tipo: 'filtro', filtro: 'saldo' },
         { id: 'criticos', titulo: 'Riesgo', tipo: 'filtro', filtro: 'criticos' },

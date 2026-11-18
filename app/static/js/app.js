@@ -6364,6 +6364,17 @@ const $ = id => document.getElementById(id);
             CrmBus.on('switchView', (name) => switchView(name));
             CrmBus.on('libroNuevo', () => recargarVistaViva());
             CrmBus.on('pantallaModulo', (vista, id) => {
+                if (vista === 'cartera') {
+                    marcarEntrada('cartera');
+                    const abierta = document.querySelector('.view.active');
+                    if (!abierta || abierta.id !== 'view-cartera') {
+                        switchView('cartera');
+                    }
+                    if (window.CarteraLibro && window.CarteraLibro.cambiarPantalla) {
+                        window.CarteraLibro.cambiarPantalla(id || 'clientes');
+                    }
+                    return;
+                }
                 if (vista === 'ticket') {
                     ventasPantalla = id || 'historial';
                     marcarEntrada('ticket');

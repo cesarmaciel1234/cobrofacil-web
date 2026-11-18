@@ -1932,7 +1932,10 @@ select.periodo-pill.active option { color: #0F172A; }
     #pedidosCuerpo .data-table,
     #contaCuerpo .data-table,
     #reporteCuerpo .data-table,
-    #ticketCuerpo .data-table {
+    #ticketCuerpo .data-table,
+    #carteraCargos .data-table,
+    #carteraCobros .data-table,
+    #carteraAuditoria .data-table {
         width: max-content;
         min-width: 100%;
     }
@@ -1943,7 +1946,13 @@ select.periodo-pill.active option { color: #0F172A; }
     #contaCuerpo .data-table th,
     #contaCuerpo .data-table td,
     #reporteCuerpo .data-table th,
-    #reporteCuerpo .data-table td {
+    #reporteCuerpo .data-table td,
+    #carteraCargos .data-table th,
+    #carteraCargos .data-table td,
+    #carteraCobros .data-table th,
+    #carteraCobros .data-table td,
+    #carteraAuditoria .data-table th,
+    #carteraAuditoria .data-table td {
         white-space: nowrap;
     }
 }

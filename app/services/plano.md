@@ -45,8 +45,11 @@ app/services/
 ### Motor de Historial Progresivo (`pos_historial.py`):
 - **Scroll Infinito y Carga Progresiva:** Retorna los primeros 400 tickets visibles ordenados cronológicamente descendentes (`offset`, `limite`, `hay_mas`). Evita el colapso del DOM y el congelamiento del navegador en dispositivos móviles al manipular más de 1.000 o 2.500 tickets por mes.
 
-### Motor de Interés y Cartera (`pos_interes.py`):
+### Motor de Interés y Cartera (`pos_interes.py` y `pos_jefe.py`):
 - **Alineación con TPV Maestra:** Calcula los intereses devengados de cuenta corriente con la misma fórmula de la tienda física (tasa CFR diaria), integrando el total adeudado en los KPI generales del jefe y en el saldo exigible.
+- **Historial de Cargos (`_cargos_cartera`):** Planilla de cargos y fiados sobre `cuenta_corriente` (`tipo = 'CARGO'`), excluyendo conceptos de mantenimiento. Desglosa ventas a crédito por ticket (`#venta_id`), cargos manuales (`MANUAL`) e intereses. Totaliza vivos, cancelados y borrados con soporte multilínea y multi-sucursal.
+- **Historial de Cobros (`_cobros_cartera`):** Planilla de cobros y abonos sobre `cuenta_corriente` (`tipo = 'ABONO'`). Identifica recibo `COB-{id}`, medio de pago (`Efectivo`, `Transferencia`, `Tarjeta`, `QR`, `Mixto`), detalle o id digital de cobro (`Caja`, ID Mercado Pago, `F9 MANUAL`), perfil y cajero responsable.
+- **Auditoría de Cartera (`_auditoria_cartera`):** Libro de eventos sobre `clientes_auditoria` con formato homólogo a TPV 2026. Registra acciones (`Alta`, `Edición`, `Límite`, `Cargo`, `Abono`, `Anulación`, `Borrado`, `Unido`, `Suspendido`), PC, caja, usuario, llegada y detalle descriptivo. Incorpora control de integridad y cuadre de saldos en tiempo real (cargos vivos - abonos vs deuda exigible).
 
 ### Motor de Sincronización LWW (`sync_hub.py`):
 - Aplica operaciones usando el algoritmo Last-Write-Wins basado en `updated_at_utc`.

@@ -115,7 +115,7 @@
             ? '<p class="herramientas-vacio">Esta pantalla ya muestra lo esencial. No hay herramientas aparte.</p>'
             : '';
 
-        const marca = pantalla || ((pantallas[0] && pantallas[0].id) || '');
+        const marca = pantalla || (activo === 'cartera' && global.CarteraLibro && global.CarteraLibro.pantallaActual ? global.CarteraLibro.pantallaActual() : ((pantallas[0] && pantallas[0].id) || ''));
         pantallas.forEach((accion) => {
             const id = accion.id || '';
             const boton = document.createElement('button');
@@ -158,7 +158,10 @@
             boton.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 cerrarMenu();
-                if (global.CarteraLibro) global.CarteraLibro.filtrar(accion.filtro);
+                if (global.CarteraLibro) {
+                    if (global.CarteraLibro.cambiarPantalla) global.CarteraLibro.cambiarPantalla('clientes');
+                    global.CarteraLibro.filtrar(accion.filtro);
+                }
                 lista.querySelectorAll('[data-filtro]').forEach((item) => {
                     item.classList.toggle('active', item.dataset.filtro === accion.filtro);
                 });

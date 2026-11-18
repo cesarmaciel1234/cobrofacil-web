@@ -23,6 +23,7 @@ _TABLAS_SELLO = (
     "articulos",
     "clientes",
     "cuenta_corriente",
+    "clientes_auditoria",
     "cobros_digitales",
     "mp_pagos",
     "proveedores",
@@ -865,6 +866,448 @@ def _calcular_cartera(sucursal_id: int | None = None) -> dict:
     }
 
 
+def _cargos_cartera(
+    sucursal_id: int | None = None,
+    periodo: str = "Mes",
+    desde: str | None = None,
+    hasta: str | None = None,
+    filtro: dict | None = None,
+) -> dict:
+    from app.services.pos_vitrina import resolver_rango
+
+    ini_iso, fin_iso, nombre_periodo = resolver_rango(
+        str(periodo or "Mes"),
+        desde_custom=desde,
+        hasta_custom=hasta,
+    )
+    col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
+    idx_cc = _indice(col_cc)
+
+    col_cli, filas_cli = _filas_clientes(sucursal_id)
+    idx_cli = _indice(col_cli)
+    clientes_map: dict[str, dict] = {}
+    for f in filas_cli:
+        cid = _clave(_valor(f, idx_cli, "id"))
+        if cid:
+            clientes_map[cid] = {
+                "nombre": str(_valor(f, idx_cli, "nombre") or "Cliente").strip(),
+                "dni": str(_valor(f, idx_cli, "dni", "cuit") or "").strip(),
+            }
+
+    cargos = []
+    total_vivo = 0.0
+    total_borrado = 0.0
+    total_cancelado = 0.0
+
+    q = str(filtro.get("texto") or "").strip().lower() if filtro else ""
+    estado_filtro = str(filtro.get("estado") or "").strip().lower() if filtro else ""
+    if estado_filtro in ("todos", ""):
+        estado_filtro = ""
+
+    for fila in filas_cc:
+        tipo = str(_valor(fila, idx_cc, "tipo") or "").upper()
+        if tipo != "CARGO":
+            continue
+        desc = str(_valor(fila, idx_cc, "descripcion") or "").strip()
+        if "MANTENIMIENTO" in desc.upper():
+            continue
+
+        fecha_raw = str(_valor(fila, idx_cc, "fecha") or "")
+        if nombre_periodo != "Todas":
+            dia_f = fecha_raw[:10]
+            if dia_f < ini_iso[:10] or dia_f > fin_iso[:10]:
+                continue
+
+        cid = _clave(_valor(fila, idx_cc, "cliente_id"))
+        cli_info = clientes_map.get(cid) or {}
+        nombre = cli_info.get("nombre") or str(_valor(fila, idx_cc, "nombre") or "").strip() or f"Cliente #{cid}"
+        dni = cli_info.get("dni") or str(_valor(fila, idx_cc, "dni") or "").strip()
+
+        monto = _numero(_valor(fila, idx_cc, "monto"))
+        saldo = _numero(_valor(fila, idx_cc, "saldo_resultante", "saldo"))
+        venta_id = _valor(fila, idx_cc, "venta_id")
+        venta_txt = str(venta_id).strip() if venta_id not in (None, "", 0, "0") else ""
+
+        d_up = desc.upper()
+        es_interes = desc.startswith("[INTERES]") or desc.startswith("INTERES:")
+        if "CANCELADO" in d_up or "CANCELADA" in d_up:
+            estado = "Cancelado"
+            estado_clave = "cancelado"
+            total_cancelado += monto
+        elif "BORRADO" in d_up or "ANULADO" in d_up or "ANULADA" in d_up:
+            estado = "Borrado"
+            estado_clave = "borrado"
+            total_borrado += monto
+        else:
+            estado = "Vivo"
+            estado_clave = "vivo"
+            total_vivo += monto
+
+        if estado_filtro and estado_clave != estado_filtro:
+            continue
+
+        if es_interes:
+            ticket = "INTERÉS"
+            origen = "Interés por ticket"
+        elif venta_txt:
+            ticket = f"#{venta_txt}"
+            origen = "Venta"
+        else:
+            ticket = "MANUAL"
+            origen = "Manual"
+
+        fecha_fmt = fecha_raw
+        if len(fecha_raw) >= 16 and fecha_raw[4] == "-" and fecha_raw[7] == "-":
+            fecha_fmt = f"{fecha_raw[8:10]}/{fecha_raw[5:7]}/{fecha_raw[:4]} {fecha_raw[11:16]}"
+
+        if q:
+            match_txt = f"{nombre} {dni} {ticket} {desc} {venta_txt}".lower()
+            if q not in match_txt:
+                continue
+
+        cargos.append({
+            "id": _valor(fila, idx_cc, "id"),
+            "ticket": ticket,
+            "venta_id": venta_txt,
+            "fecha": fecha_fmt,
+            "fecha_raw": fecha_raw,
+            "nombre": nombre,
+            "dni": dni,
+            "monto": monto,
+            "origen": origen,
+            "es_interes": es_interes,
+            "estado": estado,
+            "estado_clave": estado_clave,
+            "descripcion": desc or "—",
+            "saldo": saldo,
+            "sucursal_id": _valor(fila, idx_cc, "sucursal_id"),
+            "sucursal_nombre": _valor(fila, idx_cc, "sucursal_nombre") or "",
+        })
+
+    cargos.sort(key=lambda item: item["fecha_raw"], reverse=True)
+    return {
+        "ok": True,
+        "libro": len(cargos) > 0,
+        "panel": "cargos",
+        "periodo": nombre_periodo,
+        "cargos": cargos,
+        "resumen": {
+            "total_cargos": len(cargos),
+            "total_vivos": round(total_vivo, 2),
+            "total_borrados": round(total_borrado, 2),
+            "total_cancelados": round(total_cancelado, 2),
+        },
+        "sucursales": listar_sucursales(),
+        "sucursal_id": sucursal_id,
+    }
+
+
+def _cobros_cartera(
+    sucursal_id: int | None = None,
+    periodo: str = "Mes",
+    desde: str | None = None,
+    hasta: str | None = None,
+    filtro: dict | None = None,
+) -> dict:
+    from app.services.pos_vitrina import resolver_rango
+
+    ini_iso, fin_iso, nombre_periodo = resolver_rango(
+        str(periodo or "Mes"),
+        desde_custom=desde,
+        hasta_custom=hasta,
+    )
+    col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
+    idx_cc = _indice(col_cc)
+
+    col_cli, filas_cli = _filas_clientes(sucursal_id)
+    idx_cli = _indice(col_cli)
+    clientes_map: dict[str, dict] = {}
+    for f in filas_cli:
+        cid = _clave(_valor(f, idx_cli, "id"))
+        if cid:
+            clientes_map[cid] = {
+                "nombre": str(_valor(f, idx_cli, "nombre") or "Cliente").strip(),
+                "dni": str(_valor(f, idx_cli, "dni", "cuit") or "").strip(),
+            }
+
+    cobros = []
+    total_cobrado = 0.0
+    desglose_medios: dict[str, float] = {}
+
+    q = str(filtro.get("texto") or "").strip().lower() if filtro else ""
+    medio_filtro = str(filtro.get("medio") or "").strip().lower() if filtro else ""
+    if medio_filtro in ("todos", ""):
+        medio_filtro = ""
+
+    for fila in filas_cc:
+        tipo = str(_valor(fila, idx_cc, "tipo") or "").upper()
+        if tipo != "ABONO":
+            continue
+
+        fecha_raw = str(_valor(fila, idx_cc, "fecha") or "")
+        if nombre_periodo != "Todas":
+            dia_f = fecha_raw[:10]
+            if dia_f < ini_iso[:10] or dia_f > fin_iso[:10]:
+                continue
+
+        cid = _clave(_valor(fila, idx_cc, "cliente_id"))
+        cli_info = clientes_map.get(cid) or {}
+        nombre = cli_info.get("nombre") or str(_valor(fila, idx_cc, "nombre") or "").strip() or f"Cliente #{cid}"
+        dni = cli_info.get("dni") or str(_valor(fila, idx_cc, "dni") or "").strip()
+
+        monto = _numero(_valor(fila, idx_cc, "monto"))
+        saldo = _numero(_valor(fila, idx_cc, "saldo_resultante", "saldo"))
+        desc = str(_valor(fila, idx_cc, "descripcion") or "").strip()
+        medio_raw = str(_valor(fila, idx_cc, "medio_pago") or "").strip()
+
+        # Extraer medio y detalle como en cobradas/lista.py de TPV 2026
+        medio = medio_raw.split(":", 1)[0].strip() if medio_raw else ""
+        if not medio:
+            if desc.endswith(")") and "(" in desc:
+                dentro = desc.rsplit("(", 1)[-1].rstrip(")").strip()
+                medio = dentro.split(":", 1)[0].strip() if ":" in dentro else dentro
+        if not medio:
+            medio = "Efectivo"
+
+        detalle = ""
+        if desc.endswith(")") and "(" in desc:
+            dentro = desc.rsplit("(", 1)[-1].rstrip(")").strip()
+            if ":" in dentro:
+                detalle = dentro.split(":", 1)[1].strip()
+        if not detalle and medio.lower() == "efectivo":
+            detalle = "Caja"
+
+        if medio_filtro and medio.lower() != medio_filtro:
+            continue
+
+        cid_cobro = _valor(fila, idx_cc, "id")
+        cobro_ticket = f"COB-{cid_cobro}" if cid_cobro else "COB"
+
+        if q:
+            match_txt = f"{nombre} {dni} {cobro_ticket} {detalle} {medio} {desc}".lower()
+            if q not in match_txt:
+                continue
+
+        total_cobrado += monto
+        m_key = medio.capitalize()
+        desglose_medios[m_key] = desglose_medios.get(m_key, 0.0) + monto
+
+        fecha_fmt = fecha_raw
+        if len(fecha_raw) >= 16 and fecha_raw[4] == "-" and fecha_raw[7] == "-":
+            fecha_fmt = f"{fecha_raw[8:10]}/{fecha_raw[5:7]}/{fecha_raw[:4]} {fecha_raw[11:16]}"
+
+        perfil = str(_valor(fila, idx_cc, "perfil") or "").strip()
+        quien = str(_valor(fila, idx_cc, "registrado_por") or "").strip() or perfil
+
+        cobros.append({
+            "id": cid_cobro,
+            "ticket_cobro": cobro_ticket,
+            "fecha": fecha_fmt,
+            "fecha_raw": fecha_raw,
+            "nombre": nombre,
+            "dni": dni,
+            "monto": monto,
+            "medio": medio,
+            "detalle": detalle or "—",
+            "perfil": perfil or "—",
+            "quien": quien or "—",
+            "saldo": saldo,
+            "digital": medio.lower() in ("qr", "transferencia", "tarjeta", "mixto"),
+            "sucursal_id": _valor(fila, idx_cc, "sucursal_id"),
+            "sucursal_nombre": _valor(fila, idx_cc, "sucursal_nombre") or "",
+        })
+
+    cobros.sort(key=lambda item: item["fecha_raw"], reverse=True)
+    return {
+        "ok": True,
+        "libro": len(cobros) > 0,
+        "panel": "cobros",
+        "periodo": nombre_periodo,
+        "cobros": cobros,
+        "resumen": {
+            "total_cobros": len(cobros),
+            "monto_cobrado": round(total_cobrado, 2),
+            "desglose_medios": {k: round(v, 2) for k, v in desglose_medios.items()},
+        },
+        "sucursales": listar_sucursales(),
+        "sucursal_id": sucursal_id,
+    }
+
+
+def _auditoria_cartera(
+    sucursal_id: int | None = None,
+    filtro: dict | None = None,
+) -> dict:
+    col_aud, filas_aud = filas_de("clientes_auditoria", sucursal_id)
+    idx_aud = _indice(col_aud)
+
+    # Cuadre de integridad general:
+    col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)
+    idx_cc = _indice(col_cc)
+    col_cli, filas_cli = _filas_clientes(sucursal_id)
+    idx_cli = _indice(col_cli)
+
+    total_deuda_clientes = sum(_numero(_valor(f, idx_cli, "deuda_actual", "deuda")) for f in filas_cli)
+    cargos_vivos = sum(
+        _numero(_valor(f, idx_cc, "monto"))
+        for f in filas_cc
+        if str(_valor(f, idx_cc, "tipo") or "").upper() == "CARGO"
+        and "MANTENIMIENTO" not in str(_valor(f, idx_cc, "descripcion") or "").upper()
+        and "BORRADO" not in str(_valor(f, idx_cc, "descripcion") or "").upper()
+        and "CANCELADO" not in str(_valor(f, idx_cc, "descripcion") or "").upper()
+    )
+    abonos_totales = sum(
+        _numero(_valor(f, idx_cc, "monto"))
+        for f in filas_cc
+        if str(_valor(f, idx_cc, "tipo") or "").upper() == "ABONO"
+    )
+
+    cuadre_diferencia = round(cargos_vivos - abonos_totales - total_deuda_clientes, 2)
+
+    ACCIONES_MAP = {
+        "ALTA": "Alta",
+        "EDICION": "Edición",
+        "LIMITE": "Límite",
+        "CARGO": "Cargo",
+        "ABONO": "Abono",
+        "ANULACION": "Anulación",
+        "BORRADO": "Borrado",
+        "FUSION": "Unido",
+        "SUSPENDIDO": "Suspendido",
+    }
+
+    FILTRO_ACCION_MAP = {
+        "cargos": ("CARGO",),
+        "abonos": ("ABONO",),
+        "borrados": ("BORRADO", "ANULACION"),
+        "ficha": ("ALTA", "EDICION", "LIMITE", "FUSION", "SUSPENDIDO"),
+    }
+
+    q = str(filtro.get("texto") or "").strip().lower() if filtro else ""
+    accion_chip = str(filtro.get("accion") or "").strip().lower() if filtro else ""
+    if accion_chip in ("todas", "todos", ""):
+        accion_chip = ""
+
+    filas_out = []
+    for fila in filas_aud:
+        accion_raw = str(_valor(fila, idx_aud, "accion") or "").upper()
+        if accion_chip and accion_chip in FILTRO_ACCION_MAP:
+            if accion_raw not in FILTRO_ACCION_MAP[accion_chip]:
+                continue
+
+        fecha_raw = str(_valor(fila, idx_aud, "fecha") or "")
+        nombre = str(_valor(fila, idx_aud, "nombre") or "").strip()
+        pc = str(_valor(fila, idx_aud, "pc") or "").strip()
+        caja = str(_valor(fila, idx_aud, "caja") or "").strip()
+        usuario = str(_valor(fila, idx_aud, "usuario") or "").strip()
+        llego_via = str(_valor(fila, idx_aud, "llego_via") or "").strip()
+        llego_en = str(_valor(fila, idx_aud, "llego_en") or "").strip()
+        detalle_raw = _valor(fila, idx_aud, "detalle")
+
+        det = {}
+        if isinstance(detalle_raw, dict):
+            det = detalle_raw
+        elif isinstance(detalle_raw, str):
+            try:
+                det = json.loads(detalle_raw)
+            except Exception:
+                det = {"raw": detalle_raw}
+
+        # Formatear detalle legible
+        resumen_txt = ""
+        referencia = ""
+        medio = str(det.get("medio") or "").strip()
+        id_pago = ""
+
+        if det.get("cobro_id"):
+            referencia = f"COB-{det['cobro_id']}"
+        elif det.get("venta_id"):
+            referencia = f"#{det['venta_id']}"
+        elif det.get("cargo_id"):
+            referencia = f"Cargo #{det['cargo_id']}"
+
+        desc_ev = str(det.get("descripcion") or "")
+        if ":" in desc_ev and desc_ev.endswith(")"):
+            id_pago = desc_ev.rsplit("(", 1)[-1].rstrip(")").split(":", 1)[-1].strip()
+
+        if accion_raw == "ALTA":
+            ficha_d = det.get("ficha") or {}
+            partes = [f"desde {det.get('via') or llego_via or 'tienda'}"]
+            if ficha_d.get("dni"):
+                partes.append(f"DNI {ficha_d['dni']}")
+            if ficha_d.get("limite_credito") is not None:
+                partes.append(f"límite ${_numero(ficha_d['limite_credito']):,.2f}")
+            resumen_txt = " · ".join(partes)
+        elif accion_raw in ("EDICION", "LIMITE"):
+            desp = det.get("despues") or {}
+            antes = det.get("antes") or {}
+            resumen_txt = "; ".join(f"{k}: {antes.get(k, '—')} → {desp.get(k, '—')}" for k in desp) or "Actualización de ficha"
+        elif accion_raw in ("CARGO", "ABONO", "ANULACION", "BORRADO"):
+            m = det.get("monto")
+            m_txt = f"${_numero(m):,.2f}" if m is not None else ""
+            partes = [p for p in (m_txt, referencia, id_pago) if p]
+            resumen_txt = " · ".join(partes) or desc_ev or "Movimiento de cuenta"
+        elif accion_raw == "FUSION":
+            resumen_txt = f"Unificado con ID {det.get('id_destino') or '—'}"
+        else:
+            resumen_txt = desc_ev or str(det.get("raw") or "Evento")
+
+        if llego_via in ("OFFLINE", "LOCAL"):
+            llegada = "Sin red (esta PC)"
+        elif llego_via == "DIRECTO" or not llego_via:
+            llegada = "En esta tienda"
+        else:
+            llegada = llego_via
+        if llego_en:
+            llegada += f" · {llego_en[:16]}"
+
+        fecha_fmt = fecha_raw
+        if len(fecha_raw) >= 16 and fecha_raw[4] == "-" and fecha_raw[7] == "-":
+            fecha_fmt = f"{fecha_raw[8:10]}/{fecha_raw[5:7]}/{fecha_raw[:4]} {fecha_raw[11:16]}"
+
+        if q:
+            match_txt = f"{nombre} {pc} {usuario} {accion_raw} {referencia} {id_pago} {resumen_txt}".lower()
+            if q not in match_txt:
+                continue
+
+        filas_out.append({
+            "evento": _valor(fila, idx_aud, "evento"),
+            "fecha": fecha_fmt,
+            "fecha_raw": fecha_raw,
+            "accion": ACCIONES_MAP.get(accion_raw, accion_raw.capitalize()),
+            "accion_raw": accion_raw,
+            "cliente": nombre,
+            "referencia": referencia or "—",
+            "medio": medio or "—",
+            "id_pago": id_pago or "—",
+            "pc": pc or "—",
+            "caja": caja or "—",
+            "usuario": usuario or "—",
+            "llegada": llegada,
+            "detalle": resumen_txt,
+            "sucursal_id": _valor(fila, idx_aud, "sucursal_id"),
+            "sucursal_nombre": _valor(fila, idx_aud, "sucursal_nombre") or "",
+        })
+
+    filas_out.sort(key=lambda item: item["fecha_raw"], reverse=True)
+    return {
+        "ok": True,
+        "libro": len(filas_out) > 0,
+        "panel": "auditoria_cartera",
+        "auditoria": filas_out,
+        "resumen": {
+            "total_eventos": len(filas_out),
+            "total_deuda_clientes": round(total_deuda_clientes, 2),
+            "cargos_vivos": round(cargos_vivos, 2),
+            "abonos_totales": round(abonos_totales, 2),
+            "cuadre_diferencia": cuadre_diferencia,
+            "cuadre_ok": abs(cuadre_diferencia) < 1.0,
+        },
+        "sucursales": listar_sucursales(),
+        "sucursal_id": sucursal_id,
+    }
+
+
 def _filas_en_rango(tabla: str, ini: str | None, fin: str | None, sucursal_id: int | None = None):
     columnas, filas = filas_de(tabla, sucursal_id)
     idx = _indice(columnas)
@@ -1054,6 +1497,13 @@ def _armar_panel(
     filtro: dict | None = None,
 ) -> dict:
     sucursales_disp = listar_sucursales()
+
+    if nombre in ("cargos", "cartera_cargos"):
+        return _cargos_cartera(sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro)
+    if nombre in ("cobros", "cartera_cobros"):
+        return _cobros_cartera(sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro)
+    if nombre in ("auditoria", "auditoria_cartera", "cartera_auditoria"):
+        return _auditoria_cartera(sucursal_id, filtro=filtro)
 
     if nombre in ("admin", "cartera", "clientes"):
         cartera = _cartera_admin(sucursal_id)
