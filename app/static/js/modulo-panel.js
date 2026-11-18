@@ -105,7 +105,7 @@
         if (!lista) return;
         if (titulo) titulo.textContent = 'Herramientas · ' + (nombres()[activo] || 'Módulo');
 
-        const foot = $('sidebarFoot') || document.querySelector('.sidebar-foot');
+        const foot = $('sidebarLogoutWrap') || $('sidebarFoot') || document.querySelector('.sidebar-foot');
         if (foot) {
             const esReporte = (activo === 'reporte');
             foot.style.display = esReporte ? 'flex' : 'none';

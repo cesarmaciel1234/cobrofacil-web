@@ -52,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=5.8">
+    <link rel="stylesheet" href="/static/enterprise.css?v=5.9">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -62,7 +62,10 @@
             <div class="brand-inner">
                 <div class="brand-mark" id="sidebarCloseMobile" style="cursor: pointer;">CF</div>
                 <div class="brand-text">
-                    <h1>Cobro Fácil</h1>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <h1 style="margin: 0;">Cobro Fácil</h1>
+                        <span class="version-tag" id="versionTag">v{{ app_version }} PRO</span>
+                    </div>
                     <p>Caja y sucursales</p>
                 </div>
             </div>
@@ -86,12 +89,15 @@
                 Instalar Aplicación
             </button>
         </nav>
-        <div class="sidebar-foot" id="sidebarFoot" style="flex-direction: column; align-items: stretch; gap: 8px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <span>Casa central</span>
-                <span class="version-tag" id="versionTag">v{{ app_version }} PRO</span>
-            </div>
-            <button type="button" class="btn btn-ghost btn-sm" id="btnLogoutSidebar" style="width:100%;">Cerrar sesión</button>
+        <div class="sidebar-floating-logout" id="sidebarLogoutWrap" hidden>
+            <button type="button" class="btn-logout-floating" id="btnLogoutSidebar" title="Cerrar sesión">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                    <polyline points="16 17 21 12 16 7"/>
+                    <line x1="21" y1="12" x2="9" y2="12"/>
+                </svg>
+                <span>Cerrar sesión</span>
+            </button>
         </div>
     </aside>
     <div class="sidebar-backdrop" id="sidebarBackdrop" aria-hidden="true"></div>
@@ -257,6 +263,7 @@
                                     </tr>
                                 </thead>
                                 <tbody id="rfTablaCuerpo"></tbody>
+                                <tfoot id="rfTablaPie"></tfoot>
                             </table>
                         </div>
                     </div>
@@ -513,8 +520,8 @@
     <script src="/static/js/barra/pedidos.js?v=2"></script>
     <script src="/static/js/barra/armar.js?v=3"></script>
     <script src="/static/js/barra/toque.js?v=5"></script>
-    <script src="/static/js/modulo-panel.js?v=11"></script>
-    <script src="/static/js/barra/reporte-financiero.js?v=2"></script>
+    <script src="/static/js/modulo-panel.js?v=12"></script>
+    <script src="/static/js/barra/reporte-financiero.js?v=3"></script>
     <script src="/static/js/barra/cartera-libro.js?v=22"></script>
     <script src="/static/js/espejo.js?v=12"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>

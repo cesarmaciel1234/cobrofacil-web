@@ -554,12 +554,12 @@ def calcular_reporte_financiero(
     if p_norm in ("hoy", "dia", "diario", "ayer", "dia_anterior"):
         for h in range(8, 23):
             k = f"{h:02d}"
-            slots.append({"key": k, "label": f"{h:02d}h", "ventas": 0.0, "ganancia": 0.0, "tickets": 0, "ventas_prev": 0.0, "ganancia_prev": 0.0})
+            slots.append({"key": k, "label": f"{h:02d}h", "ventas": 0.0, "ganancia": 0.0, "tickets": 0, "ventas_prev": 0.0, "ganancia_prev": 0.0, "tickets_prev": 0})
     elif p_norm in ("año", "anio", "año actual"):
         meses_nom = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
         for i, m in enumerate(meses_nom):
             k = f"{i+1:02d}"
-            slots.append({"key": k, "label": m, "ventas": 0.0, "ganancia": 0.0, "tickets": 0, "ventas_prev": 0.0, "ganancia_prev": 0.0})
+            slots.append({"key": k, "label": m, "ventas": 0.0, "ganancia": 0.0, "tickets": 0, "ventas_prev": 0.0, "ganancia_prev": 0.0, "tickets_prev": 0})
     elif p_norm in ("semana", "semana actual", "semana_actual", "semana p.", "semana pasada", "semanap"):
         dias_nom = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
         d0 = datetime.fromisoformat(desde_iso[:10])
@@ -574,6 +574,7 @@ def calcular_reporte_financiero(
                 "tickets": 0,
                 "ventas_prev": 0.0,
                 "ganancia_prev": 0.0,
+                "tickets_prev": 0,
             })
     else:
         d0 = datetime.fromisoformat(desde_iso[:10])
@@ -591,6 +592,7 @@ def calcular_reporte_financiero(
                 "tickets": 0,
                 "ventas_prev": 0.0,
                 "ganancia_prev": 0.0,
+                "tickets_prev": 0,
             })
 
     slot_map: dict[str, dict] = {s["key"]: s for s in slots}
@@ -660,7 +662,8 @@ def calcular_reporte_financiero(
     total_costo_prev = 0.0
     hay_costo_prev = False
 
-    if comparar:
+    # Siempre calculamos el período previo para benchmark día a día y proyección de cierre
+    if prev_desde_iso and prev_hasta_iso:
         col_vp, filas_vp = filas_de("ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
         idx_vp = _indice(col_vp)
         col_dvp, filas_dvp = filas_de("detalles_ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
@@ -710,12 +713,14 @@ def calcular_reporte_financiero(
                 if slot_obj:
                     slot_obj["ventas_prev"] += tot
                     slot_obj["ganancia_prev"] += (tot - v_costo)
+                    slot_obj["tickets_prev"] += 1
             elif p_norm in ("año", "anio", "año actual"):
                 m_k = fecha_str[5:7] if len(fecha_str) >= 7 else "01"
                 slot_obj = slot_map.get(m_k)
                 if slot_obj:
                     slot_obj["ventas_prev"] += tot
                     slot_obj["ganancia_prev"] += (tot - v_costo)
+                    slot_obj["tickets_prev"] += 1
             else:
                 try:
                     f_d = datetime.fromisoformat(fecha_str[:10]).date()
@@ -723,6 +728,7 @@ def calcular_reporte_financiero(
                     if 0 <= delta_dias < len(slots):
                         slots[delta_dias]["ventas_prev"] += tot
                         slots[delta_dias]["ganancia_prev"] += (tot - v_costo)
+                        slots[delta_dias]["tickets_prev"] += 1
                 except Exception:
                     pass
 
@@ -731,15 +737,38 @@ def calcular_reporte_financiero(
     margen = round((ganancia_neta / total_ventas) * 100, 1) if (ganancia_neta is not None and total_ventas > 0) else None
     cobertura = round((venta_con_costo / total_ventas) * 100, 1) if total_ventas > 0 else 0.0
 
-    ganancia_prev = round(total_ventas_prev - total_costo_prev, 2) if (comparar and hay_costo_prev) else None
-    ventas_diff_pct = round(((total_ventas - total_ventas_prev) / total_ventas_prev) * 100, 1) if (comparar and total_ventas_prev > 0) else 0.0
-    ganancia_diff_pct = round(((ganancia_neta - ganancia_prev) / ganancia_prev) * 100, 1) if (comparar and ganancia_neta is not None and ganancia_prev and ganancia_prev > 0) else 0.0
+    ganancia_prev = round(total_ventas_prev - total_costo_prev, 2) if hay_costo_prev else None
+    ventas_diff_pct = round(((total_ventas - total_ventas_prev) / total_ventas_prev) * 100, 1) if total_ventas_prev > 0 else 0.0
+    ganancia_diff_pct = round(((ganancia_neta - ganancia_prev) / ganancia_prev) * 100, 1) if (ganancia_neta is not None and ganancia_prev and ganancia_prev > 0) else 0.0
 
     for s in slots:
         s["ventas"] = round(s["ventas"], 2)
         s["ganancia"] = round(s["ganancia"], 2)
         s["ventas_prev"] = round(s["ventas_prev"], 2)
         s["ganancia_prev"] = round(s["ganancia_prev"], 2)
+        s["tickets_prev"] = int(s.get("tickets_prev", 0))
+
+    # Proyección inteligente para la semana en curso
+    proyeccion = None
+    if p_norm in ("semana", "semana actual", "semana_actual"):
+        ventas_acum = sum(s["ventas"] for s in slots)
+        ventas_restantes = sum(s["ventas_prev"] for s in slots if s["ventas"] <= 0.009)
+        proy_ventas = round(ventas_acum + ventas_restantes, 2)
+        ganancia_acum = sum(s["ganancia"] for s in slots)
+        ganancia_restantes = sum(s["ganancia_prev"] for s in slots if s["ventas"] <= 0.009)
+        proy_ganancia = round(ganancia_acum + ganancia_restantes, 2) if hay_costo_cargado else None
+        dias_con_venta = sum(1 for s in slots if s["ventas"] > 0.009)
+        proyeccion = {
+            "ventas": proy_ventas,
+            "ventas_texto": _formatear_pesos(proy_ventas),
+            "ganancia": proy_ganancia,
+            "ganancia_texto": _formatear_pesos(proy_ganancia) if proy_ganancia is not None else None,
+            "ventas_acumuladas": round(ventas_acum, 2),
+            "ventas_restantes_est": round(ventas_restantes, 2),
+            "total_semana_anterior": round(total_ventas_prev, 2),
+            "dias_con_venta": dias_con_venta,
+            "dias_restantes": len(slots) - dias_con_venta,
+        }
 
     pico_slot = max(slots, key=lambda s: s["ventas"]) if slots else None
     if pico_slot and pico_slot["ventas"] > 0:
@@ -815,6 +844,7 @@ def calcular_reporte_financiero(
             {"tipo": "costo", "icono": "💰", "titulo": "Costo e Inventario", "texto": costo_txt},
         ],
         "serie": slots,
+        "proyeccion": proyeccion,
         "deptos": top_deptos,
         "pagos": top_pagos,
         "sucursales": listar_sucursales(),

@@ -177,19 +177,130 @@
 
         // 7. Tabla Días
         const tablaCuerpo = $('rfTablaCuerpo');
+        const tablaPie = $('rfTablaPie');
         if (tablaCuerpo) {
             const serie = data.serie || [];
             if (!serie.length) {
                 tablaCuerpo.innerHTML = '<tr><td colspan="4" style="text-align:center; padding:16px; color:var(--text-muted);">Sin datos</td></tr>';
+                if (tablaPie) tablaPie.innerHTML = '';
             } else {
-                tablaCuerpo.innerHTML = serie.map(s => `
-                    <tr>
-                        <td style="font-weight:700;">${s.label} ${s.fecha ? `<small style="color:var(--text-muted);">(${s.fecha})</small>` : ''}</td>
-                        <td style="text-align:right; font-weight:800; color:var(--accent);">${formatPesos(s.ventas)}</td>
-                        <td style="text-align:right; font-weight:700; color:#10b981;">${formatPesos(s.ganancia)}</td>
-                        <td style="text-align:right; color:var(--text-muted);">${s.tickets || 0}</td>
-                    </tr>
-                `).join('');
+                tablaCuerpo.innerHTML = serie.map(s => {
+                    const v = Number(s.ventas) || 0;
+                    const vp = Number(s.ventas_prev) || 0;
+                    const g = Number(s.ganancia) || 0;
+                    const gp = Number(s.ganancia_prev) || 0;
+                    const t = Number(s.tickets) || 0;
+                    const tp = Number(s.tickets_prev) || 0;
+
+                    let subVentas = '';
+                    if (v > 0 && vp > 0) {
+                        const diff = (((v - vp) / vp) * 100).toFixed(0);
+                        const isUp = v >= vp;
+                        subVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(vp)} <span class="${isUp ? 'rf-diff-up' : 'rf-diff-down'}">(${isUp ? '+' : ''}${diff}%)</span></div>`;
+                    } else if (v === 0 && vp > 0) {
+                        subVentas = `<div class="rf-subline rf-subline-meta"><span class="rf-subline-lbl-meta">Meta:</span> ${formatPesos(vp)}</div>`;
+                    }
+
+                    let subGanancia = '';
+                    if (gp > 0) {
+                        subGanancia = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(gp)}</div>`;
+                    }
+
+                    let subTickets = '';
+                    if (tp > 0) {
+                        subTickets = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${tp}</div>`;
+                    }
+
+                    return `
+                        <tr>
+                            <td>
+                                <div style="font-weight:700; color:var(--text-primary);">${s.label} ${s.fecha ? `<small style="color:var(--text-muted); font-weight:500;">(${s.fecha})</small>` : ''}</div>
+                            </td>
+                            <td style="text-align:right;">
+                                <div style="font-weight:800; color:var(--accent); font-size:13.5px;">${formatPesos(v)}</div>
+                                ${subVentas}
+                            </td>
+                            <td style="text-align:right;">
+                                <div style="font-weight:700; color:#10b981; font-size:13px;">${formatPesos(g)}</div>
+                                ${subGanancia}
+                            </td>
+                            <td style="text-align:right;">
+                                <div style="font-weight:700; color:var(--text-primary); font-size:13px;">${t}</div>
+                                ${subTickets}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                if (tablaPie) {
+                    const sumV = serie.reduce((acc, s) => acc + (Number(s.ventas) || 0), 0);
+                    const sumVp = serie.reduce((acc, s) => acc + (Number(s.ventas_prev) || 0), 0);
+                    const sumG = serie.reduce((acc, s) => acc + (Number(s.ganancia) || 0), 0);
+                    const sumGp = serie.reduce((acc, s) => acc + (Number(s.ganancia_prev) || 0), 0);
+                    const sumT = serie.reduce((acc, s) => acc + (Number(s.tickets) || 0), 0);
+                    const sumTp = serie.reduce((acc, s) => acc + (Number(s.tickets_prev) || 0), 0);
+
+                    const esSemana = (periodoActual || '').toLowerCase().includes('semana');
+                    const tituloTotal = esSemana ? 'TOTAL SEMANA' : 'TOTAL PERÍODO';
+
+                    let subTotalVentas = '';
+                    if (sumVp > 0 && sumV > 0) {
+                        const diffTot = (((sumV - sumVp) / sumVp) * 100).toFixed(1);
+                        const isUpTot = sumV >= sumVp;
+                        subTotalVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(sumVp)} <span class="${isUpTot ? 'rf-diff-up' : 'rf-diff-down'}">(${isUpTot ? '+' : ''}${diffTot}%)</span></div>`;
+                    } else if (sumVp > 0) {
+                        subTotalVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(sumVp)}</div>`;
+                    }
+
+                    const proy = data.proyeccion;
+                    let proyRow = '';
+                    if (proy && proy.dias_restantes > 0) {
+                        const supera = (proy.ventas >= (proy.total_semana_anterior || 0));
+                        proyRow = `
+                            <tr class="rf-proyeccion-row">
+                                <td colspan="4">
+                                    <div class="rf-proyeccion-banner">
+                                        <div class="rf-proy-left">
+                                            <span class="rf-proy-ico">🎯</span>
+                                            <div>
+                                                <div class="rf-proy-tit">Proyección Cierre de Semana</div>
+                                                <div class="rf-proy-sub">${proy.dias_con_venta} día(s) con ventas + meta de ${proy.dias_restantes} día(s) restantes s/ sem. anterior</div>
+                                            </div>
+                                        </div>
+                                        <div class="rf-proy-right">
+                                            <div class="rf-proy-monto">${formatPesos(proy.ventas)}</div>
+                                            <div class="rf-proy-badge ${supera ? 'badge-supera' : 'badge-menor'}">
+                                                ${supera ? '▲ Supera semana anterior' : '▼ Menor a semana anterior'}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        `;
+                    }
+
+                    tablaPie.innerHTML = `
+                        <tr class="rf-total-row">
+                            <td>
+                                <div class="rf-total-label">${tituloTotal}</div>
+                                ${sumVp > 0 ? `<div class="rf-subline"><span class="rf-subline-lbl">Total ant:</span> ${formatPesos(sumVp)}</div>` : ''}
+                            </td>
+                            <td style="text-align:right;">
+                                <div class="rf-total-val" style="color:var(--accent);">${formatPesos(sumV)}</div>
+                                ${subTotalVentas}
+                            </td>
+                            <td style="text-align:right;">
+                                <div class="rf-total-val" style="color:#10b981;">${formatPesos(sumG)}</div>
+                                ${sumGp > 0 ? `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(sumGp)}</div>` : ''}
+                            </td>
+                            <td style="text-align:right;">
+                                <div class="rf-total-val" style="color:var(--text-primary);">${sumT}</div>
+                                ${sumTp > 0 ? `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${sumTp}</div>` : ''}
+                            </td>
+                        </tr>
+                        ${proyRow}
+                    `;
+                }
             }
         }
     }
