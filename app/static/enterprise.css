@@ -214,6 +214,9 @@ body::before {
     display: flex; justify-content: space-between; align-items: center;
     background: var(--bg-elevated);
 }
+#sidebarFoot[hidden] {
+    display: none !important;
+}
 .version-tag {
     padding: 2px 7px;
     background: var(--bg-surface-2);
