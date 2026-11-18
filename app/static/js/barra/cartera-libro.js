@@ -222,8 +222,47 @@
         const notaLugar = lugares.length > 1
             ? `<p class="ficha-nota">Figura en ${lugares.map(esc).join(' y ')}</p>`
             : '';
+
+        const inits = iniciales(client.nombre);
+        const avatarGrad = avatarGradient(client.nombre);
+        const tipo = esExpress(client) ? 'EXPRESS' : String(client.tipo_cliente || '').replaceAll('_', ' ').toUpperCase();
+        const pillCls = esExpress(client) ? 'pill-express' : 'pill-regular';
+        const pill = tipo && tipo !== 'REGULAR' ? `<span class="client-tipo-pill ${pillCls}">${esc(tipo)}</span>` : '';
+        const metaParts = [
+            client.cuit ? 'DNI ' + esc(client.cuit) : '',
+            client.telefono ? esc(client.telefono) : '',
+            lugares.length ? lugares.map(esc).join(' · ') : ''
+        ].filter(Boolean).join(' &nbsp;·&nbsp; ');
+
+        const waBtn = client.telefono ? `
+            <div>
+                <button type="button" class="ficha-profile-wa" id="btnFichaWa">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                    <span>Enviar saldo por WhatsApp</span>
+                </button>
+            </div>` : '';
+
         if (ficha) {
             ficha.innerHTML = `
+                <button type="button" class="btn-ficha-volver" id="btnVolverFicha">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
+                    <span>Volver a clientes</span>
+                </button>
+                <div class="ficha-profile-card">
+                    <div class="ficha-profile-top">
+                        <div class="ficha-profile-avatar" style="background:${avatarGrad}">
+                            <span>${esc(inits)}</span>
+                        </div>
+                        <div class="ficha-profile-info">
+                            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                                <h2 class="ficha-profile-name">${esc(client.nombre)}</h2>
+                                ${pill}
+                            </div>
+                            <div class="ficha-profile-meta">${metaParts || 'Sin datos adicionales'}</div>
+                        </div>
+                    </div>
+                    ${waBtn}
+                </div>
                 ${notaNombres}
                 ${notaLugar}
                 <div class="ficha-numeros">
@@ -231,8 +270,11 @@
                     <div><span>INTERÉS</span><strong>${interesTxt}</strong></div>
                     <div><span>CFR DÍA</span><strong>${cfrPorDia(client.tarifa)}</strong></div>
                 </div>
-                <div class="ficha-total"><span>TOTAL A PAGAR</span><strong>${formatCompact(total)}</strong></div>
+                <div class="ficha-total"><span>TOTAL A PAGAR</span><strong>${formatMoney(total)}</strong></div>
                 <div id="fichaCuerpo">${cuerpo}</div>`;
+
+            nodo('btnVolverFicha')?.addEventListener('click', () => mostrarLista());
+            nodo('btnFichaWa')?.addEventListener('click', () => enviarWhatsAppCliente(client, total));
         }
         window.scrollTo(0, 0);
     }
@@ -472,10 +514,77 @@
         });
     }
 
+    const AVATAR_PALETTE = [
+        ['#3b82f6', '#1d4ed8'],
+        ['#8b5cf6', '#6d28d9'],
+        ['#ec4899', '#be185d'],
+        ['#10b981', '#047857'],
+        ['#f59e0b', '#b45309'],
+        ['#06b6d4', '#0e7490'],
+        ['#6366f1', '#4338ca'],
+        ['#ef4444', '#b91c1c']
+    ];
+
+    function avatarGradient(nombre) {
+        if (!nombre) return `linear-gradient(135deg, ${AVATAR_PALETTE[0][0]}, ${AVATAR_PALETTE[0][1]})`;
+        let hash = 0;
+        for (let i = 0; i < nombre.length; i++) {
+            hash = (hash << 5) - hash + nombre.charCodeAt(i);
+            hash |= 0;
+        }
+        const idx = Math.abs(hash) % AVATAR_PALETTE.length;
+        const [c1, c2] = AVATAR_PALETTE[idx];
+        return `linear-gradient(135deg, ${c1}, ${c2})`;
+    }
+
+    function iniciales(nombre) {
+        if (!nombre) return 'CF';
+        const partes = nombre.trim().split(/\s+/).filter(Boolean);
+        if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
+        return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
+    }
+
+    function badgeEstado(client, saldo) {
+        if (saldo <= 0) {
+            return '<span class="client-status-badge badge-al-dia">✓ Al día</span>';
+        }
+        const d = client.dias != null ? Number(client.dias) : null;
+        if (d != null) {
+            if (d >= 30) return `<span class="client-status-badge badge-mora-grave">🚨 ${d}d mora</span>`;
+            if (d > 0) return `<span class="client-status-badge badge-mora-leve">⚠️ ${d}d mora</span>`;
+            return '<span class="client-status-badge badge-al-dia">✓ Al día</span>';
+        }
+        return '<span class="client-status-badge badge-deuda">Con saldo</span>';
+    }
+
+    function limpiarTelefono(tel) {
+        if (!tel) return '';
+        let num = String(tel).replace(/\D+/g, '');
+        if (!num) return '';
+        if (num.startsWith('549')) return num;
+        if (num.startsWith('54')) return '549' + num.slice(2);
+        if (num.startsWith('0')) num = num.slice(1);
+        if (num.startsWith('15')) num = num.slice(2);
+        if (num.length === 10) return '549' + num;
+        return num;
+    }
+
+    function enviarWhatsAppCliente(client, total) {
+        const tel = limpiarTelefono(client.telefono);
+        if (!tel) return;
+        const msg = encodeURIComponent(`Hola ${client.nombre}, te escribimos de Cobro Fácil para informarte que tu saldo actual es de ${formatMoney(total)}. Cualquier consulta quedamos a tu disposición.`);
+        const url = `https://wa.me/${tel}?text=${msg}`;
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
     function setFilter(filter) {
-        currentFilter = filter;
+        currentFilter = filter || 'all';
         caja.querySelectorAll('.resumen button').forEach(item => {
-            item.classList.toggle('on', item.dataset.filter === filter);
+            item.classList.toggle('on', item.dataset.filter === currentFilter);
+        });
+        const chips = document.querySelectorAll('#carteraFiltrosChips .periodo-chip');
+        chips.forEach(chip => {
+            chip.classList.toggle('active', (chip.dataset.filter || 'all') === currentFilter);
         });
         filterClients();
     }
@@ -518,42 +627,63 @@
             const saldo = deudaVisible(client);
             const interes = interesCuenta(client);
             const total = saldo + interes.monto;
+            const inits = iniciales(client.nombre);
+            const avatarGrad = avatarGradient(client.nombre);
             const tipo = esExpress(client) ? 'EXPRESS' : String(client.tipo_cliente || '').replaceAll('_', ' ').toUpperCase();
-            const pill = tipo && tipo !== 'REGULAR' ? `<span class="pill">${esc(tipo)}</span>` : '';
+            const pillCls = esExpress(client) ? 'pill-express' : 'pill-regular';
+            const pill = tipo && tipo !== 'REGULAR' ? `<span class="client-tipo-pill ${pillCls}">${esc(tipo)}</span>` : '';
             const interesTxt = interes.real ? formatCompact(interes.monto) : ('est. ' + formatCompact(interes.monto));
-            const late = client.dias == null
-                ? '<span class="late">Sin días<br>en el libro</span>'
-                : (Number(client.dias) > 0
-                    ? `<span class="late">${esc(client.dias)} días<br>retraso</span>`
-                    : '<span class="late ok">Al día</span>');
+            const badge = badgeEstado(client, saldo);
+
             const lugares = (client.sucursales || []).filter(Boolean);
-            const lugar = lugares.length > 1 ? lugares.join(' · ') : '';
-            const pie = [client.cuit ? 'DNI ' + client.cuit : '', lugar, client.telefono || ''].filter(Boolean).join(' · ') || 'Ver historial';
+            const lugar = lugares.length > 1 ? lugares.join(' · ') : (lugares[0] || '');
+            const subParts = [
+                client.cuit ? 'DNI ' + esc(client.cuit) : '',
+                lugar ? esc(lugar) : '',
+                client.telefono ? esc(client.telefono) : ''
+            ].filter(Boolean);
+            const sublineHtml = subParts.length ? subParts.map(s => `<span>${s}</span>`).join(' &nbsp;·&nbsp; ') : '<span>Sin DNI registrado</span>';
+
+            const waBtn = client.telefono ? `
+                <button type="button" class="btn-card-wa" data-action="wa" title="Enviar saldo por WhatsApp">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                    <span>WhatsApp</span>
+                </button>` : '';
+
             return `
                 <article class="debt-card" data-id="${esc(client.id)}">
-                    <div class="card-top">
-                        <div class="who">
-                            <div class="avatar" aria-hidden="true">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" stroke-width="1.8"><path d="M20 21a8 8 0 10-16 0"/><circle cx="12" cy="7" r="4"/></svg>
+                    <div class="card-head-row">
+                        <div class="card-avatar-wrap">
+                            <div class="card-avatar" style="background:${avatarGrad}">
+                                <span>${esc(inits)}</span>
                             </div>
-                            <div>
-                                <h2>${esc(client.nombre)}</h2>
-                                ${pill}
+                            <div class="card-identity">
+                                <div class="card-title-row">
+                                    <h2 class="card-name">${esc(client.nombre)}</h2>
+                                    ${pill}
+                                </div>
+                                <div class="card-subline">${sublineHtml}</div>
                             </div>
                         </div>
-                        ${late}
+                        <div class="card-status-col">${badge}</div>
                     </div>
-                    <div class="metrics">
-                        <div><span>CAPITAL</span><strong>${formatCompact(saldo)}</strong></div>
-                        <div><span>INTERÉS</span><strong>${interesTxt}</strong></div>
-                        <div><span>CFR</span><strong>${esc(client.tarifa || '—')}</strong></div>
-                    </div>
-                    <div class="card-foot">
-                        <div>
-                            <span class="amount-label">TOTAL A PAGAR</span>
-                            <span class="amount ${saldo > 0 ? 'hot' : 'cool'}">${formatCompact(total)}</span>
+                    <div class="card-main-box">
+                        <div class="card-hero-amount">
+                            <span class="hero-amount-label">TOTAL A PAGAR</span>
+                            <span class="hero-amount-val ${saldo > 0 ? 'deuda-activa' : 'sin-deuda'}">${formatMoney(total)}</span>
                         </div>
-                        <div class="foot-note">${esc(pie)}</div>
+                        <div class="card-breakdown-grid">
+                            <div class="breakdown-item"><span class="bd-lbl">CAPITAL</span><strong class="bd-val">${formatCompact(saldo)}</strong></div>
+                            <div class="breakdown-item"><span class="bd-lbl">INTERÉS</span><strong class="bd-val">${interesTxt}</strong></div>
+                            <div class="breakdown-item"><span class="bd-lbl">TASA CFR</span><strong class="bd-val">${esc(client.tarifa || '0%')}</strong></div>
+                        </div>
+                    </div>
+                    <div class="card-foot-actions">
+                        ${waBtn}
+                        <button type="button" class="btn-card-ficha" data-action="ficha">
+                            <span>Ver ficha</span>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                        </button>
                     </div>
                 </article>`;
         }).join('');
@@ -563,6 +693,8 @@
         const base = allClients;
         const conDeuda = base.filter(c => deudaVisible(c) > 0);
         const riesgo = base.filter(enRiesgo);
+        const alDia = base.filter(c => deudaVisible(c) <= 0);
+        const expres = base.filter(esExpress);
         const deuda = conDeuda.reduce((sum, c) => sum + deudaVisible(c), 0);
         const deudaRiesgo = riesgo.reduce((sum, c) => sum + Math.max(deudaVisible(c), 0), 0);
         texto('barDeuda', formatMoney(libro.cartera_en_calle != null ? libro.cartera_en_calle : deuda));
@@ -570,6 +702,13 @@
         texto('barRiesgo', formatMoney(libro.cartera_en_riesgo != null ? libro.cartera_en_riesgo : deudaRiesgo));
         texto('barRiesgoSub', `${libro.cuentas_en_riesgo != null ? libro.cuentas_en_riesgo : riesgo.length} cuentas`);
         texto('barCobros', formatMoney(libro.cobros_del_mes != null ? libro.cobros_del_mes : cobrosMes));
+
+        // Chips counts
+        texto('countAll', String(base.length));
+        texto('countSaldo', String(conDeuda.length));
+        texto('countRiesgo', String(riesgo.length));
+        texto('countAlDia', String(alDia.length));
+        texto('countExpress', String(expres.length));
     }
 
     function aplicarLibro(dato) {
@@ -1025,7 +1164,25 @@
         if (!button || !button.dataset.filter) return;
         setFilter(button.dataset.filter === currentFilter ? 'all' : button.dataset.filter);
     });
+    nodo('carteraFiltrosChips')?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.periodo-chip');
+        if (!btn || !btn.dataset.filter) return;
+        setFilter(btn.dataset.filter);
+    });
     nodo('cards')?.addEventListener('click', (event) => {
+        const waBtn = event.target.closest('[data-action="wa"]');
+        if (waBtn) {
+            event.stopPropagation();
+            event.preventDefault();
+            const card = waBtn.closest('.debt-card');
+            const client = card ? allClients.find(c => String(c.id) === String(card.dataset.id)) : null;
+            if (client) {
+                const saldo = deudaVisible(client);
+                const interes = interesCuenta(client);
+                enviarWhatsAppCliente(client, saldo + interes.monto);
+            }
+            return;
+        }
         const card = event.target.closest('.debt-card');
         if (!card) return;
         const marca = '#c=' + encodeURIComponent(card.dataset.id);

@@ -52,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=5.4">
+    <link rel="stylesheet" href="/static/enterprise.css?v=5.5">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -196,6 +196,14 @@
                             <span class="sub">del mes</span>
                         </button>
                     </nav>
+                    <div class="chips-barra cartera-filtros-chips" id="carteraFiltrosChips">
+                        <button type="button" class="periodo-chip active" data-filter="all">Todos <span class="chip-count" id="countAll">0</span></button>
+                        <button type="button" class="periodo-chip" data-filter="saldo">Con deuda <span class="chip-count" id="countSaldo">0</span></button>
+                        <button type="button" class="periodo-chip" data-filter="criticos">En riesgo <span class="chip-count" id="countRiesgo">0</span></button>
+                        <button type="button" class="periodo-chip" data-filter="al_dia">Al día <span class="chip-count" id="countAlDia">0</span></button>
+                        <button type="button" class="periodo-chip" data-filter="expres">Express <span class="chip-count" id="countExpress">0</span></button>
+                        <button type="button" class="periodo-chip" data-filter="30+">30+ días</button>
+                    </div>
                     <div class="cards" id="cards"></div>
                     <div class="empty" id="emptyState">Cargando el libro…</div>
                 </div>
@@ -399,7 +407,7 @@
     <script src="/static/js/barra/armar.js?v=3"></script>
     <script src="/static/js/barra/toque.js?v=5"></script>
     <script src="/static/js/modulo-panel.js?v=10"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=20"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=21"></script>
     <script src="/static/js/espejo.js?v=12"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>
     <script src="/static/js/nodo.js?v=3"></script>
