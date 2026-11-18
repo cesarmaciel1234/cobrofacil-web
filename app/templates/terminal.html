@@ -52,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=5.1">
+    <link rel="stylesheet" href="/static/enterprise.css?v=5.2">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -224,7 +224,7 @@
                         </select>
                     </div>
                     <input class="buscar" id="buscarCargos" type="search" placeholder="Buscar cliente, DNI, ticket o descripción" autocomplete="off">
-                    <div class="tabla-scroll-hint"><span>↔ Deslizá la tabla para ver más columnas</span></div>
+                    <div class="tabla-scroll-hint"><span>💡 Tocá una fila para ver el detalle</span></div>
                     <div class="table-wrap">
                         <table class="data-table" id="tablaCargos">
                             <thead>
@@ -232,12 +232,12 @@
                                     <th>Fecha</th>
                                     <th>Ticket</th>
                                     <th>Cliente</th>
-                                    <th>DNI</th>
+                                    <th class="col-det">DNI</th>
                                     <th style="text-align:right;">Monto</th>
-                                    <th>Origen</th>
-                                    <th>Estado</th>
-                                    <th style="text-align:right;">Saldo</th>
-                                    <th>Descripción</th>
+                                    <th class="col-det">Origen</th>
+                                    <th class="col-det">Estado</th>
+                                    <th class="col-det" style="text-align:right;">Saldo</th>
+                                    <th class="col-det">Descripción</th>
                                 </tr>
                             </thead>
                             <tbody id="cuerpoCargos"></tbody>
@@ -271,7 +271,7 @@
                         </select>
                     </div>
                     <input class="buscar" id="buscarCobros" type="search" placeholder="Buscar cliente, DNI, COB- o id de pago" autocomplete="off">
-                    <div class="tabla-scroll-hint"><span>↔ Deslizá la tabla para ver más columnas</span></div>
+                    <div class="tabla-scroll-hint"><span>💡 Tocá una fila para ver el detalle</span></div>
                     <div class="table-wrap">
                         <table class="data-table" id="tablaCobros">
                             <thead>
@@ -279,13 +279,13 @@
                                     <th>Fecha</th>
                                     <th>Ticket Cobro</th>
                                     <th>Cliente</th>
-                                    <th>DNI</th>
+                                    <th class="col-det">DNI</th>
                                     <th style="text-align:right;">Monto</th>
-                                    <th>Medio</th>
-                                    <th>Id Pago / Detalle</th>
-                                    <th>Perfil</th>
-                                    <th>Registró</th>
-                                    <th style="text-align:right;">Saldo</th>
+                                    <th class="col-det">Medio</th>
+                                    <th class="col-det">Id Pago / Detalle</th>
+                                    <th class="col-det">Perfil</th>
+                                    <th class="col-det">Registró</th>
+                                    <th class="col-det" style="text-align:right;">Saldo</th>
                                 </tr>
                             </thead>
                             <tbody id="cuerpoCobros"></tbody>
@@ -314,7 +314,7 @@
                         <button type="button" class="periodo-chip" data-accion-auditoria="ficha">Ficha</button>
                     </div>
                     <input class="buscar" id="buscarAuditoria" type="search" placeholder="Buscar cliente, COB-, PC, usuario o detalle" autocomplete="off">
-                    <div class="tabla-scroll-hint"><span>↔ Deslizá la tabla para ver más columnas</span></div>
+                    <div class="tabla-scroll-hint"><span>💡 Tocá una fila para ver el detalle</span></div>
                     <div class="table-wrap">
                         <table class="data-table" id="tablaAuditoria">
                             <thead>
@@ -322,12 +322,12 @@
                                     <th>Fecha</th>
                                     <th>Acción</th>
                                     <th>Cliente</th>
-                                    <th>Referencia</th>
-                                    <th>Medio</th>
-                                    <th>Id Pago</th>
-                                    <th>Usuario</th>
-                                    <th>PC / Caja</th>
-                                    <th>Llegada</th>
+                                    <th class="col-det">Referencia</th>
+                                    <th class="col-det">Medio</th>
+                                    <th class="col-det">Id Pago</th>
+                                    <th class="col-det">Usuario</th>
+                                    <th class="col-det">PC / Caja</th>
+                                    <th class="col-det">Llegada</th>
                                     <th>Detalle</th>
                                 </tr>
                             </thead>
@@ -399,7 +399,7 @@
     <script src="/static/js/barra/armar.js?v=3"></script>
     <script src="/static/js/barra/toque.js?v=5"></script>
     <script src="/static/js/modulo-panel.js?v=8"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=18"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=20"></script>
     <script src="/static/js/espejo.js?v=12"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>
     <script src="/static/js/nodo.js?v=3"></script>

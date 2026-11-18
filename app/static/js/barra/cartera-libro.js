@@ -648,6 +648,10 @@
     let textoAuditoria = '';
     let timerAuditoria = null;
 
+    let cargosActuales = [];
+    let cobrosActuales = [];
+    let auditoriaActual = [];
+
     function cambiarPantalla(id) {
         pantallaActual = id || 'clientes';
         const lista = nodo('carteraLista');
@@ -709,6 +713,7 @@
     }
 
     function renderCargos(filas, resumen) {
+        cargosActuales = filas || [];
         const cuerpo = nodo('cuerpoCargos');
         const pie = nodo('pieCargos');
         if (!cuerpo) return;
@@ -718,23 +723,23 @@
             return;
         }
 
-        cuerpo.innerHTML = filas.map(f => {
+        cuerpo.innerHTML = filas.map((f, idx) => {
             const inactivo = f.estado_clave === 'borrado' || f.estado_clave === 'cancelado';
             const estiloFila = inactivo ? 'opacity:0.6; text-decoration:line-through;' : '';
             const colorMonto = inactivo ? 'var(--text-muted)' : '#dc2626';
             const colorEstado = f.estado_clave === 'vivo' ? 'background:rgba(220,38,38,0.15); color:#f87171;' : (f.estado_clave === 'borrado' ? 'background:rgba(217,119,6,0.15); color:#fbbf24;' : 'background:rgba(100,116,139,0.2); color:#94a3b8;');
             const ticketHtml = f.venta_id ? `<span style="color:#3b82f6; font-weight:700;">#${esc(f.venta_id)}</span>` : esc(f.ticket);
 
-            return `<tr style="${estiloFila}">
+            return `<tr class="clickable" data-cargo-idx="${idx}" style="${estiloFila}">
                 <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">${esc(f.fecha)}</td>
                 <td style="white-space:nowrap;">${ticketHtml}</td>
                 <td style="font-weight:700;">${esc(f.nombre)}</td>
-                <td style="font-size:12px; color:var(--text-muted);">${esc(f.dni || '—')}</td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted);">${esc(f.dni || '—')}</td>
                 <td style="text-align:right; font-weight:800; color:${colorMonto}; white-space:nowrap;">${formatPos(f.monto)}</td>
-                <td style="font-size:12px;">${esc(f.origen)}</td>
-                <td><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${colorEstado}">${esc(f.estado)}</span></td>
-                <td style="text-align:right; font-size:13px; font-weight:600; white-space:nowrap;">${formatPos(f.saldo)}</td>
-                <td style="font-size:12px; color:var(--text-muted); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(f.descripcion)}">${esc(f.descripcion)}</td>
+                <td class="col-det" style="font-size:12px;">${esc(f.origen)}</td>
+                <td class="col-det"><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${colorEstado}">${esc(f.estado)}</span></td>
+                <td class="col-det" style="text-align:right; font-size:13px; font-weight:600; white-space:nowrap;">${formatPos(f.saldo)}</td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted); max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(f.descripcion)}">${esc(f.descripcion)}</td>
             </tr>`;
         }).join('');
 
@@ -774,6 +779,7 @@
     }
 
     function renderCobros(filas, resumen) {
+        cobrosActuales = filas || [];
         const cuerpo = nodo('cuerpoCobros');
         const pie = nodo('pieCobros');
         if (!cuerpo) return;
@@ -783,20 +789,20 @@
             return;
         }
 
-        cuerpo.innerHTML = filas.map(f => {
+        cuerpo.innerHTML = filas.map((f, idx) => {
             const colorMedio = f.digital ? 'background:rgba(59,130,246,0.15); color:#60a5fa;' : 'background:rgba(16,185,129,0.15); color:#34d399;';
 
-            return `<tr>
+            return `<tr class="clickable" data-cobro-idx="${idx}">
                 <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">${esc(f.fecha)}</td>
                 <td style="white-space:nowrap; font-weight:800; color:#3b82f6;">${esc(f.ticket_cobro)}</td>
                 <td style="font-weight:700;">${esc(f.nombre)}</td>
-                <td style="font-size:12px; color:var(--text-muted);">${esc(f.dni || '—')}</td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted);">${esc(f.dni || '—')}</td>
                 <td style="text-align:right; font-weight:800; color:#059669; white-space:nowrap;">${formatPos(f.monto)}</td>
-                <td><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${colorMedio}">${esc(f.medio)}</span></td>
-                <td style="font-size:12px; color:var(--text-muted);">${esc(f.detalle)}</td>
-                <td style="font-size:12px;">${esc(f.perfil)}</td>
-                <td style="font-size:12px; color:var(--text-muted);">${esc(f.quien)}</td>
-                <td style="text-align:right; font-size:13px; font-weight:600; white-space:nowrap;">${formatPos(f.saldo)}</td>
+                <td class="col-det"><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${colorMedio}">${esc(f.medio)}</span></td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted);">${esc(f.detalle)}</td>
+                <td class="col-det" style="font-size:12px;">${esc(f.perfil)}</td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted);">${esc(f.quien)}</td>
+                <td class="col-det" style="text-align:right; font-size:13px; font-weight:600; white-space:nowrap;">${formatPos(f.saldo)}</td>
             </tr>`;
         }).join('');
 
@@ -838,6 +844,7 @@
     }
 
     function renderAuditoria(filas, resumen) {
+        auditoriaActual = filas || [];
         const cuerpo = nodo('cuerpoAuditoria');
         const barra = nodo('barraCuadreCartera');
         const pie = nodo('pieAuditoria');
@@ -886,18 +893,18 @@
             'Suspendido': 'background:rgba(153,27,27,0.2); color:#fca5a5;',
         };
 
-        cuerpo.innerHTML = filas.map(f => {
+        cuerpo.innerHTML = filas.map((f, idx) => {
             const estiloBadge = TONO[f.accion] || 'background:rgba(255,255,255,0.1); color:#cbd5e1;';
-            return `<tr>
+            return `<tr class="clickable" data-auditoria-idx="${idx}">
                 <td style="white-space:nowrap; font-size:12px; color:var(--text-muted);">${esc(f.fecha)}</td>
                 <td><span style="display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:800; text-transform:uppercase; ${estiloBadge}">${esc(f.accion)}</span></td>
                 <td style="font-weight:700;">${esc(f.cliente)}</td>
-                <td style="font-size:12px; color:#3b82f6; font-weight:700;">${esc(f.referencia)}</td>
-                <td style="font-size:12px;">${esc(f.medio)}</td>
-                <td style="font-size:12px; color:var(--text-muted);">${esc(f.id_pago)}</td>
-                <td style="font-size:12px;">${esc(f.usuario)}</td>
-                <td style="font-size:12px; color:var(--text-muted);">${esc(f.pc)}${f.caja ? ' (caja ' + esc(f.caja) + ')' : ''}</td>
-                <td style="font-size:12px; color:var(--text-muted); white-space:nowrap;">${esc(f.llegada)}</td>
+                <td class="col-det" style="font-size:12px; color:#3b82f6; font-weight:700;">${esc(f.referencia)}</td>
+                <td class="col-det" style="font-size:12px;">${esc(f.medio)}</td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted);">${esc(f.id_pago)}</td>
+                <td class="col-det" style="font-size:12px;">${esc(f.usuario)}</td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted);">${esc(f.pc)}${f.caja ? ' (caja ' + esc(f.caja) + ')' : ''}</td>
+                <td class="col-det" style="font-size:12px; color:var(--text-muted); white-space:nowrap;">${esc(f.llegada)}</td>
                 <td style="font-size:12px; max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${esc(f.detalle)}">${esc(f.detalle)}</td>
             </tr>`;
         }).join('');
@@ -906,6 +913,111 @@
             pie.innerHTML = `<span>${filas.length} eventos registrados</span>`;
         }
     }
+
+    function abrirDetalleCargo(indice) {
+        const f = cargosActuales[indice];
+        if (!f) return;
+        const host = nodo('sheetHost');
+        if (!host) return;
+        const colorEstado = f.estado_clave === 'vivo' ? 'color:#ef4444;' : (f.estado_clave === 'borrado' ? 'color:#f59e0b;' : 'color:#94a3b8;');
+        const ticketBtn = f.venta_id
+            ? `<button type="button" class="fact" data-ticket="${esc(f.venta_id)}" style="background:#eff6ff; border:1px solid #bfdbfe;">
+                 <span style="color:#3b82f6;">Ticket POS (Ver Cortes)</span>
+                 <strong style="color:#2563eb;">#${esc(f.venta_id)} ↗</strong>
+               </button>`
+            : `<div class="fact"><span>Ticket</span><strong>${esc(f.ticket || '—')}</strong></div>`;
+
+        host.hidden = false;
+        host.innerHTML = `
+            <div class="sheet-back" data-close="1"></div>
+            <section class="sheet" role="dialog" aria-modal="true" aria-label="Detalle de Cargo">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <h3 style="margin:0;">Cargo en Cuenta</h3>
+                    <span style="font-size:12px; font-weight:800; text-transform:uppercase; ${colorEstado}">${esc(f.estado)}</span>
+                </div>
+                <p style="margin-bottom:14px;">${esc(f.fecha)} · ${esc(f.nombre)}</p>
+                <div class="facts">
+                    <div class="fact"><span>Cliente</span><strong>${esc(f.nombre)}</strong></div>
+                    <div class="fact"><span>DNI</span><strong>${esc(f.dni || '—')}</strong></div>
+                    <div class="fact"><span>Monto del Cargo</span><strong style="color:#dc2626; font-size:1.1rem;">${formatPos(f.monto)}</strong></div>
+                    <div class="fact"><span>Saldo Actual</span><strong style="font-size:1.1rem;">${formatPos(f.saldo)}</strong></div>
+                    ${ticketBtn}
+                    <div class="fact"><span>Origen</span><strong>${esc(f.origen || '—')}</strong></div>
+                    <div class="fact" style="grid-column: span 2;"><span>Descripción</span><strong style="font-weight:500; font-size:13px; line-height:1.4;">${esc(f.descripcion || '—')}</strong></div>
+                </div>
+                <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+            </section>`;
+    }
+
+    function abrirDetalleCobro(indice) {
+        const f = cobrosActuales[indice];
+        if (!f) return;
+        const host = nodo('sheetHost');
+        if (!host) return;
+        host.hidden = false;
+        host.innerHTML = `
+            <div class="sheet-back" data-close="1"></div>
+            <section class="sheet" role="dialog" aria-modal="true" aria-label="Detalle de Cobro">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <h3 style="margin:0;">Cobro Registrado</h3>
+                    <span style="font-size:12px; font-weight:800; color:#3b82f6;">${esc(f.ticket_cobro)}</span>
+                </div>
+                <p style="margin-bottom:14px;">${esc(f.fecha)} · ${esc(f.nombre)}</p>
+                <div class="facts">
+                    <div class="fact"><span>Cliente</span><strong>${esc(f.nombre)}</strong></div>
+                    <div class="fact"><span>DNI</span><strong>${esc(f.dni || '—')}</strong></div>
+                    <div class="fact"><span>Monto Cobrado</span><strong style="color:#059669; font-size:1.1rem;">${formatPos(f.monto)}</strong></div>
+                    <div class="fact"><span>Saldo Posterior</span><strong style="font-size:1.1rem;">${formatPos(f.saldo)}</strong></div>
+                    <div class="fact"><span>Medio de Pago</span><strong style="text-transform:capitalize;">${esc(f.medio)}</strong></div>
+                    <div class="fact"><span>Id Pago / Detalle</span><strong>${esc(f.detalle || '—')}</strong></div>
+                    <div class="fact"><span>Perfil / Cuenta</span><strong>${esc(f.perfil || '—')}</strong></div>
+                    <div class="fact"><span>Registró</span><strong>${esc(f.quien || '—')}</strong></div>
+                </div>
+                <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+            </section>`;
+    }
+
+    function abrirDetalleAuditoria(indice) {
+        const f = auditoriaActual[indice];
+        if (!f) return;
+        const host = nodo('sheetHost');
+        if (!host) return;
+        host.hidden = false;
+        host.innerHTML = `
+            <div class="sheet-back" data-close="1"></div>
+            <section class="sheet" role="dialog" aria-modal="true" aria-label="Detalle de Auditoría">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <h3 style="margin:0;">Evento de Auditoría</h3>
+                    <span style="font-size:12px; font-weight:800; text-transform:uppercase;">${esc(f.accion)}</span>
+                </div>
+                <p style="margin-bottom:14px;">${esc(f.fecha)} · ${esc(f.usuario || 'Sistema')}</p>
+                <div class="facts">
+                    <div class="fact"><span>Acción</span><strong>${esc(f.accion)}</strong></div>
+                    <div class="fact"><span>Cliente</span><strong>${esc(f.cliente)}</strong></div>
+                    <div class="fact"><span>Referencia</span><strong style="color:#3b82f6;">${esc(f.referencia || '—')}</strong></div>
+                    <div class="fact"><span>Medio / Pago</span><strong>${esc(f.medio || '—')}</strong></div>
+                    <div class="fact"><span>Id Pago</span><strong>${esc(f.id_pago || '—')}</strong></div>
+                    <div class="fact"><span>Usuario</span><strong>${esc(f.usuario || '—')}</strong></div>
+                    <div class="fact"><span>PC / Caja</span><strong>${esc(f.pc || '—')}${f.caja ? ' (caja ' + esc(f.caja) + ')' : ''}</strong></div>
+                    <div class="fact"><span>Llegada a Nube</span><strong>${esc(f.llegada || '—')}</strong></div>
+                    <div class="fact" style="grid-column: span 2;"><span>Detalle Completo</span><strong style="font-weight:500; font-size:13px; line-height:1.4;">${esc(f.detalle || '—')}</strong></div>
+                </div>
+                <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+            </section>`;
+    }
+
+    nodo('cuerpoCargos')?.addEventListener('click', (ev) => {
+        const fila = ev.target.closest('[data-cargo-idx]');
+        if (fila) abrirDetalleCargo(Number(fila.dataset.cargoIdx));
+    });
+    nodo('cuerpoCobros')?.addEventListener('click', (ev) => {
+        const fila = ev.target.closest('[data-cobro-idx]');
+        if (fila) abrirDetalleCobro(Number(fila.dataset.cobroIdx));
+    });
+    nodo('cuerpoAuditoria')?.addEventListener('click', (ev) => {
+        const fila = ev.target.closest('[data-auditoria-idx]');
+        if (fila) abrirDetalleAuditoria(Number(fila.dataset.auditoriaIdx));
+    });
 
     nodo('searchInput')?.addEventListener('input', () => filterClients());
     caja?.querySelector('.resumen')?.addEventListener('click', (event) => {
