@@ -182,6 +182,9 @@
         if (auditoria) auditoria.hidden = true;
         fichaAbierta = '';
         pantallaActual = 'clientes';
+        if (location.hash && location.hash.startsWith('#c=')) {
+            try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+        }
         libroAbierto = [];
         cerrarMovimiento();
         ponerMarca(marcaEmpresa);
@@ -695,6 +698,7 @@
         const riesgo = base.filter(enRiesgo);
         const alDia = base.filter(c => deudaVisible(c) <= 0);
         const expres = base.filter(esExpress);
+        const mas30 = base.filter(c => diasDe(c) != null && diasDe(c) >= 30);
         const deuda = conDeuda.reduce((sum, c) => sum + deudaVisible(c), 0);
         const deudaRiesgo = riesgo.reduce((sum, c) => sum + Math.max(deudaVisible(c), 0), 0);
         texto('barDeuda', formatMoney(libro.cartera_en_calle != null ? libro.cartera_en_calle : deuda));
@@ -709,6 +713,7 @@
         texto('countRiesgo', String(riesgo.length));
         texto('countAlDia', String(alDia.length));
         texto('countExpress', String(expres.length));
+        texto('count30', String(mas30.length));
     }
 
     function aplicarLibro(dato) {
