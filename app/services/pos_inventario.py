@@ -21,7 +21,23 @@ MARIADB_PASS = os.environ.get("POS_MARIADB_PASS", "1234")
 MARIADB_DB = os.environ.get("POS_MARIADB_DB", "punpro_db")
 
 
-def _conectar_mariadb(timeout: float = 2.0):
+def _conectar_mariadb(timeout: float = 0.5):
+    # En entornos cloud (Render, Heroku, etc.) las IPs privadas 192.168.0.x no existen
+    if os.environ.get("RENDER") or os.environ.get("DYNO"):
+        return None
+
+    # Pre-chequeo ultra rápido por socket (300ms) para evitar bloqueos del handshake TCP en Windows/Linux
+    import socket
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(0.3)
+        res = sock.connect_ex((MARIADB_HOST, MARIADB_PORT))
+        sock.close()
+        if res != 0:
+            return None
+    except Exception:
+        return None
+
     try:
         import pymysql
 
@@ -32,8 +48,8 @@ def _conectar_mariadb(timeout: float = 2.0):
             password=MARIADB_PASS,
             database=MARIADB_DB,
             connect_timeout=timeout,
-            read_timeout=timeout + 2,
-            write_timeout=timeout + 2,
+            read_timeout=timeout + 1,
+            write_timeout=timeout + 1,
             charset="utf8mb4",
             autocommit=True,
         )

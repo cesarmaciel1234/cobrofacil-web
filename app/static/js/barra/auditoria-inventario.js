@@ -95,14 +95,28 @@
     }
 
     // -------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // CARGA DE DATOS DESDE LA API
     // -------------------------------------------------------------------------
+    function renderSkeletonAuditoria(wrap) {
+        if (!wrap) return;
+        wrap.innerHTML = `
+            <div class="auditoria-mobile-container" style="padding: 48px 16px; text-align: center;">
+                <div style="display:inline-block; width:38px; height:38px; border:3px solid #e2e8f0; border-top-color:#3b82f6; border-radius:50%; animation:auditoriaSpin 0.8s linear infinite; margin-bottom:14px;"></div>
+                <p style="font-weight:700; color:#1e293b; margin:0 0 6px; font-size:16px;">Cargando inventario para auditar…</p>
+                <span style="font-size:13px; color:#64748b;">Obteniendo stock y artículos de la sucursal</span>
+            </div>
+        `;
+    }
+
     async function cargarCatalogoAuditoria(forzar = false) {
         const wrap = $('pedidosAuditoriaWrap');
         if (!wrap) return;
 
         try {
-            const res = await fetch('/api/pos/inventario/auditoria');
+            const sid = global.activeSucursalId;
+            const url = '/api/pos/inventario/auditoria' + (sid !== undefined && sid !== null ? ('?sucursal_id=' + encodeURIComponent(sid)) : '');
+            const res = await fetch(url);
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             if (data.ok) {
@@ -111,10 +125,29 @@
                 resumen = data.resumen || resumen;
                 fuenteConexion = data.fuente || 'local';
                 renderAuditoria();
+            } else {
+                throw new Error(data.error || 'Respuesta no exitosa');
             }
         } catch (err) {
             console.error('Error cargando catálogo de auditoría:', err);
             if (global.CrmBus) global.CrmBus.emit('toast', 'No se pudo cargar el inventario: ' + err.message, true);
+            if (!catalogo || catalogo.length === 0) {
+                wrap.innerHTML = `
+                    <div class="auditoria-mobile-container" style="padding: 48px 16px; text-align: center;">
+                        <div style="font-size:36px; margin-bottom:10px;">📦</div>
+                        <p style="font-weight:700; color:#ef4444; margin:0 0 6px; font-size:16px;">No se pudo conectar al inventario</p>
+                        <p style="font-size:13px; color:#64748b; margin-bottom:18px;">${err.message || 'Error de red o servidor no disponible'}</p>
+                        <button type="button" class="btn btn-primary" id="btnReintentarAuditoria" style="padding:10px 24px; border-radius:10px; font-weight:700; cursor:pointer;">Reintentar</button>
+                    </div>
+                `;
+                const btnRe = wrap.querySelector('#btnReintentarAuditoria');
+                if (btnRe) {
+                    btnRe.addEventListener('click', () => {
+                        renderSkeletonAuditoria(wrap);
+                        cargarCatalogoAuditoria(true);
+                    });
+                }
+            }
         }
     }
 
@@ -130,6 +163,11 @@
             if (faltantesWrap) faltantesWrap.style.display = 'none';
             if (auditoriaWrap) {
                 auditoriaWrap.style.display = 'block';
+                if (catalogo && catalogo.length > 0) {
+                    renderAuditoria();
+                } else {
+                    renderSkeletonAuditoria(auditoriaWrap);
+                }
                 cargarCatalogoAuditoria();
             }
         } else {
@@ -1174,6 +1212,7 @@
     global.AuditoriaInventario = {
         cambiarPantalla,
         cargarCatalogoAuditoria,
+        recargar: () => cargarCatalogoAuditoria(true),
         renderAuditoria,
         abrirDrawerConteo,
         abrirEscanerCamara,

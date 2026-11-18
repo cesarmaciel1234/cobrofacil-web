@@ -46,6 +46,9 @@
             if (nombre === 'reporte' && window.CrmBus && window.CrmBus.get('switchView')) {
                 window.CrmBus.emit('switchView', 'reporte');
             }
+            if (nombre === 'pedidos' && window.AuditoriaInventario && window.AuditoriaInventario.cambiarPantalla) {
+                window.AuditoriaInventario.cambiarPantalla('faltantes');
+            }
             return;
         }
         pintar(nombre);

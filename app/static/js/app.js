@@ -4839,6 +4839,18 @@ const $ = id => document.getElementById(id);
             if (name === 'contabilidad') {
                 cajaPantalla = 'arqueo';
             }
+            if (name === 'pedidos') {
+                const faltantesWrap = $('pedidosFaltantesWrap');
+                const auditoriaWrap = $('pedidosAuditoriaWrap');
+                const pActiva = (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual) ? window.AuditoriaInventario.pantallaActual() : 'faltantes';
+                if (pActiva === 'auditoria') {
+                    if (faltantesWrap) faltantesWrap.style.display = 'none';
+                    if (auditoriaWrap) auditoriaWrap.style.display = 'block';
+                } else {
+                    if (auditoriaWrap) auditoriaWrap.style.display = 'none';
+                    if (faltantesWrap) faltantesWrap.style.display = 'block';
+                }
+            }
             programarDatos(name);
             if ($('cobranzasBar')) {
                 if (name === 'cobranzas') {
