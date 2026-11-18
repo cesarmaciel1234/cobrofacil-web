@@ -702,8 +702,30 @@
         const btnLinterna = $('btnToggleLinterna');
         if (btnLinterna) {
             btnLinterna.style.display = capabilities.torch ? 'inline-block' : 'none';
+            btnLinterna.textContent = linternaEncendida ? '🔦' : '💡';
+        }
+    }
+
+    async function autoEncenderLinterna() {
+        if (!trackLinterna) return;
+        const capabilities = trackLinterna.getCapabilities ? trackLinterna.getCapabilities() : {};
+        if (capabilities.torch) {
+            try {
+                await trackLinterna.applyConstraints({
+                    advanced: [{ torch: true }]
+                });
+                linternaEncendida = true;
+            } catch (err) {
+                console.warn('No se pudo encender flash automáticamente:', err);
+                linternaEncendida = false;
+            }
+        } else {
             linternaEncendida = false;
-            btnLinterna.textContent = '💡';
+        }
+        const btnLinterna = $('btnToggleLinterna');
+        if (btnLinterna) {
+            btnLinterna.style.display = capabilities.torch ? 'inline-block' : 'none';
+            btnLinterna.textContent = linternaEncendida ? '🔦' : '💡';
         }
     }
 
@@ -758,6 +780,7 @@
 
             trackLinterna = videoStream.getVideoTracks()[0];
             actualizarEstadoCamara();
+            await autoEncenderLinterna();
 
             // Iniciar bucle de escaneo continuo
             bucleEscaneo();
@@ -770,6 +793,7 @@
                 await video.play();
                 trackLinterna = videoStream.getVideoTracks()[0];
                 actualizarEstadoCamara();
+                await autoEncenderLinterna();
                 bucleEscaneo();
             } catch (err2) {
                 console.error('Fallo definitivo acceso cámara:', err2);
@@ -782,6 +806,7 @@
 
     function cerrarEscanerCamara() {
         escaneando = false;
+        linternaEncendida = false;
         if (animFrameId) cancelAnimationFrame(animFrameId);
         animFrameId = null;
 
@@ -789,6 +814,7 @@
             videoStream.getTracks().forEach((t) => t.stop());
             videoStream = null;
         }
+        trackLinterna = null;
 
         const modal = $('modalEscanerCamara');
         if (modal) {
@@ -843,6 +869,7 @@
             await video.play();
             trackLinterna = videoStream.getVideoTracks()[0];
             actualizarEstadoCamara();
+            await autoEncenderLinterna();
         } catch (err) {
             console.warn('Error cambiando lente de cámara, usando fallback:', err);
             try {
@@ -852,7 +879,9 @@
                 });
                 video.srcObject = videoStream;
                 await video.play();
+                trackLinterna = videoStream.getVideoTracks()[0];
                 actualizarEstadoCamara();
+                await autoEncenderLinterna();
             } catch (err2) {
                 console.error('Fallo cambiar cámara:', err2);
             }
