@@ -4,7 +4,7 @@
 (function (global) {
     function getEmpresaDatos() {
         const defaults = {
-            nombre: 'Master Total',
+            nombre: 'Cobro Fácil',
             cuit: '30-12345678-9',
             direccion: 'Av. Juan B. Justo 1234, CABA',
             telefono: '+54 11 4567-8901',

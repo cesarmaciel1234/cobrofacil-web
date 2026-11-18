@@ -24,8 +24,10 @@
 ```
 app/services/
 ├── pos_base.py           <-- Motor de identidad, lectura de tablas espejo y caché TTL 5s
+├── pos_historial.py      <-- Motor de historial de tickets con paginación progresiva (bloques de 400)
+├── pos_interes.py        <-- Motor de cálculo de intereses devengados y mora de cartera
 ├── nodo.py               <-- Nodo maestro: arma reporte y el resto en segundo plano
-├── pos_jefe.py           <-- Generador de paneles (Reporte, Jefe, Contabilidad, Cartera, Pedidos)
+├── pos_jefe.py           <-- Generador de paneles (Reporte, Jefe, Caja, Cartera, Pedidos)
 ├── pos_vitrina.py        <-- Motor de control de gestión (12 tarjetas)
 ├── sync_hub.py           <-- Motor de replicación LWW, idempotencia y changelog
 ├── signal_bus.py         <-- Bus pub/sub SSE aislado por empresa_id
@@ -39,6 +41,12 @@ app/services/
 - **Caché ágil:** `_CACHE_TTL = 5.0` segundos. Una lectura llena Todas y cada sucursal. Si el sello del libro no cambió, no se vuelven a bajar las filas. El panel armado se reusa mientras ese sello siga igual.
 - **Unificación por DNI:** Un cliente con el mismo DNI en dos sucursales se consolida en una sola persona sumando sus deudas reales.
 - **Unificación por Nombre:** Si no hay DNI, clientes con nombres exactamente idénticos en distintas sucursales se unifican sin duplicar la deuda copiada.
+
+### Motor de Historial Progresivo (`pos_historial.py`):
+- **Scroll Infinito y Carga Progresiva:** Retorna los primeros 400 tickets visibles ordenados cronológicamente descendentes (`offset`, `limite`, `hay_mas`). Evita el colapso del DOM y el congelamiento del navegador en dispositivos móviles al manipular más de 1.000 o 2.500 tickets por mes.
+
+### Motor de Interés y Cartera (`pos_interes.py`):
+- **Alineación con TPV Maestra:** Calcula los intereses devengados de cuenta corriente con la misma fórmula de la tienda física (tasa CFR diaria), integrando el total adeudado en los KPI generales del jefe y en el saldo exigible.
 
 ### Motor de Sincronización LWW (`sync_hub.py`):
 - Aplica operaciones usando el algoritmo Last-Write-Wins basado en `updated_at_utc`.

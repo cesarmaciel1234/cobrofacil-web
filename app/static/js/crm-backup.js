@@ -55,7 +55,7 @@ function empresaDatosParaBackup() {
             return null;
         }
         return {
-            razon_social: razon || 'Master Total',
+            razon_social: razon || 'Cobro Fácil',
             cuit: raw.cuit || '',
             direccion: raw.direccion || '',
             telefono: raw.telefono || '',

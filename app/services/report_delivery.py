@@ -465,7 +465,7 @@ tr.row-urgente td {{ background:#fffbeb!important; }}
     <div>
       <div class="hero-tag">Informe Empresarial</div>
       <div class="brand">{_esc(nombre_emp)}</div>
-      <div class="sub">Reporte de gestión · Master Total{f' · CUIT {cuit}' if cuit else ''}{f'<br>{_esc(contacto)}' if contacto else ''}</div>
+      <div class="sub">Reporte de gestión · Cobro Fácil{f' · CUIT {cuit}' if cuit else ''}{f'<br>{_esc(contacto)}' if contacto else ''}</div>
     </div>
     <div class="hero-right">
       <div class="fecha-box">
@@ -556,7 +556,7 @@ tr.row-urgente td {{ background:#fffbeb!important; }}
   </div>
 
   <footer class="footer">
-    <span>Informe Empresarial · <strong>Master Total</strong> · Confidencial</span>
+    <span>Informe Empresarial · <strong>Cobro Fácil</strong> · Confidencial</span>
     <span>Generado {_esc(report.get('generado_at', '')[:19].replace('T', ' '))} UTC</span>
   </footer>
 </div>

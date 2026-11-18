@@ -21,10 +21,11 @@
 - `GET /cartera` -> Libro consolidado de cuentas corrientes.
 
 ### Endpoints POS y Sucursales (`api_pos.py`):
-- `GET /api/pos/jefe/sucursales` -> Lista las sucursales detectadas (`Todas`, `Maciel`, `alfaro 1964`).
-- `GET /api/pos/jefe/panel?panel=<nombre>&sucursal_id=<id>` -> Datos de los paneles `reporte`, `jefe`, `contabilidad`, `cartera`, `digitales`, `pedidos`.
+- `GET /api/pos/sucursales` -> Lista las sucursales detectadas (`Todas`, `maciel - DESKTOP-7Q2Q4VD`, etc.) aisladas por tenant.
+- `GET /api/pos/jefe?panel=<nombre>&sucursal_id=<id>` -> Datos de los paneles `reporte`, `jefe`, `caja`, `cartera`, `digitales`, `pedidos`.
+- `GET /api/pos/jefe?panel=ticket&offset=<num>&limite=<num>` -> Historial de tickets con paginación progresiva en lotes de a 400 (`hay_mas`, `offset`, `limite`) sin congelamiento de UI.
 - `GET /api/pos/nodo` -> Sello del libro. `GET /api/pos/nodo?pieza=reporte` -> Esa pantalla ya armada, para que la PWA no la calcule en la cara.
-- `GET /api/pos/jefe/vitrina?periodo=<dias>` -> Métricas de las 12 tarjetas de control.
+- `GET /api/pos/jefe/vitrina?periodo=<dias>` -> Métricas de las 12 tarjetas de control de gestión.
 
 ### Sincronización LWW (`api_sync.py`):
 - `POST /api/sync/push` -> Recepción de cambios de TPV (clientes, operaciones, remitos).

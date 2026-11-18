@@ -1,6 +1,6 @@
-# CRM Frigorífico — Master Total
+# Cobro Fácil — Cloud Hub & CRM
 
-Dashboard ejecutivo Flask para distribuidoras de carne.
+Dashboard ejecutivo Flask para distribuidoras de carne, sincronizado en vivo con Cobro Fácil TPV.
 
 ## Dos proyectos
 

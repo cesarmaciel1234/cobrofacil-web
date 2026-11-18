@@ -13,7 +13,7 @@ ROLES = frozenset({"admin", "operador", "visor"})
 ROLE_RANK = {"visor": 0, "operador": 1, "admin": 2}
 
 EMPRESA_DEFAULTS: dict[str, Any] = {
-    "razon_social": "Master Total",
+    "razon_social": "Cobro Fácil",
     "cuit": "",
     "direccion": "",
     "telefono": "",

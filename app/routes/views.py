@@ -20,7 +20,7 @@ views_bp = Blueprint('views', __name__)
 
 @views_bp.route("/health")
 def health():
-    return jsonify({"status": "ok", "service": "master-total", "app_version": Config.APP_VERSION})
+    return jsonify({"status": "ok", "service": "cobrofacil", "app_version": Config.APP_VERSION})
 
 
 @views_bp.route("/health/ready")

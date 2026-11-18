@@ -2001,7 +2001,7 @@ const $ = id => document.getElementById(id);
                 const emp = await api('/api/empresa');
                 if (emp && (emp.razon_social || emp.nombre)) {
                     localStorage.setItem('empresa_datos', JSON.stringify({
-                        nombre: emp.razon_social || emp.nombre || 'Master Total',
+                        nombre: emp.razon_social || emp.nombre || 'Cobro Fácil',
                         cuit: emp.cuit || '',
                         direccion: emp.direccion || '',
                         telefono: emp.telefono || '',
@@ -2146,7 +2146,7 @@ const $ = id => document.getElementById(id);
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = 'master-total-export-' + new Date().toISOString().slice(0, 10) + '.json';
+                a.download = 'cobrofacil-export-' + new Date().toISOString().slice(0, 10) + '.json';
                 a.click();
                 URL.revokeObjectURL(url);
                 toast('Exportación descargada');
@@ -5029,7 +5029,7 @@ const $ = id => document.getElementById(id);
         $('formEmpresa')?.addEventListener('submit', async ev => {
             ev.preventDefault();
             const data = {
-                nombre: $('inpEmpresaNombre')?.value.trim() || "Master Total",
+                nombre: $('inpEmpresaNombre')?.value.trim() || "Cobro Fácil",
                 cuit: $('inpEmpresaCuit')?.value.trim() || "",
                 direccion: $('inpEmpresaDireccion')?.value.trim() || "",
                 telefono: $('inpEmpresaTelefono')?.value.trim() || "",

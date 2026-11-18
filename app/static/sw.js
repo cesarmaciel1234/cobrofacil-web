@@ -1,4 +1,4 @@
-/* Master Total PWA — network-first for shell updates, offline fallback */
+/* Cobro Fácil PWA — network-first for shell updates, offline fallback */
 const CACHE_VERSION = 'crm-frigorifico-v4.94';
 const SHELL_ASSETS = [
   '/login',

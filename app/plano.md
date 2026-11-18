@@ -1,12 +1,12 @@
-# Plano General: Cloud Hub Multi-Tenant (Flask + Neon PostgreSQL)
+# Plano General: Cobro Fácil — Cloud Hub Multi-Tenant (Flask + Neon PostgreSQL)
 
 **Ubicación:** `app/`  
-**Propósito:** Núcleo central del CRM Web. Centraliza la recepción de datos desde las tiendas físicas (TPV PRO), gestiona el aislamiento multi-tenant por esquemas en Neon DB / SQLite, y expone tanto la API REST/SSE como la interfaz SPA ejecutiva (`terminal.html`).
+**Propósito:** Núcleo central del Cloud Hub y CRM Web de **Cobro Fácil**. Centraliza la recepción de datos desde las tiendas físicas (Cobro Fácil TPV PRO), gestiona el aislamiento multi-tenant por esquemas en Neon DB / SQLite, y expone tanto la API REST/SSE como la interfaz PWA ejecutiva (`terminal.html`).
 
 ---
 
 ## 1. De dónde viene (Entradas / Triggers)
-- **Tiendas físicas (TPV PRO 2026):** Envíos automáticos en segundo plano (`POST /api/sync/push`, `POST /api/pos/nube/novedades`) con ventas, clientes y transacciones financieras.
+- **Tiendas físicas (Cobro Fácil TPV):** Envíos automáticos en segundo plano (`POST /api/sync/push`, `POST /api/pos/nube/novedades`) con ventas, clientes y transacciones financieras.
 - **Navegadores de Administradores / Jefes:** Acceso web autenticado a `http://127.0.0.1:5005` o dominio en Render (`https://crm-frigorifico.onrender.com`).
 - **Tareas programadas (Cron):** Disparo de informe semanal los lunes a las 05:00 (`GET /api/reportes/trigger-cron`).
 
@@ -16,10 +16,12 @@
 - `GET /`: Redirige al panel ejecutivo `terminal.html` (o a `/login` si no hay sesión).
 - `GET /login`: Formulario de acceso con usuario de empresa y contraseña.
 - `GET /terminal`: Consola unificada SPA con paneles dinámicos:
-  - **Reporte:** Visión general ejecutiva, deuda total de clientes y balance.
-  - **Jefe (Sucursales):** Selector de sucursales (`Todas`, `Maciel`, `alfaro 1964`) con métricas en tiempo real.
-  - **Vitrina:** Tablero de 12 tarjetas de control de gestión.
-  - **Contabilidad, Cartera, Digitales, Pedidos:** Pestañas de análisis profundo.
+  - **Reporte:** Visión general ejecutiva, 12 KPI cards, deuda total de clientes e intereses devengados.
+  - **Ventas:** Historial de tickets con scroll infinito progresivo en lotes de 400 (`Hoy`, `Semana`, `Mes`, `Período`), búsqueda de cortes/folios y detalle modal.
+  - **Caja:** Arqueo transaccional de Efectivo, QR, Fiado y Tarjeta con desglose porcentual.
+  - **Cartera:** Libro mayor de clientes con CFR diario, cálculo de interés en formato regional argentino (`es-AR`) y cancelación preventiva vía `AbortController`.
+  - **Pedidos:** Faltantes de stock, sugerencias de compra y pedidos para proveedores.
+  - **Sucursales:** Selector multi-sucursal (`Todas` / sucursal específica) con aislamiento estricto por `empresa_id`.
 
 ---
 

@@ -23,6 +23,13 @@
 - `unir_clientes(columnas, filas)`: Agrupa clientes evitando duplicar saldos copiados.
 - `listar_sucursales()`: Descubre sucursales activas en el sistema (`id`, `nombre`). Si ese número ya tiene un solo nombre, el siguiente envío no abre otro.
 
+### `pos_historial.py`
+- `historial_ventas(...)`: Genera el listado de tickets paginado progresivamente (400 tickets iniciales, cargando bloques sucesivos al hacer scroll). Retorna `tickets`, `hay_mas`, `offset`, `limite`, `total_filtrado` y `total_monto`.
+
+### `pos_interes.py`
+- `calcular_interes_cliente(...)`: Aplica la fórmula de interés devengado sobre saldos deudores de cuenta corriente por mora o plazo acordado (CFR diario).
+- `sumar_intereses_a_cartera(...)`: Enriquece el balance de cartera con el interés acumulado para coincidir con la Maestra del POS.
+
 ### `nodo.py`
 - `leer(pieza, ...)`: Devuelve reporte, caja, ventas o cartera ya armados. Si el sello del libro no cambió, no vuelve a calcular.
 - `alimentar()`: En segundo plano arma primero el reporte del día que ya está en el libro y después caja, ventas del mes y cartera.
