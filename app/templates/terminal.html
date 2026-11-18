@@ -495,10 +495,13 @@
     <div id="modalEscanerCamara" class="modal-escaner" style="display:none;" aria-hidden="true">
         <div class="escaner-camara-header">
             <button type="button" class="btn-escaner-ctrl" id="btnCerrarEscaner">✕ Cerrar</button>
-            <span class="escaner-titulo">Escáner de Inventario</span>
+            <div class="escaner-titulo-wrap">
+                <span class="escaner-titulo">Escáner de Inventario</span>
+                <span class="escaner-badge badge-frontal" id="badgeModoCamara">📷 Frontal (Auto-espejo)</span>
+            </div>
             <div class="escaner-controles-top">
                 <button type="button" class="btn-escaner-ctrl" id="btnToggleLinterna" title="Encender Linterna" style="display:none;">💡</button>
-                <button type="button" class="btn-escaner-ctrl" id="btnCambiarCamara" title="Cambiar Cámara" style="display:none;">🔄</button>
+                <button type="button" class="btn-escaner-ctrl" id="btnCambiarCamara" title="Cambiar Cámara">🔄 Girar</button>
             </div>
         </div>
         
@@ -617,29 +620,30 @@
 
     <script src="/static/js/crm-safe.js"></script>
     <script src="/static/vendor/dexie.min.js"></script>
-    <script src="/static/js/crm-bus.js?v=3.7"></script>
-    <script src="/static/js/crm-format.js?v=3.7"></script>
-    <script src="/static/js/crm-ui.js?v=3.7"></script>
-    <script src="/static/js/crm-db.js?v=3.7"></script>
-    <script src="/static/js/sync-engine.js?v=3.8"></script>
-    <script src="/static/js/crm-sync-api.js?v=3.7"></script>
-    <script src="/static/js/crm-loader.js?v=3.12"></script>
-    <script src="/static/js/crm-delete.js?v=3.7"></script>
-    <script src="/static/js/crm-backup.js?v=3.7"></script>
-    <script src="/static/js/barra/ventas.js?v=5"></script>
-    <script src="/static/js/barra/cobros.js?v=6"></script>
-    <script src="/static/js/barra/caja.js?v=6.3"></script>
-    <script src="/static/js/barra/cartera.js?v=6.3"></script>
-    <script src="/static/js/barra/pedidos.js?v=2"></script>
-    <script src="/static/js/barra/armar.js?v=3"></script>
-    <script src="/static/js/barra/toque.js?v=5"></script>
-    <script src="/static/js/modulo-panel.js?v=12"></script>
-    <script src="/static/js/barra/reporte-financiero.js?v=3"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=6.4"></script>
-    <script src="/static/js/barra/auditoria-inventario.js?v=6.5"></script>
-    <script src="/static/js/espejo.js?v=6.4"></script>
-    <script src="/static/js/espejo-engine.js?v=6.4"></script>
-    <script src="/static/js/nodo.js?v=6.4"></script>
-    <script src="/static/js/app.js?v=6.4"></script>
+    <script src="/static/vendor/zxing.min.js"></script>
+    <script src="/static/js/crm-bus.js?v=6.6"></script>
+    <script src="/static/js/crm-format.js?v=6.6"></script>
+    <script src="/static/js/crm-ui.js?v=6.6"></script>
+    <script src="/static/js/crm-db.js?v=6.6"></script>
+    <script src="/static/js/sync-engine.js?v=6.6"></script>
+    <script src="/static/js/crm-sync-api.js?v=6.6"></script>
+    <script src="/static/js/crm-loader.js?v=6.6"></script>
+    <script src="/static/js/crm-delete.js?v=6.6"></script>
+    <script src="/static/js/crm-backup.js?v=6.6"></script>
+    <script src="/static/js/barra/ventas.js?v=6.6"></script>
+    <script src="/static/js/barra/cobros.js?v=6.6"></script>
+    <script src="/static/js/barra/caja.js?v=6.6"></script>
+    <script src="/static/js/barra/cartera.js?v=6.6"></script>
+    <script src="/static/js/barra/pedidos.js?v=6.6"></script>
+    <script src="/static/js/barra/armar.js?v=6.6"></script>
+    <script src="/static/js/barra/toque.js?v=6.6"></script>
+    <script src="/static/js/modulo-panel.js?v=6.6"></script>
+    <script src="/static/js/barra/reporte-financiero.js?v=6.6"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=6.6"></script>
+    <script src="/static/js/barra/auditoria-inventario.js?v=6.6"></script>
+    <script src="/static/js/espejo.js?v=6.6"></script>
+    <script src="/static/js/espejo-engine.js?v=6.6"></script>
+    <script src="/static/js/nodo.js?v=6.6"></script>
+    <script src="/static/js/app.js?v=6.6"></script>
 </body>
 </html>

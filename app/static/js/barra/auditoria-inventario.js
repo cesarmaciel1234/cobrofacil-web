@@ -37,6 +37,9 @@
     let linternaEncendida = false;
     let camarasDisponibles = [];
     let camaraIndice = 0;
+    let modoFacingActual = 'environment';
+    let zxingReader = null;
+    let escaneoEnProgreso = false;
 
     function $(id) {
         return document.getElementById(id);
@@ -388,28 +391,184 @@
         const q = String(query).trim().toLowerCase();
 
         // 1. Coincidencia exacta de código
-        let prod = catalogo.find((p) => String(p.codigo || '').toLowerCase() === q);
+        let prod = catalogo.find((p) => String(p.codigo || '').trim().toLowerCase() === q);
         if (prod) return prod;
 
         // 2. Coincidencia exacta de ID
         prod = catalogo.find((p) => String(p.id) === q);
         if (prod) return prod;
 
-        // 3. Coincidencia exacta de nombre
+        // 3. Comparación numérica (para barcodes con ceros a la izquierda ej. 00010 vs 10)
+        const qNum = parseInt(q, 10);
+        if (!isNaN(qNum) && qNum > 0) {
+            prod = catalogo.find((p) => {
+                const codNum = parseInt(p.codigo, 10);
+                return (!isNaN(codNum) && codNum === qNum) || p.id === qNum;
+            });
+            if (prod) return prod;
+        }
+
+        // 4. Códigos de balanza EAN-13 (prefijo 2, código en dígitos 2 a 6)
+        if (q.length === 13 && q.startsWith('2')) {
+            const codBalanza = q.substring(2, 7);
+            const numBalanza = parseInt(codBalanza, 10);
+            prod = catalogo.find((p) => {
+                const c = String(p.codigo || '').trim();
+                return c === codBalanza || (parseInt(c, 10) === numBalanza) || p.id === numBalanza;
+            });
+            if (prod) return prod;
+        }
+
+        // 5. Coincidencia exacta de nombre
         prod = catalogo.find((p) => (p.nombre || '').toLowerCase() === q);
         if (prod) return prod;
 
-        // 4. Nombre que empiece con la búsqueda
+        // 6. Nombre que empiece con la búsqueda
         prod = catalogo.find((p) => (p.nombre || '').toLowerCase().startsWith(q));
         if (prod) return prod;
 
-        // 5. Nombre que contenga la búsqueda
+        // 7. Nombre que contenga la búsqueda
         return catalogo.find((p) => (p.nombre || '').toLowerCase().includes(q)) || null;
     }
 
     // -------------------------------------------------------------------------
-    // ESCÁNER DE CÁMARA CON EFECTO LÁSER
+    // ESCÁNER DE CÁMARA BIDIRECCIONAL CON DECODIFICACIÓN ESPEJO (FRONTAL & TRASERA)
     // -------------------------------------------------------------------------
+    function decodificarCanvasZXing(canvas) {
+        if (!window.ZXing) return null;
+        try {
+            if (!zxingReader) {
+                const hints = new Map();
+                const formats = [
+                    window.ZXing.BarcodeFormat.EAN_13,
+                    window.ZXing.BarcodeFormat.EAN_8,
+                    window.ZXing.BarcodeFormat.CODE_128,
+                    window.ZXing.BarcodeFormat.CODE_39,
+                    window.ZXing.BarcodeFormat.UPC_A,
+                    window.ZXing.BarcodeFormat.UPC_E,
+                    window.ZXing.BarcodeFormat.ITF,
+                    window.ZXing.BarcodeFormat.QR_CODE
+                ];
+                hints.set(window.ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+                hints.set(window.ZXing.DecodeHintType.TRY_HARDER, true);
+                zxingReader = new window.ZXing.MultiFormatReader();
+                zxingReader.setHints(hints);
+            }
+            const lum = new window.ZXing.HTMLCanvasElementLuminanceSource(canvas);
+            const bitmap = new window.ZXing.BinaryBitmap(new window.ZXing.HybridBinarizer(lum));
+            const res = zxingReader.decode(bitmap);
+            return res ? res.getText() : null;
+        } catch (_) {
+            return null;
+        }
+    }
+
+    async function decodificarFrame(video, canvas, ctx) {
+        const w = video.videoWidth || 640;
+        const h = video.videoHeight || 480;
+        if (canvas.width !== w || canvas.height !== h) {
+            canvas.width = w;
+            canvas.height = h;
+        }
+
+        // --- PASE 1: ORIENTACIÓN NORMAL ---
+        if (barcodeDetector) {
+            try {
+                const barcodes = await barcodeDetector.detect(video);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                    return barcodes[0].rawValue;
+                }
+            } catch (_) {}
+        }
+
+        // Renderizar frame normal en canvas para ZXing / BarcodeDetector canvas
+        ctx.save();
+        ctx.drawImage(video, 0, 0, w, h);
+        ctx.restore();
+
+        if (barcodeDetector) {
+            try {
+                const barcodes = await barcodeDetector.detect(canvas);
+                if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+                    return barcodes[0].rawValue;
+                }
+            } catch (_) {}
+        }
+
+        if (window.ZXing) {
+            const zxCode = decodificarCanvasZXing(canvas);
+            if (zxCode) return zxCode;
+        }
+
+        // --- PASE 2: ORIENTACIÓN ESPEJO / HORIZONTALMENTE INVERTIDA ---
+        // Crucial para cámaras frontales que entregan el video espejado o al revés
+        ctx.save();
+        ctx.translate(w, 0);
+        ctx.scale(-1, 1);
+        ctx.drawImage(video, 0, 0, w, h);
+        ctx.restore();
+
+        if (barcodeDetector) {
+            try {
+                const barcodesEspejo = await barcodeDetector.detect(canvas);
+                if (barcodesEspejo && barcodesEspejo.length > 0 && barcodesEspejo[0].rawValue) {
+                    return barcodesEspejo[0].rawValue;
+                }
+            } catch (_) {}
+        }
+
+        if (window.ZXing) {
+            const zxCodeEspejo = decodificarCanvasZXing(canvas);
+            if (zxCodeEspejo) return zxCodeEspejo;
+        }
+
+        return null;
+    }
+
+    function actualizarEstadoCamara() {
+        if (!videoStream) return;
+        const track = videoStream.getVideoTracks()[0];
+        if (!track) return;
+
+        const settings = track.getSettings ? track.getSettings() : {};
+        const label = (track.label || '').toLowerCase();
+        const isFront = settings.facingMode === 'user' ||
+                        label.includes('front') ||
+                        label.includes('delantera') ||
+                        label.includes('selfie') ||
+                        label.includes('user') ||
+                        modoFacingActual === 'user';
+
+        const video = $('videoEscaner');
+        const badge = $('badgeModoCamara');
+        const prompt = $('scannerPrompt');
+
+        if (isFront) {
+            if (video) video.style.transform = 'scaleX(-1)';
+            if (badge) {
+                badge.textContent = '📷 Frontal (Auto-espejo ON)';
+                badge.className = 'escaner-badge badge-frontal';
+            }
+            if (prompt) prompt.textContent = '📷 Cámara Frontal activa · Lectura espejo dual habilitada';
+        } else {
+            if (video) video.style.transform = 'none';
+            if (badge) {
+                badge.textContent = '📷 Trasera';
+                badge.className = 'escaner-badge badge-trasera';
+            }
+            if (prompt) prompt.textContent = '📷 Apuntá el código de barras o QR dentro del recuadro';
+        }
+
+        // Soporte de linterna si existe
+        const capabilities = track.getCapabilities ? track.getCapabilities() : {};
+        const btnLinterna = $('btnToggleLinterna');
+        if (btnLinterna) {
+            btnLinterna.style.display = capabilities.torch ? 'inline-block' : 'none';
+            linternaEncendida = false;
+            btnLinterna.textContent = '💡';
+        }
+    }
+
     async function abrirEscanerCamara() {
         const modal = $('modalEscanerCamara');
         const video = $('videoEscaner');
@@ -420,13 +579,13 @@
         modal.setAttribute('aria-hidden', 'false');
         escaneando = true;
 
-        if (prompt) prompt.textContent = 'Apuntá el código de barras o QR dentro del recuadro';
+        if (prompt) prompt.textContent = 'Iniciando escáner de alta precisión...';
 
         // Inicializar BarcodeDetector si está disponible nativamente
         if ('BarcodeDetector' in window) {
             try {
                 barcodeDetector = new window.BarcodeDetector({
-                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e']
+                    formats: ['ean_13', 'ean_8', 'code_128', 'code_39', 'qr_code', 'upc_a', 'upc_e', 'itf']
                 });
             } catch (e) {
                 barcodeDetector = null;
@@ -435,15 +594,20 @@
 
         // Obtener cámaras y arrancar stream
         try {
-            const devices = await navigator.mediaDevices.enumerateDevices();
-            camarasDisponibles = devices.filter((d) => d.kind === 'videoinput');
-            const btnCamara = $('btnCambiarCamara');
-            if (btnCamara) btnCamara.style.display = camarasDisponibles.length > 1 ? 'inline-block' : 'none';
+            try {
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                camarasDisponibles = devices.filter((d) => d.kind === 'videoinput');
+            } catch (_) {
+                camarasDisponibles = [];
+            }
 
-            // Preferir cámara trasera
+            const btnCamara = $('btnCambiarCamara');
+            if (btnCamara) btnCamara.style.display = 'inline-block';
+
+            // Intentar primero con la cámara preferida actual
             const constraints = {
                 video: {
-                    facingMode: { ideal: 'environment' },
+                    facingMode: modoFacingActual ? { ideal: modoFacingActual } : { ideal: 'environment' },
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
                 },
@@ -454,24 +618,27 @@
             video.srcObject = videoStream;
             await video.play();
 
-            // Detectar soporte de linterna (torch)
-            const track = videoStream.getVideoTracks()[0];
-            trackLinterna = track;
-            const capabilities = track.getCapabilities ? track.getCapabilities() : {};
-            const btnLinterna = $('btnToggleLinterna');
-            if (btnLinterna) {
-                btnLinterna.style.display = capabilities.torch ? 'inline-block' : 'none';
-                linternaEncendida = false;
-                btnLinterna.textContent = '💡';
-            }
+            trackLinterna = videoStream.getVideoTracks()[0];
+            actualizarEstadoCamara();
 
             // Iniciar bucle de escaneo continuo
             bucleEscaneo();
         } catch (err) {
             console.error('Error accediendo a la cámara:', err);
-            if (prompt) prompt.textContent = 'No se pudo acceder a la cámara. Verificá los permisos del navegador.';
-            audioBeep(false);
-            if (global.CrmBus) global.CrmBus.emit('toast', 'Permiso de cámara denegado o no disponible.', true);
+            // Reintento genérico sin restricciones
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+                video.srcObject = videoStream;
+                await video.play();
+                trackLinterna = videoStream.getVideoTracks()[0];
+                actualizarEstadoCamara();
+                bucleEscaneo();
+            } catch (err2) {
+                console.error('Fallo definitivo acceso cámara:', err2);
+                if (prompt) prompt.textContent = 'No se pudo acceder a la cámara. Verificá los permisos del navegador.';
+                audioBeep(false);
+                if (global.CrmBus) global.CrmBus.emit('toast', 'Permiso de cámara denegado o no disponible.', true);
+            }
         }
     }
 
@@ -510,44 +677,75 @@
     }
 
     async function cambiarCamara() {
-        if (camarasDisponibles.length <= 1) return;
-        camaraIndice = (camaraIndice + 1) % camarasDisponibles.length;
-        const deviceId = camarasDisponibles[camaraIndice].deviceId;
+        modoFacingActual = (modoFacingActual === 'environment') ? 'user' : 'environment';
 
         if (videoStream) {
             videoStream.getTracks().forEach((t) => t.stop());
+            videoStream = null;
         }
 
+        const video = $('videoEscaner');
+        if (!video) return;
+
         try {
-            const video = $('videoEscaner');
-            videoStream = await navigator.mediaDevices.getUserMedia({
-                video: { deviceId: { exact: deviceId } },
-                audio: false
-            });
+            if (camarasDisponibles.length > 1) {
+                camaraIndice = (camaraIndice + 1) % camarasDisponibles.length;
+                const dev = camarasDisponibles[camaraIndice];
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { deviceId: { exact: dev.deviceId }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+            } else {
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: modoFacingActual }, width: { ideal: 1280 }, height: { ideal: 720 } },
+                    audio: false
+                });
+            }
             video.srcObject = videoStream;
             await video.play();
             trackLinterna = videoStream.getVideoTracks()[0];
+            actualizarEstadoCamara();
         } catch (err) {
-            console.warn('Error cambiando lente de cámara:', err);
+            console.warn('Error cambiando lente de cámara, usando fallback:', err);
+            try {
+                videoStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: modoFacingActual },
+                    audio: false
+                });
+                video.srcObject = videoStream;
+                await video.play();
+                actualizarEstadoCamara();
+            } catch (err2) {
+                console.error('Fallo cambiar cámara:', err2);
+            }
         }
     }
 
     async function bucleEscaneo() {
         if (!escaneando) return;
         const video = $('videoEscaner');
-        if (video && video.readyState >= video.HAVE_CURRENT_DATA) {
-            if (barcodeDetector) {
-                try {
-                    const barcodes = await barcodeDetector.detect(video);
-                    if (barcodes && barcodes.length > 0) {
-                        const codigoDetectado = barcodes[0].rawValue;
-                        onCodigoDetectado(codigoDetectado);
-                        return;
-                    }
-                } catch (_) {}
+        const canvas = $('canvasEscaner');
+
+        if (video && video.readyState >= video.HAVE_CURRENT_DATA && canvas && !escaneoEnProgreso) {
+            escaneoEnProgreso = true;
+            try {
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                const codigoDetectado = await decodificarFrame(video, canvas, ctx);
+                if (codigoDetectado) {
+                    onCodigoDetectado(codigoDetectado);
+                    escaneoEnProgreso = false;
+                    return;
+                }
+            } catch (err) {
+                console.warn('Error decodificando frame:', err);
+            } finally {
+                escaneoEnProgreso = false;
             }
         }
-        animFrameId = requestAnimationFrame(bucleEscaneo);
+
+        if (escaneando) {
+            animFrameId = requestAnimationFrame(bucleEscaneo);
+        }
     }
 
     function onCodigoDetectado(codigo) {
@@ -571,7 +769,7 @@
                 audioBeep(false);
                 vibrar([150, 80, 150]);
                 if (global.CrmBus) {
-                    global.CrmBus.emit('toast', `Código "${codigo}" no encontrado en el inventario.`, true);
+                    global.CrmBus.emit('toast', `Código "${codigo}" detectado, pero no figura en inventario.`, true);
                 }
                 // Si no se encuentra, poner el código en el buscador para facilitar carga
                 textoBusqueda = codigo;
