@@ -2807,6 +2807,7 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
     .chips-barra select.buscar {
         flex-shrink: 0;
         white-space: nowrap;
+        max-width: 140px;
     }
     .tabla-scroll-hint {
         display: flex;
@@ -2831,9 +2832,9 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
         border-radius: 12px;
         padding: 8px 10px;
         min-width: 0;
-    }
-    #barraCuadreCartera > div:last-child {
-        grid-column: 1 / -1;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
     }
     .table-wrap {
         max-height: 55vh !important;
