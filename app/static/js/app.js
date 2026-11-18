@@ -4862,6 +4862,12 @@ const $ = id => document.getElementById(id);
         
         $('btnRefresh').addEventListener('click', () => {
             const btn = $('btnRefresh');
+            if (btn.classList.contains('es-editar-cliente')) {
+                if (window.CarteraLibro && window.CarteraLibro.abrirPerfil) {
+                    window.CarteraLibro.abrirPerfil();
+                    return;
+                }
+            }
             if (btn.classList.contains('es-filtro')) {
                 const vista = document.querySelector('.view.active');
                 const nombre = vista && vista.id.startsWith('view-') ? vista.id.slice(5) : '';
@@ -6559,7 +6565,18 @@ const $ = id => document.getElementById(id);
                 initBackupUi();
                 seguirCargaLibro();
                 cargarSucursalesSelector();
-                $('topbarIcon')?.addEventListener('click', () => abrirSelectorSucursal());
+                const tocarCabecera = () => {
+                    const activeView = document.querySelector('.view.active');
+                    const vName = activeView ? activeView.id.replace('view-', '') : '';
+                    const enFicha = vName === 'cartera' && (location.hash.startsWith('#c=') || (document.getElementById('ficha') && !document.getElementById('ficha').hidden));
+                    if (enFicha && window.CarteraLibro && window.CarteraLibro.abrirPerfil) {
+                        window.CarteraLibro.abrirPerfil();
+                        return;
+                    }
+                    abrirSelectorSucursal();
+                };
+                $('topbarIcon')?.addEventListener('click', tocarCabecera);
+                $('empresaNombre')?.addEventListener('click', tocarCabecera);
                 await CrmLoader.runBoot();
                 setTimeout(() => arrancarLibroOffline(), 15000);
             } catch (e) {

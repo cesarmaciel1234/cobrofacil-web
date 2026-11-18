@@ -14,6 +14,7 @@
 ## 2. Frente (Experiencia de Usuario)
 - **Diseño Glassmorphism:** Fondo oscuro (#0f172a), tarjetas translúcidas (#1e293b), bordes finos (#334155), badges pulsantes y tipografía nítida (`Segoe UI`, `Consolas` para valores numéricos).
 - **Controlador SPA (`app.js`):** Navegación fluida entre paneles (`Reporte`, `Jefe`, `Vitrina`, `Contabilidad`, `Cartera`, `Digitales`, `Pedidos`) sin recarga de página completa.
+- **Ficha y Edición de Cliente Estilo WhatsApp:** En la ficha individual de cliente, el botón superior `#btnRefresh` cambia automáticamente de filtro a lápiz de edición (`.es-editar-cliente`). Al tocar el lápiz, el avatar o la cabecera superior se abre la hoja modal con datos de contacto (nombre, DNI, teléfono, dirección, límite) y accesos directos de llamada/WhatsApp. El botón de ticket en movimientos se destaca en azul claro (`#eff6ff`) con flecha `↗` para abrir cortes.
 - **Selector de Sucursales:** Menú desplegable y modal flotante que permite alternar entre `Todas`, `Maciel` (ID 1) y `alfaro 1964` (ID 2), actualizando instantáneamente la barra superior (`MACIEL · ALFARO 1964`) y los montos filtrados.
 
 ---

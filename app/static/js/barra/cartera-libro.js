@@ -130,13 +130,26 @@
 
     function actualizarBotonFiltro() {
         const refresh = nodo('btnRefresh');
-        if (refresh && vistaActiva()) {
+        if (!refresh || !vistaActiva()) return;
+        const enFicha = !!(fichaAbierta || clienteDelHash() || (nodo('ficha') && !nodo('ficha').hidden));
+        if (enFicha) {
             refresh.hidden = false;
-            refresh.classList.add('es-filtro');
-            refresh.classList.toggle('filtrando', filtroActivo());
-            refresh.setAttribute('aria-label', 'Filtrar cartera');
-            refresh.title = 'Filtrar cartera';
+            refresh.classList.remove('es-filtro');
+            refresh.classList.add('es-editar-cliente');
+            refresh.classList.remove('filtrando');
+            refresh.setAttribute('aria-label', 'Editar datos del cliente');
+            refresh.title = 'Editar datos del cliente';
+            if (!refresh.querySelector('.ico-pencil')) {
+                refresh.insertAdjacentHTML('beforeend', '<svg class="ico-pencil" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>');
+            }
+            return;
         }
+        refresh.hidden = false;
+        refresh.classList.remove('es-editar-cliente');
+        refresh.classList.add('es-filtro');
+        refresh.classList.toggle('filtrando', filtroActivo());
+        refresh.setAttribute('aria-label', 'Filtrar cartera');
+        refresh.title = 'Filtrar cartera';
     }
 
     function filtroActivo() {
@@ -237,13 +250,13 @@
             lugares.length ? lugares.map(esc).join(' · ') : ''
         ].filter(Boolean).join(' &nbsp;·&nbsp; ');
 
-        const waBtn = client.telefono ? `
-            <div>
-                <button type="button" class="ficha-profile-wa" id="btnFichaWa">
+        const waBtn = `
+            <div style="display:flex; gap:8px; margin-top:8px;">
+                <button type="button" class="ficha-profile-wa${client.telefono ? '' : ' sin-tel'}" id="btnFichaWa" style="${client.telefono ? '' : 'background:rgba(255,255,255,0.08); border-color:rgba(255,255,255,0.2); color:#94a3b8;'}">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-                    <span>Enviar saldo por WhatsApp</span>
+                    <span>${client.telefono ? 'Enviar saldo por WhatsApp' : '+ Agregar WhatsApp'}</span>
                 </button>
-            </div>` : '';
+            </div>`;
 
         if (ficha) {
             ficha.innerHTML = `
@@ -251,7 +264,8 @@
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
                     <span>Volver a clientes</span>
                 </button>
-                <div class="ficha-profile-card">
+                <div class="ficha-profile-card" title="Tocar para ver o editar datos (estilo WhatsApp)">
+                    <span class="ficha-edit-badge"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg> Editar</span>
                     <div class="ficha-profile-top">
                         <div class="ficha-profile-avatar" style="background:${avatarGrad}">
                             <span>${esc(inits)}</span>
@@ -277,7 +291,18 @@
                 <div id="fichaCuerpo">${cuerpo}</div>`;
 
             nodo('btnVolverFicha')?.addEventListener('click', () => mostrarLista());
-            nodo('btnFichaWa')?.addEventListener('click', () => enviarWhatsAppCliente(client, total));
+            nodo('btnFichaWa')?.addEventListener('click', (ev) => {
+                ev.stopPropagation();
+                if (client.telefono) {
+                    enviarWhatsAppCliente(client, total);
+                } else {
+                    abrirPerfil(client, true);
+                }
+            });
+            ficha.querySelector('.ficha-profile-card')?.addEventListener('click', (ev) => {
+                if (ev.target.closest('#btnFichaWa')) return;
+                abrirPerfil(client);
+            });
         }
         window.scrollTo(0, 0);
     }
@@ -347,10 +372,14 @@
         if (!fila) return;
         const dias = fila.dias == null ? '—' : `${fila.dias} días`;
         const mant = fila.es_interes ? 'Asentado' : (fila.mantenimiento == null ? '—' : formatPos(fila.mantenimiento));
-        const numero = String(fila.ticket || '').match(/#(\d+)/);
-        const ticket = numero
-            ? `<button type="button" class="fact" data-ticket="${esc(numero[1])}"><span>Ticket</span><strong>#${esc(numero[1])}</strong></button>`
-            : `<div class="fact"><span>Ticket</span><strong>${esc(fila.ticket)}</strong></div>`;
+        const numero = String(fila.ticket || fila.detalle || '').match(/(\d+)/);
+        const ticketId = numero ? numero[1] : '';
+        const ticket = ticketId
+            ? `<button type="button" class="fact fact-ticket-pos" data-ticket="${esc(ticketId)}" style="background:#eff6ff; border:1px solid #bfdbfe; cursor:pointer;">
+                 <span style="color:#3b82f6; font-weight:700;">Ticket POS (Ver Cortes)</span>
+                 <strong style="color:#2563eb; font-weight:800;">#${esc(ticketId)} ↗</strong>
+               </button>`
+            : `<div class="fact"><span>Ticket</span><strong>${esc(fila.ticket || '—')}</strong></div>`;
         const host = nodo('sheetHost');
         host.hidden = false;
         host.innerHTML = `
@@ -401,33 +430,135 @@
         host.innerHTML = '';
     }
 
-    function abrirPerfil() {
-        const id = fichaAbierta || clienteDelHash();
-        const client = allClients.find(item => String(item.id) === String(id));
+    function abrirPerfil(clienteTarget, enfocarTelefono) {
+        const id = (clienteTarget && clienteTarget.id) || fichaAbierta || clienteDelHash();
+        const client = clienteTarget || allClients.find(item => String(item.id) === String(id));
         const host = nodo('sheetHost');
+        if (!host) return;
         host.hidden = false;
         if (!client) {
             host.innerHTML = `
                 <div class="sheet-back" data-close="1"></div>
-                <section class="sheet" role="dialog" aria-modal="true" aria-label="Perfil">
-                    <h3>Perfil</h3>
-                    <p>Abrí un cliente para editar su ficha.</p>
-                    <button class="sheet-close" type="button" data-close="1">Cerrar</button>
+                <section class="sheet wa-profile-sheet" role="dialog" aria-modal="true" aria-label="Perfil">
+                    <div class="wa-sheet-top">
+                        <span class="wa-sheet-title">Info. del cliente</span>
+                        <button class="sheet-close wa-close-icon" type="button" data-close="1">✕</button>
+                    </div>
+                    <div style="padding:20px; text-align:center;">
+                        <p style="color:#64748b;">Abrí un cliente para editar sus datos.</p>
+                        <button class="sheet-close btn btn-primary" type="button" data-close="1">Aceptar</button>
+                    </div>
                 </section>`;
             return;
         }
+
+        const saldo = deudaVisible(client);
+        const interes = interesCuenta(client);
+        const total = saldo + interes.monto;
+        const inits = iniciales(client.nombre);
+        const avatarGrad = avatarGradient(client.nombre);
+        const lugares = (client.sucursales || []).filter(Boolean);
+        const lugarStr = lugares.length ? lugares.join(' · ') : 'Casa central';
+
         host.innerHTML = `
             <div class="sheet-back" data-close="1"></div>
-            <section class="sheet" role="dialog" aria-modal="true" aria-label="Perfil">
-                <h3>Perfil</h3>
-                <p class="perfil-aviso">Queda en este teléfono. La base se actualiza más adelante.</p>
-                <label class="perfil-campo"><span>NOMBRE</span><input id="perfilNombre" value="${esc(client.nombre || '')}" autocomplete="name"></label>
-                <label class="perfil-campo"><span>DNI</span><input id="perfilDni" value="${esc(client.cuit || '')}" inputmode="numeric" autocomplete="off"></label>
-                <label class="perfil-campo"><span>TELÉFONO</span><input id="perfilTelefono" value="${esc(client.telefono || '')}" inputmode="tel" autocomplete="tel"></label>
-                <label class="perfil-campo"><span>DIRECCIÓN</span><input id="perfilDireccion" value="${esc(client.direccion || '')}" autocomplete="street-address"></label>
-                <button class="sheet-close" type="button" data-guardar="1">Guardar en el teléfono</button>
+            <section class="sheet wa-profile-sheet" role="dialog" aria-modal="true" aria-label="Información del cliente">
+                <div class="wa-sheet-top">
+                    <span class="wa-sheet-title">Info. del cliente</span>
+                    <button class="sheet-close wa-close-icon" type="button" data-close="1" aria-label="Cerrar">✕</button>
+                </div>
+
+                <div class="wa-profile-header">
+                    <div class="wa-avatar-big" style="background:${avatarGrad}">
+                        <span>${esc(inits)}</span>
+                    </div>
+                    <h3 class="wa-client-name">${esc(client.nombre)}</h3>
+                    <div class="wa-client-status">
+                        ${saldo > 0 ? `<span class="wa-status-pill con-deuda">Total a pagar: ${formatMoney(total)}</span>` : `<span class="wa-status-pill al-dia">Al día · Sin deuda</span>`}
+                    </div>
+                    <div class="wa-quick-actions">
+                        <button type="button" class="wa-action-circle" id="waQuickChat" title="WhatsApp">
+                            <div class="wa-circle-icon wa-bg-green">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+                            </div>
+                            <span>WhatsApp</span>
+                        </button>
+                        ${client.telefono ? `
+                        <a href="tel:${esc(client.telefono)}" class="wa-action-circle" title="Llamar">
+                            <div class="wa-circle-icon wa-bg-blue">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            </div>
+                            <span>Llamar</span>
+                        </a>` : ''}
+                    </div>
+                </div>
+
+                <div class="wa-fields-container">
+                    <div class="wa-group-box">
+                        <span class="wa-group-header">DATOS DE CONTACTO Y EDICIÓN</span>
+                        <div class="wa-field-row">
+                            <label for="perfilNombre">Nombre del cliente</label>
+                            <input id="perfilNombre" type="text" value="${esc(client.nombre || '')}" placeholder="Nombre completo" autocomplete="name">
+                        </div>
+                        <div class="wa-field-row">
+                            <label for="perfilTelefono">Teléfono celular (WhatsApp)</label>
+                            <div class="wa-input-wrap">
+                                <span class="wa-input-prefix">📱</span>
+                                <input id="perfilTelefono" type="tel" value="${esc(client.telefono || '')}" placeholder="Ej: 3415551234" autocomplete="tel">
+                            </div>
+                            <small class="wa-input-hint">Sin 0 ni 15 para envío directo de WhatsApp.</small>
+                        </div>
+                        <div class="wa-field-row">
+                            <label for="perfilDni">DNI / CUIT</label>
+                            <input id="perfilDni" type="text" value="${esc(client.cuit || '')}" placeholder="Número de documento" autocomplete="off">
+                        </div>
+                        <div class="wa-field-row">
+                            <label for="perfilDireccion">Dirección</label>
+                            <input id="perfilDireccion" type="text" value="${esc(client.direccion || '')}" placeholder="Domicilio del cliente" autocomplete="street-address">
+                        </div>
+                        <div class="wa-field-row">
+                            <label>Sucursal / Origen</label>
+                            <div class="wa-static-val">${esc(lugarStr)}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="wa-footer-bar">
+                    <button class="btn btn-primary wa-btn-guardar" type="button" data-guardar="1">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Guardar cambios</span>
+                    </button>
+                </div>
             </section>`;
         host.dataset.perfilId = String(client.id);
+
+        nodo('waQuickChat')?.addEventListener('click', (ev) => {
+            ev.stopPropagation();
+            const telInput = nodo('perfilTelefono');
+            const telVal = (telInput?.value || client.telefono || '').trim();
+            if (telVal) {
+                enviarWhatsAppCliente({ ...client, telefono: telVal }, total);
+            } else {
+                if (telInput) {
+                    telInput.focus();
+                    telInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    telInput.classList.add('wa-highlight-field');
+                    setTimeout(() => telInput.classList.remove('wa-highlight-field'), 2000);
+                }
+            }
+        });
+
+        if (enfocarTelefono) {
+            setTimeout(() => {
+                const tel = nodo('perfilTelefono');
+                if (tel) {
+                    tel.focus();
+                    tel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    tel.classList.add('wa-highlight-field');
+                    setTimeout(() => tel.classList.remove('wa-highlight-field'), 2000);
+                }
+            }, 100);
+        }
     }
 
     function leerPerfiles() {
@@ -461,23 +592,26 @@
     }
 
     function guardarPerfilAbierto() {
-        const id = nodo('sheetHost').dataset.perfilId;
+        const id = nodo('sheetHost')?.dataset?.perfilId;
         const client = allClients.find(item => String(item.id) === String(id));
         if (!client) return;
         const perfil = {
             id: client.id,
             pos_id: client.pos_id,
-            nombre: nodo('perfilNombre').value.trim(),
-            dni: nodo('perfilDni').value.trim(),
-            telefono: nodo('perfilTelefono').value.trim(),
-            direccion: nodo('perfilDireccion').value.trim()
+            nombre: (nodo('perfilNombre')?.value || '').trim() || client.nombre,
+            dni: (nodo('perfilDni')?.value || '').trim(),
+            telefono: (nodo('perfilTelefono')?.value || '').trim(),
+            direccion: (nodo('perfilDireccion')?.value || '').trim()
         };
         guardarPerfilLocal(perfil);
         if (perfil.nombre) client.nombre = perfil.nombre;
         client.cuit = perfil.dni;
         client.telefono = perfil.telefono;
         client.direccion = perfil.direccion;
-        if (fichaAbierta === String(client.id)) ponerMarca(client.nombre);
+        if (fichaAbierta === String(client.id)) {
+            ponerMarca(client.nombre);
+            pintarFicha(client);
+        }
         filterClients();
         cerrarMovimiento();
     }
@@ -574,7 +708,10 @@
 
     function enviarWhatsAppCliente(client, total) {
         const tel = limpiarTelefono(client.telefono);
-        if (!tel) return;
+        if (!tel) {
+            abrirPerfil(client, true);
+            return;
+        }
         const msg = encodeURIComponent(`Hola ${client.nombre}, te escribimos de Cobro Fácil para informarte que tu saldo actual es de ${formatMoney(total)}. Cualquier consulta quedamos a tu disposición.`);
         const url = `https://wa.me/${tel}?text=${msg}`;
         window.open(url, '_blank', 'noopener,noreferrer');
@@ -647,11 +784,11 @@
             ].filter(Boolean);
             const sublineHtml = subParts.length ? subParts.map(s => `<span>${s}</span>`).join(' &nbsp;·&nbsp; ') : '<span>Sin DNI registrado</span>';
 
-            const waBtn = client.telefono ? `
-                <button type="button" class="btn-card-wa" data-action="wa" title="Enviar saldo por WhatsApp">
+            const waBtn = `
+                <button type="button" class="btn-card-wa${client.telefono ? '' : ' sin-telefono'}" data-action="wa" title="${client.telefono ? 'Enviar saldo por WhatsApp' : 'Agregar teléfono para WhatsApp'}">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
-                    <span>WhatsApp</span>
-                </button>` : '';
+                    <span>${client.telefono ? 'WhatsApp' : '+ WhatsApp'}</span>
+                </button>`;
 
             return `
                 <article class="debt-card" data-id="${esc(client.id)}">
@@ -1486,6 +1623,7 @@
         filtroActual() { return currentFilter; },
         filtrar(filtro) { setFilter(filtro || 'all'); },
         abrirFiltro() { abrirFiltro(); },
+        abrirPerfil(clienteTarget, focusTel) { abrirPerfil(clienteTarget, focusTel); },
         filtroActivo() { return filtroActivo(); },
         actualizar() {
             try {
