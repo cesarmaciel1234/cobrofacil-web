@@ -805,47 +805,6 @@
             numpadPunto.style.visibility = esPesable ? 'visible' : 'hidden';
         }
 
-        // Generar botones de incremento rápido
-        const quickBtnsWrap = $('drawerQuickBtns');
-        if (quickBtnsWrap) {
-            if (esPesable) {
-                quickBtnsWrap.innerHTML = `
-                    <button type="button" class="quick-btn" data-inc="0.5">+0,5 kg</button>
-                    <button type="button" class="quick-btn" data-inc="1">+1 kg</button>
-                    <button type="button" class="quick-btn" data-inc="2">+2 kg</button>
-                    <button type="button" class="quick-btn" data-inc="5">+5 kg</button>
-                    <button type="button" class="quick-btn" data-inc="10">+10 kg</button>
-                    <button type="button" class="quick-btn btn-cero" data-set="0">Poner 0</button>
-                `;
-            } else {
-                quickBtnsWrap.innerHTML = `
-                    <button type="button" class="quick-btn" data-inc="1">+1 un</button>
-                    <button type="button" class="quick-btn" data-inc="2">+2 un</button>
-                    <button type="button" class="quick-btn" data-inc="5">+5 un</button>
-                    <button type="button" class="quick-btn" data-inc="10">+10 un</button>
-                    <button type="button" class="quick-btn" data-inc="20">+20 un</button>
-                    <button type="button" class="quick-btn btn-cero" data-set="0">Poner 0</button>
-                `;
-            }
-
-            quickBtnsWrap.querySelectorAll('[data-inc]').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    const inc = parseFloat(btn.dataset.inc) || 0;
-                    let actual = parseFloat(bufferConteo) || 0;
-                    actual = Math.max(0, actual + inc);
-                    bufferConteo = esPesable ? String(Math.round(actual * 1000) / 1000) : String(Math.round(actual));
-                    actualizarDisplayDrawer();
-                });
-            });
-
-            quickBtnsWrap.querySelectorAll('[data-set]').forEach((btn) => {
-                btn.addEventListener('click', () => {
-                    bufferConteo = btn.dataset.set;
-                    actualizarDisplayDrawer();
-                });
-            });
-        }
-
         actualizarDisplayDrawer();
 
         drawer.style.display = 'block';
