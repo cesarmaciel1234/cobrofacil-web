@@ -4700,15 +4700,16 @@ const $ = id => document.getElementById(id);
             if (refresh) {
                 const caja = name === 'contabilidad';
                 const digital = caja && cajaPantalla === 'digital';
-                const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja;
+                const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja || name === 'cartera';
                 refresh.classList.toggle('es-filtro', filtrar);
                 if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
                 else if (name === 'pedidos') refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
                 else if (name === 'reporte') refresh.classList.toggle('filtrando', (window.vitrinaPeriodo || 'Hoy') !== 'Hoy');
                 else if (digital) refresh.classList.toggle('filtrando', periodoDigital !== 'Semana');
                 else if (caja) refresh.classList.toggle('filtrando', (periodoCaja || 'Hoy') !== 'Hoy');
+                else if (name === 'cartera') refresh.classList.toggle('filtrando', !!(window.CarteraLibro?.filtroActivo?.()));
                 else refresh.classList.remove('filtrando');
-                const etiqueta = name === 'pedidos' ? 'Filtrar proveedor' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar'));
+                const etiqueta = name === 'cartera' ? 'Filtrar cartera' : (name === 'pedidos' ? 'Filtrar proveedor' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar')));
                 refresh.setAttribute('aria-label', etiqueta);
                 refresh.title = etiqueta;
                 const icono = refresh.querySelector('svg');
@@ -4862,6 +4863,11 @@ const $ = id => document.getElementById(id);
                 const vista = document.querySelector('.view.active');
                 const nombre = vista && vista.id.startsWith('view-') ? vista.id.slice(5) : '';
                 if (nombre === 'ticket') abrirFiltroVentas();
+                else if (nombre === 'cartera') {
+                    if (window.CarteraLibro && window.CarteraLibro.abrirFiltro) {
+                        window.CarteraLibro.abrirFiltro();
+                    }
+                }
                 else if (nombre === 'reporte') abrirFiltroPeriodo({
                     actual: window.vitrinaPeriodo || 'Hoy',
                     desde: window.vitrinaDesde,

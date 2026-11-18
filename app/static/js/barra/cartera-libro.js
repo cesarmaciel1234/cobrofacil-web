@@ -120,13 +120,41 @@
         const boton = nodo('menuToggle');
         if (boton) {
             boton.classList.toggle('es-atras', activo);
-            boton.setAttribute('aria-label', activo ? 'Volver' : 'Opciones del módulo');
-            boton.title = activo ? 'Volver' : 'Opciones del módulo';
+            boton.setAttribute('aria-label', activo ? 'Volver a clientes' : 'Opciones del módulo');
+            boton.title = activo ? 'Volver a clientes' : 'Opciones del módulo';
         }
         const perfil = nodo('btnPerfil');
+        if (perfil) perfil.hidden = true;
+        actualizarBotonFiltro();
+    }
+
+    function actualizarBotonFiltro() {
         const refresh = nodo('btnRefresh');
-        if (perfil) perfil.hidden = !activo;
-        if (refresh) refresh.hidden = !!activo;
+        if (refresh && vistaActiva()) {
+            refresh.hidden = false;
+            refresh.classList.add('es-filtro');
+            refresh.classList.toggle('filtrando', filtroActivo());
+            refresh.setAttribute('aria-label', 'Filtrar cartera');
+            refresh.title = 'Filtrar cartera';
+        }
+    }
+
+    function filtroActivo() {
+        if (pantallaActual === 'cargos') {
+            return (periodoCargos && periodoCargos !== 'Mes') || (estadoCargos && estadoCargos !== 'todos') || !!textoCargos;
+        }
+        if (pantallaActual === 'cobros') {
+            return (periodoCobros && periodoCobros !== 'Mes') || (medioCobros && medioCobros !== 'todos') || !!textoCobros;
+        }
+        if (pantallaActual === 'auditoria') {
+            return (accionAuditoria && accionAuditoria !== 'todas') || !!textoAuditoria;
+        }
+        return currentFilter !== 'all' || !!(nodo('searchInput')?.value?.trim());
+    }
+
+    function actualizarPeriodoChip(id, texto) {
+        const el = nodo(id);
+        if (el && texto) el.textContent = texto;
     }
 
     function cromo() {
@@ -589,6 +617,10 @@
             let url = `${API_BASE}/pos/jefe?panel=admin`;
             if (sucursalId) url += '&sucursal_id=' + encodeURIComponent(sucursalId);
             const response = await fetch(url);
+            if (response.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
             if (!response.ok) throw new Error('libro');
             const dato = await response.json();
             try { localStorage.setItem(claveCacheCartera(), JSON.stringify(dato)); } catch (e) {}
@@ -635,7 +667,8 @@
         if (cobros) cobros.hidden = (pantallaActual !== 'cobros');
         if (auditoria) auditoria.hidden = (pantallaActual !== 'auditoria');
 
-        marcarAtras(true);
+        marcarAtras(false);
+        actualizarBotonFiltro();
         if (pantallaActual === 'cargos') {
             ponerMarca('Historial de cargos');
             cargarCargos();
@@ -651,6 +684,11 @@
     async function cargarCargos() {
         const cuerpo = nodo('cuerpoCargos');
         const pie = nodo('pieCargos');
+        actualizarBotonFiltro();
+        let chipTexto = periodoCargos;
+        if (estadoCargos && estadoCargos !== 'todos') chipTexto += ` · ${estadoCargos}`;
+        if (textoCargos) chipTexto += ` · "${textoCargos}"`;
+        actualizarPeriodoChip('chipCarteraCargos', chipTexto);
         if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="9" style="text-align:center; padding:24px; color:var(--text-muted);">Cargando planilla de cargos…</td></tr>';
         try {
             let url = `${API_BASE}/pos/jefe?panel=cargos&periodo=${encodeURIComponent(periodoCargos)}`;
@@ -658,6 +696,10 @@
             if (textoCargos) url += `&q=${encodeURIComponent(textoCargos)}`;
             if (sucursalId) url += `&sucursal_id=${encodeURIComponent(sucursalId)}`;
             const res = await fetch(url);
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
             if (!res.ok) throw new Error('cargos');
             const data = await res.json();
             renderCargos(data.cargos || [], data.resumen || {});
@@ -707,6 +749,11 @@
     async function cargarCobros() {
         const cuerpo = nodo('cuerpoCobros');
         const pie = nodo('pieCobros');
+        actualizarBotonFiltro();
+        let chipTexto = periodoCobros;
+        if (medioCobros && medioCobros !== 'todos') chipTexto += ` · ${medioCobros}`;
+        if (textoCobros) chipTexto += ` · "${textoCobros}"`;
+        actualizarPeriodoChip('chipCarteraCobros', chipTexto);
         if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:var(--text-muted);">Cargando planilla de cobros…</td></tr>';
         try {
             let url = `${API_BASE}/pos/jefe?panel=cobros&periodo=${encodeURIComponent(periodoCobros)}`;
@@ -714,6 +761,10 @@
             if (textoCobros) url += `&q=${encodeURIComponent(textoCobros)}`;
             if (sucursalId) url += `&sucursal_id=${encodeURIComponent(sucursalId)}`;
             const res = await fetch(url);
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
             if (!res.ok) throw new Error('cobros');
             const data = await res.json();
             renderCobros(data.cobros || [], data.resumen || {});
@@ -763,6 +814,10 @@
         const cuerpo = nodo('cuerpoAuditoria');
         const barra = nodo('barraCuadreCartera');
         const pie = nodo('pieAuditoria');
+        actualizarBotonFiltro();
+        let chipTexto = (accionAuditoria || 'todas').toUpperCase();
+        if (textoAuditoria) chipTexto += ` · "${textoAuditoria}"`;
+        actualizarPeriodoChip('chipCarteraAuditoria', chipTexto);
         if (cuerpo) cuerpo.innerHTML = '<tr><td colspan="10" style="text-align:center; padding:24px; color:var(--text-muted);">Cargando auditoría de clientes…</td></tr>';
         try {
             let url = `${API_BASE}/pos/jefe?panel=auditoria_cartera`;
@@ -770,6 +825,10 @@
             if (textoAuditoria) url += `&q=${encodeURIComponent(textoAuditoria)}`;
             if (sucursalId) url += `&sucursal_id=${encodeURIComponent(sucursalId)}`;
             const res = await fetch(url);
+            if (res.status === 401) {
+                window.location.href = '/login';
+                return;
+            }
             if (!res.ok) throw new Error('auditoria');
             const data = await res.json();
             renderAuditoria(data.auditoria || [], data.resumen || {});
@@ -951,11 +1010,209 @@
         else mostrarLista();
     });
 
+    nodo('chipCarteraCargos')?.addEventListener('click', () => abrirFiltro());
+    nodo('chipCarteraCobros')?.addEventListener('click', () => abrirFiltro());
+    nodo('chipCarteraAuditoria')?.addEventListener('click', () => abrirFiltro());
+
+    function abrirFiltro() {
+        document.getElementById('ticketSheet')?.remove();
+        document.getElementById('carteraSheet')?.remove();
+
+        const fondo = document.createElement('div');
+        fondo.id = 'carteraSheet';
+        fondo.className = 'pedido-sheet-back';
+
+        let contenidoHtml = '';
+
+        if (pantallaActual === 'cargos') {
+            const estados = [
+                { id: 'todos', label: 'Estado: Todos' },
+                { id: 'vivo', label: 'Solo Vivos' },
+                { id: 'borrado', label: 'Borrados' },
+                { id: 'cancelado', label: 'Cancelados' }
+            ];
+            const periodos = ['Mes', 'Hoy', 'Semana', 'Todas'];
+            contenidoHtml = `
+                <div class="pedido-sheet filtro-venta" role="dialog" aria-label="Filtro de cargos">
+                    <div class="filtro-cabeza">
+                        <strong class="pedido-sheet-titulo">Filtro</strong>
+                        <button type="button" class="filtro-cerrar" data-cerrar aria-label="Cerrar">×</button>
+                    </div>
+                    <label>Buscar cliente, DNI, ticket o descripción
+                        <input id="filtroCarteraQ" type="search" value="${esc(textoCargos)}" placeholder="1024, asado o cliente">
+                    </label>
+                    <div class="filtro-periodos" role="group" aria-label="Período">
+                        ${periodos.map(p => `<button type="button" class="filtro-periodo${p === periodoCargos ? ' active' : ''}" data-periodo="${p}">${p}</button>`).join('')}
+                    </div>
+                    <label>Estado
+                        <select id="filtroCarteraEstado">
+                            ${estados.map(e => `<option value="${e.id}"${e.id === estadoCargos ? ' selected' : ''}>${e.label}</option>`).join('')}
+                        </select>
+                    </label>
+                    <button type="button" class="pedido-cerrar" data-aplicar>Aplicar</button>
+                </div>
+            `;
+        } else if (pantallaActual === 'cobros') {
+            const medios = [
+                { id: 'todos', label: 'Medio: Todos' },
+                { id: 'efectivo', label: 'Efectivo' },
+                { id: 'transferencia', label: 'Transferencia' },
+                { id: 'tarjeta', label: 'Tarjeta' },
+                { id: 'qr', label: 'QR' },
+                { id: 'mixto', label: 'Mixto' }
+            ];
+            const periodos = ['Mes', 'Hoy', 'Semana', 'Todas'];
+            contenidoHtml = `
+                <div class="pedido-sheet filtro-venta" role="dialog" aria-label="Filtro de cobros">
+                    <div class="filtro-cabeza">
+                        <strong class="pedido-sheet-titulo">Filtro</strong>
+                        <button type="button" class="filtro-cerrar" data-cerrar aria-label="Cerrar">×</button>
+                    </div>
+                    <label>Buscar cliente, DNI, COB- o id de pago
+                        <input id="filtroCarteraQ" type="search" value="${esc(textoCobros)}" placeholder="COB-12, María o MP">
+                    </label>
+                    <div class="filtro-periodos" role="group" aria-label="Período">
+                        ${periodos.map(p => `<button type="button" class="filtro-periodo${p === periodoCobros ? ' active' : ''}" data-periodo="${p}">${p}</button>`).join('')}
+                    </div>
+                    <label>Medio de pago
+                        <select id="filtroCarteraMedio">
+                            ${medios.map(m => `<option value="${m.id}"${m.id === medioCobros ? ' selected' : ''}>${m.label}</option>`).join('')}
+                        </select>
+                    </label>
+                    <button type="button" class="pedido-cerrar" data-aplicar>Aplicar</button>
+                </div>
+            `;
+        } else if (pantallaActual === 'auditoria') {
+            const acciones = [
+                { id: 'todas', label: 'Todas' },
+                { id: 'cargos', label: 'Cargos' },
+                { id: 'abonos', label: 'Abonos' },
+                { id: 'borrados', label: 'Borrados' },
+                { id: 'ficha', label: 'Ficha' }
+            ];
+            contenidoHtml = `
+                <div class="pedido-sheet filtro-venta" role="dialog" aria-label="Filtro de auditoría">
+                    <div class="filtro-cabeza">
+                        <strong class="pedido-sheet-titulo">Filtro</strong>
+                        <button type="button" class="filtro-cerrar" data-cerrar aria-label="Cerrar">×</button>
+                    </div>
+                    <label>Buscar cliente, COB-, PC, usuario o detalle
+                        <input id="filtroCarteraQ" type="search" value="${esc(textoAuditoria)}" placeholder="Caja1, admin o cliente">
+                    </label>
+                    <div class="filtro-periodos" role="group" aria-label="Acción">
+                        ${acciones.map(a => `<button type="button" class="filtro-periodo${a.id === accionAuditoria ? ' active' : ''}" data-accion="${a.id}">${a.label}</button>`).join('')}
+                    </div>
+                    <button type="button" class="pedido-cerrar" data-aplicar style="margin-top:16px;">Aplicar</button>
+                </div>
+            `;
+        } else {
+            const busqActual = (nodo('searchInput')?.value || '').trim();
+            const filtros = [
+                { id: 'all', label: 'Todos' },
+                { id: 'saldo', label: 'Con saldo' },
+                { id: 'aldia', label: 'Al día' },
+                { id: 'reciente', label: 'Recientes' },
+                { id: 'criticos', label: 'En riesgo' },
+                { id: 'quietos', label: 'Sin mov.' }
+            ];
+            contenidoHtml = `
+                <div class="pedido-sheet filtro-venta" role="dialog" aria-label="Filtro de clientes">
+                    <div class="filtro-cabeza">
+                        <strong class="pedido-sheet-titulo">Filtro</strong>
+                        <button type="button" class="filtro-cerrar" data-cerrar aria-label="Cerrar">×</button>
+                    </div>
+                    <label>Buscar cliente por nombre o DNI
+                        <input id="filtroCarteraQ" type="search" value="${esc(busqActual)}" placeholder="Ej: Perez o 34888999">
+                    </label>
+                    <label style="margin-top:14px;">Estado de cuenta</label>
+                    <div class="filtro-periodos" role="group" aria-label="Filtro rápido" style="flex-wrap:wrap;">
+                        ${filtros.map(f => `<button type="button" class="filtro-periodo${f.id === currentFilter ? ' active' : ''}" data-filtro-cliente="${f.id}" style="flex:1 1 30%;">${f.label}</button>`).join('')}
+                    </div>
+                    <button type="button" class="pedido-cerrar" data-aplicar style="margin-top:16px;">Aplicar</button>
+                </div>
+            `;
+        }
+
+        fondo.innerHTML = contenidoHtml;
+
+        fondo.addEventListener('click', (ev) => {
+            if (ev.target === fondo || ev.target.closest('[data-cerrar]')) {
+                fondo.remove();
+                return;
+            }
+
+            const btnP = ev.target.closest('[data-periodo]');
+            if (btnP) {
+                fondo.querySelectorAll('[data-periodo]').forEach(b => b.classList.toggle('active', b === btnP));
+                return;
+            }
+
+            const btnA = ev.target.closest('[data-accion]');
+            if (btnA) {
+                fondo.querySelectorAll('[data-accion]').forEach(b => b.classList.toggle('active', b === btnA));
+                return;
+            }
+
+            const btnC = ev.target.closest('[data-filtro-cliente]');
+            if (btnC) {
+                fondo.querySelectorAll('[data-filtro-cliente]').forEach(b => b.classList.toggle('active', b === btnC));
+                return;
+            }
+
+            if (ev.target.closest('[data-aplicar]')) {
+                const q = (fondo.querySelector('#filtroCarteraQ')?.value || '').trim();
+                if (pantallaActual === 'cargos') {
+                    textoCargos = q;
+                    periodoCargos = fondo.querySelector('[data-periodo].active')?.dataset.periodo || 'Mes';
+                    estadoCargos = fondo.querySelector('#filtroCarteraEstado')?.value || 'todos';
+                    if (nodo('buscarCargos')) nodo('buscarCargos').value = q;
+                    if (nodo('filtroEstadoCargos')) nodo('filtroEstadoCargos').value = estadoCargos;
+                    nodo('carteraCargos')?.querySelectorAll('[data-periodo-cargos]').forEach(b => {
+                        b.classList.toggle('active', b.dataset.periodoCargos === periodoCargos);
+                    });
+                    fondo.remove();
+                    cargarCargos();
+                } else if (pantallaActual === 'cobros') {
+                    textoCobros = q;
+                    periodoCobros = fondo.querySelector('[data-periodo].active')?.dataset.periodo || 'Mes';
+                    medioCobros = fondo.querySelector('#filtroCarteraMedio')?.value || 'todos';
+                    if (nodo('buscarCobros')) nodo('buscarCobros').value = q;
+                    if (nodo('filtroMedioCobros')) nodo('filtroMedioCobros').value = medioCobros;
+                    nodo('carteraCobros')?.querySelectorAll('[data-periodo-cobros]').forEach(b => {
+                        b.classList.toggle('active', b.dataset.periodoCobros === periodoCobros);
+                    });
+                    fondo.remove();
+                    cargarCobros();
+                } else if (pantallaActual === 'auditoria') {
+                    textoAuditoria = q;
+                    accionAuditoria = fondo.querySelector('[data-accion].active')?.dataset.accion || 'todas';
+                    if (nodo('buscarAuditoria')) nodo('buscarAuditoria').value = q;
+                    nodo('carteraAuditoria')?.querySelectorAll('[data-accion-auditoria]').forEach(b => {
+                        b.classList.toggle('active', b.dataset.accionAuditoria === accionAuditoria);
+                    });
+                    fondo.remove();
+                    cargarAuditoria();
+                } else {
+                    const fActivo = fondo.querySelector('[data-filtro-cliente].active')?.dataset.filtroCliente || 'all';
+                    const inputSearch = nodo('searchInput');
+                    if (inputSearch) inputSearch.value = q;
+                    fondo.remove();
+                    setFilter(fActivo);
+                }
+                actualizarBotonFiltro();
+            }
+        });
+
+        document.body.appendChild(fondo);
+    }
+
     window.CarteraLibro = {
         pantallaActual() { return pantallaActual; },
         cambiarPantalla(id) { cambiarPantalla(id); },
         filtroActual() { return currentFilter; },
         filtrar(filtro) { setFilter(filtro || 'all'); },
+        abrirFiltro() { abrirFiltro(); },
+        filtroActivo() { return filtroActivo(); },
         actualizar() {
             try {
                 fetch('/api/pos/sync/solicitar?sucursal_id=' + (sucursalId || '1'), { method: 'POST' }).catch(() => {});

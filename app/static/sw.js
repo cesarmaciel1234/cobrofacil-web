@@ -1,5 +1,5 @@
 /* Cobro Fácil PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v4.99';
+const CACHE_VERSION = 'crm-frigorifico-v5.0';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',

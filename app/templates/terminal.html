@@ -52,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.99">
+    <link rel="stylesheet" href="/static/enterprise.css?v=5.0">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -125,9 +125,6 @@
             <div class="topbar-actions" style="display: flex; align-items: center; gap: 6px;">
                 <button type="button" class="btn btn-primary" id="btnRefresh" style="border-radius: 10px; padding: 0; width: 38px; height: 38px; display: flex; align-items: center; justify-content: center;">
                     <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg>
-                </button>
-                <button type="button" class="btn btn-primary" id="btnPerfil" hidden aria-label="Perfil del cliente" title="Perfil del cliente" style="border-radius: 10px; padding: 0; width: 38px; height: 38px; align-items: center; justify-content: center;">
-                    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                 </button>
             </div>
         </header>
@@ -206,13 +203,11 @@
 
                 <!-- PLANILLA DE CARGOS -->
                 <div id="carteraCargos" class="card planilla-cartera-card" hidden>
+                    <p id="chipCarteraCargos" class="periodo-chip" style="cursor:pointer;" title="Cambiar filtro">Mes</p>
                     <div class="planillas-topbar">
                         <div class="planillas-info">
                             <h3 class="planillas-titulo">HISTORIAL DE CARGOS</h3>
                             <small class="planillas-subtitulo">Ventas a crédito y cargos manuales. Borrados y cancelados no suman en vivos.</small>
-                        </div>
-                        <div class="planillas-acciones">
-                            <button type="button" class="btn-secundario btn-volver-cartera" id="btnVolverCarteraCargos">← Volver a Clientes</button>
                         </div>
                     </div>
                     <!-- Chips período y filtros -->
@@ -253,13 +248,11 @@
 
                 <!-- PLANILLA DE COBROS -->
                 <div id="carteraCobros" class="card planilla-cartera-card" hidden>
+                    <p id="chipCarteraCobros" class="periodo-chip" style="cursor:pointer;" title="Cambiar filtro">Mes</p>
                     <div class="planillas-topbar">
                         <div class="planillas-info">
                             <h3 class="planillas-titulo">HISTORIAL DE COBROS</h3>
                             <small class="planillas-subtitulo">Recibos COB- y pagos acreditados en cuenta corriente.</small>
-                        </div>
-                        <div class="planillas-acciones">
-                            <button type="button" class="btn-secundario btn-volver-cartera" id="btnVolverCarteraCobros">← Volver a Clientes</button>
                         </div>
                     </div>
                     <!-- Chips período y medio -->
@@ -303,13 +296,11 @@
 
                 <!-- AUDITORÍA DE CARTERA -->
                 <div id="carteraAuditoria" class="card planilla-cartera-card" hidden>
+                    <p id="chipCarteraAuditoria" class="periodo-chip" style="cursor:pointer;" title="Cambiar filtro">Todas</p>
                     <div class="planillas-topbar">
                         <div class="planillas-info">
                             <h3 class="planillas-titulo">AUDITORÍA DE CARTERA</h3>
                             <small class="planillas-subtitulo">Libro de eventos: qué pasó, a quién, en qué PC, quién y cuándo. Control de integridad de saldos.</small>
-                        </div>
-                        <div class="planillas-acciones">
-                            <button type="button" class="btn-secundario btn-volver-cartera" id="btnVolverCarteraAuditoria">← Volver a Clientes</button>
                         </div>
                     </div>
                     <!-- Barra de integridad / Cuadre -->
@@ -408,10 +399,10 @@
     <script src="/static/js/barra/armar.js?v=3"></script>
     <script src="/static/js/barra/toque.js?v=5"></script>
     <script src="/static/js/modulo-panel.js?v=8"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=16"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=18"></script>
     <script src="/static/js/espejo.js?v=12"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>
     <script src="/static/js/nodo.js?v=3"></script>
-    <script src="/static/js/app.js?v=4.95"></script>
+    <script src="/static/js/app.js?v=5.0"></script>
 </body>
 </html>
