@@ -4333,12 +4333,15 @@ const $ = id => document.getElementById(id);
                     $('contaCuerpo').innerHTML = `<p style="margin:0; color:#64748b;">${aviso}</p>`;
                 } else {
                     const medios = c.medios_pago || [];
+                    const cobrosTotal = Number(c.cobros) || 0;
+                    const cobrosCant = Number(c.cobros_cant) || 0;
+                    const cobrosPorMedio = c.cobros_por_medio || {};
                     const sumaMedios = medios.reduce((acc, m) => acc + (Number(m.monto != null ? m.monto : m.total) || 0), 0);
                     const totalMedios = sumaMedios || 1;
                     pintarChipPeriodo('cajaPeriodo', periodoCaja || 'Hoy');
                     const periodoCajaTxt = c.etiqueta ? `<p class="caja-periodo">${textoJefe(c.etiqueta)}</p>` : '';
                     let html = `${periodoCajaTxt}<div data-pantalla="arqueo" class="arqueo-lista">`;
-                    if (medios.length === 0) {
+                    if (medios.length === 0 && cobrosTotal === 0) {
                         html += `<p class="caja-vacio" style="padding:14px;">${(c.etiqueta && !String(c.etiqueta).startsWith('Hoy')) ? 'Sin movimientos de pago en este período.' : 'Sin movimientos de pago ese día.'}</p>`;
                     } else {
                         const montos = medios.map((m) => Number(m.monto != null ? m.monto : m.total) || 0);
@@ -4347,10 +4350,51 @@ const $ = id => document.getElementById(id);
                             const cant = Number(m.tickets) || 0;
                             const tickets = cant + (cant === 1 ? ' ticket' : ' tickets');
                             const monto = montos[i];
-                            html += `<div class="arqueo-fila"><b>${textoJefe(m.medio)}</b><span>${textoJefe(tickets)}</span><span><b>${plataJefe(monto)}</b><small class="arqueo-pct">${partes[i]}%</small></span></div>`;
+                            const nombreMedio = String(m.medio || 'Efectivo');
+
+                            // Extra por cobro de deuda de cliente
+                            let extraCobro = 0;
+                            const nmLower = nombreMedio.toLowerCase();
+                            for (const [k, v] of Object.entries(cobrosPorMedio)) {
+                                if (k.toLowerCase() === nmLower) {
+                                    extraCobro += Number(v.monto || v) || 0;
+                                }
+                            }
+                            const badgeExtra = extraCobro > 0
+                                ? `<small class="arqueo-extra-badge" title="Cobro deuda cliente en ${textoJefe(nombreMedio)}: +${plataJefe(extraCobro)}">+${plataJefe(extraCobro)} cobro</small>`
+                                : '';
+
+                            html += `<div class="arqueo-fila">
+                                <div>
+                                    <b>${textoJefe(nombreMedio)}</b>
+                                    ${badgeExtra}
+                                </div>
+                                <span>${textoJefe(tickets)}</span>
+                                <span><b>${plataJefe(monto)}</b><small class="arqueo-pct">${partes[i]}%</small></span>
+                            </div>`;
                         });
                     }
-                    html += `<div class="arqueo-pie"><span>Total</span><b>${plataJefe(sumaMedios)}</b></div></div>`;
+                    html += `<div class="arqueo-pie"><span>Total ventas</span><b>${plataJefe(sumaMedios)}</b></div>`;
+
+                    // Fila especial "Cobro deuda cliente" solicitada por el usuario
+                    if (cobrosTotal > 0 || cobrosCant > 0) {
+                        const txtCobros = cobrosCant + (cobrosCant === 1 ? ' cobro registrado' : ' cobros registrados');
+                        html += `
+                        <div class="arqueo-deuda-cliente" onclick="window.irAHistorialCobros && window.irAHistorialCobros()" role="button" tabindex="0" title="Tocar para ver detalle en Cartera → Historial de cobros">
+                            <div class="arqueo-deuda-info">
+                                <span class="arqueo-deuda-titulo">🤝 Cobro deuda cliente</span>
+                                <small class="arqueo-deuda-sub">${txtCobros} · Ver en Cartera ↗</small>
+                            </div>
+                            <div class="arqueo-deuda-monto">
+                                <b>+ ${plataJefe(cobrosTotal)}</b>
+                            </div>
+                        </div>
+                        <div class="arqueo-total-caja">
+                            <span>Total en caja / ingresos</span>
+                            <b>${plataJefe(sumaMedios + cobrosTotal)}</b>
+                        </div>`;
+                    }
+                    html += `</div>`;
 
                     $('contaCuerpo').innerHTML = html;
                 }
@@ -4832,6 +4876,15 @@ const $ = id => document.getElementById(id);
             marcarEntrada(name);
             setSidebarOpen(false);
         }
+
+        window.irAHistorialCobros = function() {
+            switchView('cartera');
+            setTimeout(() => {
+                if (window.CarteraLibro && window.CarteraLibro.cambiarPantalla) {
+                    window.CarteraLibro.cambiarPantalla('cobros');
+                }
+            }, 60);
+        };
 
         document.querySelectorAll('.nav-item').forEach(btn => {
             btn.addEventListener('click', () => switchView(btn.dataset.view));

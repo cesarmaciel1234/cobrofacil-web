@@ -2082,6 +2082,17 @@ select.periodo-pill.active option { color: #0F172A; }
 .arqueo-fila b { font-weight: 800; }
 .arqueo-fila span:nth-child(2) { color: #64748b; }
 .arqueo-pct { display: block; font-size: 11px; font-weight: 700; color: #0369a1; }
+.arqueo-extra-badge { display: block; margin-top: 3px; font-size: 11px; font-weight: 700; color: #15803d; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 2px 6px; border-radius: 6px; width: fit-content; line-height: 1.2; }
+.arqueo-deuda-cliente { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 14px; background: #f8fafc; border-top: 1px solid #e2e8f0; cursor: pointer; transition: background 0.15s ease; }
+.arqueo-deuda-cliente:hover { background: #f1f5f9; }
+.arqueo-deuda-info { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.arqueo-deuda-titulo { font-size: 13px; font-weight: 800; color: #0f172a; }
+.arqueo-deuda-sub { font-size: 11px; color: #0284c7; font-weight: 600; margin-top: 2px; }
+.arqueo-deuda-monto { text-align: right; }
+.arqueo-deuda-monto b { font-size: 16px; font-weight: 800; color: #15803d; }
+.arqueo-total-caja { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 14px; border-top: 2px solid #cbd5e1; background: #0f172a; color: #fff; }
+.arqueo-total-caja span { color: #94a3b8; font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.arqueo-total-caja b { font-size: 19px; font-weight: 900; color: #38bdf8; letter-spacing: -0.02em; }
 .herramientas-detalle { display: none !important; }
 .pedido-lista { width: 100%; box-sizing: border-box; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; overflow: hidden; }
 .pedido-fila { display: flex; align-items: center; gap: 10px; width: 100%; min-width: 0; box-sizing: border-box; min-height: 64px; padding: 8px 10px 8px 14px; border-top: 1px solid #f1f5f9; background: #fff; }

@@ -1338,14 +1338,33 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
     idx_cc, movimientos = _filas_en_rango("cuenta_corriente", ini, fin, sucursal_id)
     cobros = 0.0
     detalle_cobros = []
+    cobros_por_medio: dict[str, dict] = {}
     for fila in movimientos:
         tipo = str(_valor(fila, idx_cc, "tipo") or "").upper()
         if tipo == "ABONO":
             monto = _numero(_valor(fila, idx_cc, "monto"))
             cobros += monto
+            desc = str(_valor(fila, idx_cc, "descripcion") or "Cobro fiado").strip()
+            medio_raw = str(_valor(fila, idx_cc, "medio_pago") or "").strip()
+            medio = medio_raw.split(":", 1)[0].strip() if medio_raw else ""
+            if not medio and desc.endswith(")") and "(" in desc:
+                dentro = desc.rsplit("(", 1)[-1].rstrip(")").strip()
+                medio = dentro.split(":", 1)[0].strip() if ":" in dentro else dentro
+            if not medio:
+                medio = "Efectivo"
+            medio = medio.capitalize()
+            if medio.lower() in ("mercadopago", "mp"):
+                medio = "QR"
+
+            if medio not in cobros_por_medio:
+                cobros_por_medio[medio] = {"monto": 0.0, "cant": 0}
+            cobros_por_medio[medio]["monto"] = round(cobros_por_medio[medio]["monto"] + monto, 2)
+            cobros_por_medio[medio]["cant"] += 1
+
             detalle_cobros.append({
                 "monto": round(monto, 2),
-                "descripcion": str(_valor(fila, idx_cc, "descripcion") or "Cobro fiado"),
+                "descripcion": desc,
+                "medio": medio,
             })
 
     idx_g, gastos = _filas_en_rango("gastos", ini, fin, sucursal_id)
@@ -1375,6 +1394,8 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
         "etiqueta": etiqueta,
         "medios_pago": medios_lista,
         "cobros": round(cobros, 2),
+        "cobros_cant": len(detalle_cobros),
+        "cobros_por_medio": cobros_por_medio,
         "detalle_cobros": detalle_cobros[:20],
         "gastos": round(total_gastos, 2),
         "resultado": round(total_medios + cobros - total_gastos, 2),

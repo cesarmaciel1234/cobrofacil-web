@@ -693,12 +693,33 @@
 
         const ccFilas = filasTabla('cuenta_corriente', sucursalId);
         let totalCobros = 0;
+        let cantCobros = 0;
+        const cobrosPorMedio = {};
         ccFilas.forEach((c) => {
             const dia = diaDe(c.fecha);
             if (ini && dia && dia < ini) return;
             if (fin && dia && dia > fin) return;
-            const haber = Number(c.haber) || 0;
-            if (haber > 0) totalCobros += haber;
+            const tipo = String(c.tipo || '').toUpperCase();
+            if (tipo === 'ABONO' || Number(c.haber) > 0) {
+                const m = Number(c.monto || c.haber) || 0;
+                if (m > 0) {
+                    totalCobros += m;
+                    cantCobros += 1;
+                    let desc = String(c.descripcion || '').trim();
+                    let medio = String(c.medio_pago || c.medio || '').trim();
+                    if (!medio && desc.endsWith(')') && desc.includes('(')) {
+                        const dentro = desc.slice(desc.lastIndexOf('(') + 1, -1).trim();
+                        medio = dentro.split(':')[0].trim();
+                    }
+                    if (!medio) medio = 'Efectivo';
+                    medio = medio.charAt(0).toUpperCase() + medio.slice(1).toLowerCase();
+                    if (medio.toLowerCase() === 'mercadopago' || medio.toLowerCase() === 'mp') medio = 'QR';
+
+                    if (!cobrosPorMedio[medio]) cobrosPorMedio[medio] = { monto: 0, cant: 0 };
+                    cobrosPorMedio[medio].monto = Math.round((cobrosPorMedio[medio].monto + m) * 100) / 100;
+                    cobrosPorMedio[medio].cant += 1;
+                }
+            }
         });
 
         const cjFilas = filasTabla('movimientos_caja', sucursalId);
@@ -728,6 +749,8 @@
                 tickets: tickets,
                 medios_pago: mediosLista,
                 cobros: Math.round(totalCobros * 100) / 100,
+                cobros_cant: cantCobros,
+                cobros_por_medio: cobrosPorMedio,
                 gastos: Math.round(totalGastos * 100) / 100,
                 resultado: Math.round((totalVentas + totalCobros - totalGastos) * 100) / 100,
                 detalle_gastos: detalleGastos.slice(0, 40),
