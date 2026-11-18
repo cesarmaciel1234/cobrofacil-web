@@ -645,3 +645,59 @@ def api_pos_sync_confirmar():
     sid = request.args.get("sucursal_id") or (request.get_json(silent=True) or {}).get("sucursal_id") or "1"
     limpiar_solicitud_sync(sid)
     return jsonify({"ok": True, "mensaje": "Sincronización confirmada", "sucursal_id": sid})
+
+
+@api_bp.route("/pos/inventario/auditoria", methods=["GET"])
+def api_pos_inventario_auditoria():
+    """Retorna el catálogo completo para auditoría con stock vivo y conteos."""
+    from app.services.pos_inventario import obtener_catalogo_auditoria
+
+    emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.args.get("empresa_id") or 1
+    emp_id = int(emp_raw) if str(emp_raw).isdigit() else 1
+    sid_raw = request.args.get("sucursal_id")
+    sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+    dato = obtener_catalogo_auditoria(sucursal_id=sid, empresa_id=emp_id)
+    return jsonify(dato)
+
+
+@api_bp.route("/pos/inventario/ajuste", methods=["POST"])
+def api_pos_inventario_ajuste():
+    """Aplica un ajuste de stock SET inmediato y registra auditoría."""
+    from app.services.pos_inventario import registrar_ajuste_inventario
+
+    data = request.get_json(silent=True) or {}
+    emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or data.get("empresa_id") or 1
+    emp_id = int(emp_raw) if str(emp_raw).isdigit() else 1
+    pid = data.get("producto_id")
+    stock_fisico = data.get("stock_fisico")
+    responsable = str(data.get("responsable") or session.get("user") or "Admin").strip()
+    motivo = str(data.get("motivo") or "Recuento físico").strip()
+    sid_raw = data.get("sucursal_id")
+    sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+
+    if pid is None or stock_fisico is None:
+        return jsonify({"ok": False, "error": "producto_id y stock_fisico son obligatorios"}), 400
+
+    resultado = registrar_ajuste_inventario(
+        producto_id=pid,
+        stock_fisico=stock_fisico,
+        responsable=responsable,
+        motivo=motivo,
+        sucursal_id=sid,
+        empresa_id=emp_id,
+    )
+    status_code = 200 if resultado.get("ok") else 400
+    return jsonify(resultado), status_code
+
+
+@api_bp.route("/pos/inventario/historial", methods=["GET"])
+def api_pos_inventario_historial():
+    """Retorna los últimos registros de auditoría de inventario."""
+    from app.services.pos_inventario import obtener_historial_auditorias
+
+    emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.args.get("empresa_id") or 1
+    emp_id = int(emp_raw) if str(emp_raw).isdigit() else 1
+    limite = int(request.args.get("limite") or 50)
+    historial = obtener_historial_auditorias(limite=limite, empresa_id=emp_id)
+    return jsonify({"ok": True, "historial": historial})
+

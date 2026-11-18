@@ -6463,6 +6463,17 @@ const $ = id => document.getElementById(id);
                     }
                     return;
                 }
+                if (vista === 'pedidos') {
+                    marcarEntrada('pedidos');
+                    const abierta = document.querySelector('.view.active');
+                    if (!abierta || abierta.id !== 'view-pedidos') {
+                        switchView('pedidos');
+                    }
+                    if (window.AuditoriaInventario && window.AuditoriaInventario.cambiarPantalla) {
+                        window.AuditoriaInventario.cambiarPantalla(id || 'faltantes');
+                    }
+                    return;
+                }
                 if (vista !== 'contabilidad') return;
                 cajaPantalla = id || 'arqueo';
                 if (cajaPantalla === 'digital') {

@@ -52,7 +52,8 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=6.3">
+    <link rel="stylesheet" href="/static/enterprise.css?v=6.4">
+    <link rel="stylesheet" href="/static/css/auditoria.css?v=6.4">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -286,9 +287,12 @@
                 </div>
             </div>
             <div class="view" id="view-pedidos">
-                <div class="card">
-                    <div class="card-body" id="pedidosCuerpo" style="padding:12px 16px 16px; line-height:1.5;">Cargando faltantes de stock…</div>
+                <div id="pedidosFaltantesWrap">
+                    <div class="card">
+                        <div class="card-body" id="pedidosCuerpo" style="padding:12px 16px 16px; line-height:1.5;">Cargando faltantes de stock…</div>
+                    </div>
                 </div>
+                <div id="pedidosAuditoriaWrap" style="display:none;"></div>
             </div>
             <div class="view" id="view-cartera">
                 <div id="carteraLista">
@@ -487,6 +491,115 @@
     <div id="bolsaHerramientas" hidden></div>
     <div id="sheetHost" hidden></div>
 
+    <!-- Modal Escáner Cámara para Móviles con Efecto Láser -->
+    <div id="modalEscanerCamara" class="modal-escaner" style="display:none;" aria-hidden="true">
+        <div class="escaner-camara-header">
+            <button type="button" class="btn-escaner-ctrl" id="btnCerrarEscaner">✕ Cerrar</button>
+            <span class="escaner-titulo">Escáner de Inventario</span>
+            <div class="escaner-controles-top">
+                <button type="button" class="btn-escaner-ctrl" id="btnToggleLinterna" title="Encender Linterna" style="display:none;">💡</button>
+                <button type="button" class="btn-escaner-ctrl" id="btnCambiarCamara" title="Cambiar Cámara" style="display:none;">🔄</button>
+            </div>
+        </div>
+        
+        <div class="escaner-video-container">
+            <video id="videoEscaner" playsinline muted autoplay></video>
+            <canvas id="canvasEscaner" style="display:none;"></canvas>
+            
+            <div class="scanner-overlay">
+                <div class="scanner-mask-top"></div>
+                <div class="scanner-middle-row">
+                    <div class="scanner-mask-side"></div>
+                    <div class="scanner-target" id="scannerTarget">
+                        <div class="corner corner-tl"></div>
+                        <div class="corner corner-tr"></div>
+                        <div class="corner corner-bl"></div>
+                        <div class="corner corner-br"></div>
+                        <div class="scanner-laser" id="scannerLaser"></div>
+                    </div>
+                    <div class="scanner-mask-side"></div>
+                </div>
+                <div class="scanner-mask-bottom">
+                    <div class="scanner-prompt" id="scannerPrompt">Apuntá el código de barras o QR dentro del recuadro</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Drawer Táctil de Conteo Físico para Celular -->
+    <div id="drawerConteoTactil" class="bottom-sheet-drawer" style="display:none;" aria-hidden="true">
+        <div class="drawer-backdrop" id="backdropConteo"></div>
+        <div class="drawer-content">
+            <div class="drawer-handle"></div>
+            <div class="drawer-header">
+                <div class="drawer-title-wrap">
+                    <span class="drawer-depto" id="drawerDepto">CARNE</span>
+                    <h3 class="drawer-nombre" id="drawerNombre">ASADO</h3>
+                    <span class="drawer-codigo" id="drawerCodigo">Cód: 10 · UN: KG</span>
+                </div>
+                <button type="button" class="btn-drawer-cerrar" id="btnCerrarDrawer">✕</button>
+            </div>
+
+            <div class="drawer-stock-info">
+                <div class="info-stock-sist">
+                    <span class="lbl">Stock Sistema</span>
+                    <b class="val" id="drawerStockSistema">999,600 KG</b>
+                </div>
+                <div class="info-diferencia" id="drawerDiffBox">
+                    <span class="lbl">Diferencia</span>
+                    <b class="val" id="drawerDiferencia">0,000 KG</b>
+                </div>
+            </div>
+
+            <div class="drawer-conteo-display">
+                <span class="display-lbl">Conteo Físico Real</span>
+                <div class="display-val-wrap">
+                    <span class="display-val" id="drawerDisplayConteo">0</span>
+                    <span class="display-unit" id="drawerDisplayUnidad">KG</span>
+                </div>
+            </div>
+
+            <!-- Incrementos rápidos adaptados a la unidad -->
+            <div class="drawer-quick-increments" id="drawerQuickBtns"></div>
+
+            <!-- Teclado Numérico Táctil -->
+            <div class="drawer-numpad">
+                <button type="button" class="numpad-btn" data-key="7">7</button>
+                <button type="button" class="numpad-btn" data-key="8">8</button>
+                <button type="button" class="numpad-btn" data-key="9">9</button>
+                <button type="button" class="numpad-btn" data-key="4">4</button>
+                <button type="button" class="numpad-btn" data-key="5">5</button>
+                <button type="button" class="numpad-btn" data-key="6">6</button>
+                <button type="button" class="numpad-btn" data-key="1">1</button>
+                <button type="button" class="numpad-btn" data-key="2">2</button>
+                <button type="button" class="numpad-btn" data-key="3">3</button>
+                <button type="button" class="numpad-btn numpad-action" data-key="C">C</button>
+                <button type="button" class="numpad-btn" data-key="0">0</button>
+                <button type="button" class="numpad-btn" data-key="." id="numpadPunto">,</button>
+                <button type="button" class="numpad-btn numpad-action" data-key="BACK">⌫</button>
+            </div>
+
+            <!-- Selector de Motivo -->
+            <div class="drawer-motivo-wrap">
+                <label for="selectMotivoAjuste">Motivo del ajuste:</label>
+                <select id="selectMotivoAjuste" class="select-motivo">
+                    <option value="Recuento físico rutinario">Recuento físico rutinario</option>
+                    <option value="Merma / Vencimiento">Merma / Vencimiento</option>
+                    <option value="Rotura / Daño">Rotura / Daño</option>
+                    <option value="Diferencia de remito / recepción">Diferencia de remito / recepción</option>
+                    <option value="Consumo interno">Consumo interno</option>
+                    <option value="Ajuste de quiebre">Ajuste de quiebre (Stock 0)</option>
+                </select>
+            </div>
+
+            <!-- Botón CTA Confirmar Ajuste Inmediato -->
+            <button type="button" class="btn-confirmar-ajuste" id="btnConfirmarAjuste">
+                <span class="btn-ico">✓</span>
+                <span class="btn-txt">CONFIRMAR AJUSTE INMEDIATO</span>
+            </button>
+        </div>
+    </div>
+
     <script>
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('/sw.js').then(function(reg) {
@@ -522,10 +635,11 @@
     <script src="/static/js/barra/toque.js?v=5"></script>
     <script src="/static/js/modulo-panel.js?v=12"></script>
     <script src="/static/js/barra/reporte-financiero.js?v=3"></script>
-    <script src="/static/js/barra/cartera-libro.js?v=6.3"></script>
-    <script src="/static/js/espejo.js?v=6.3"></script>
-    <script src="/static/js/espejo-engine.js?v=6.3"></script>
-    <script src="/static/js/nodo.js?v=6.3"></script>
-    <script src="/static/js/app.js?v=6.3"></script>
+    <script src="/static/js/barra/cartera-libro.js?v=6.4"></script>
+    <script src="/static/js/barra/auditoria-inventario.js?v=6.4"></script>
+    <script src="/static/js/espejo.js?v=6.4"></script>
+    <script src="/static/js/espejo-engine.js?v=6.4"></script>
+    <script src="/static/js/nodo.js?v=6.4"></script>
+    <script src="/static/js/app.js?v=6.4"></script>
 </body>
 </html>

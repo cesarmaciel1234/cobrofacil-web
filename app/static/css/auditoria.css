@@ -1,0 +1,1044 @@
+/* ==============================================================================
+   COBRO FÁCIL - AUDITORÍA DE INVENTARIO CONTINUA & ESCÁNER CÁMARA MÓVIL
+   Estilos específicos para celular y escritorio.
+   ============================================================================== */
+
+.auditoria-container {
+    padding: 12px 14px 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* Barra superior de conexión y botones secundarios */
+.auditoria-top-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 4px;
+}
+
+.audit-badge-online {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.12);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    color: #10b981;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+}
+
+.audit-badge-offline {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(59, 130, 246, 0.12);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    color: #3b82f6;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.02em;
+}
+
+.auditoria-top-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-audit-sec {
+    background: var(--card-bg, #1e293b);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: var(--text-primary, #f8fafc);
+    padding: 6px 12px;
+    font-size: 12px;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-audit-sec:hover {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Grid de KPIs */
+.auditoria-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+}
+
+@media (min-width: 768px) {
+    .auditoria-kpi-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.audit-kpi-card {
+    background: var(--card-bg, #1e293b);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+}
+
+.audit-kpi-card:active {
+    transform: scale(0.98);
+}
+
+.audit-kpi-card.active {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.08);
+}
+
+.audit-kpi-card .kpi-label {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+    color: var(--text-tertiary, #94a3b8);
+    text-transform: uppercase;
+}
+
+.audit-kpi-card .kpi-val {
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--text-primary, #f8fafc);
+    line-height: 1.2;
+}
+
+.audit-kpi-card .kpi-sub {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted, #64748b);
+}
+
+.kpi-green { color: #10b981 !important; }
+.kpi-red { color: #ef4444 !important; }
+.kpi-orange { color: #f59e0b !important; }
+
+/* Buscador con Botón de Cámara Escáner */
+.auditoria-search-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    position: relative;
+}
+
+.auditoria-input-box {
+    position: relative;
+    flex: 1;
+}
+
+.auditoria-search-input {
+    width: 100%;
+    height: 48px;
+    background: var(--card-bg, #1e293b);
+    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    padding: 0 40px 0 16px;
+    font-size: 15px;
+    color: var(--text-primary, #f8fafc);
+    outline: none;
+    box-sizing: border-box;
+    transition: border-color 0.2s ease;
+}
+
+.auditoria-search-input:focus {
+    border-color: #3b82f6;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.btn-clear-search {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 6px;
+}
+
+/* Botón Destacado de Cámara Escáner */
+.btn-cam-scanner {
+    height: 48px;
+    padding: 0 16px;
+    background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);
+    border: none;
+    border-radius: 12px;
+    color: #ffffff;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.btn-cam-scanner:active {
+    transform: scale(0.96);
+    box-shadow: 0 2px 6px rgba(37, 99, 235, 0.4);
+}
+
+.btn-cam-scanner .cam-ico {
+    flex-shrink: 0;
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
+.cam-btn-text {
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+/* Chips horizontales de estado */
+.auditoria-chips-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 4px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.auditoria-chips-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.chip-btn {
+    background: var(--card-bg, #1e293b);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-tertiary, #94a3b8);
+    font-size: 12.5px;
+    font-weight: 600;
+    padding: 7px 14px;
+    border-radius: 999px;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.chip-btn.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(37, 99, 235, 0.35);
+}
+
+/* Chips horizontales de rubros / deptos */
+.auditoria-deptos-scroll {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding: 2px 0 6px;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.auditoria-deptos-scroll::-webkit-scrollbar {
+    display: none;
+}
+
+.depto-chip {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    color: var(--text-muted, #64748b);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.depto-chip.active {
+    border-color: #06b6d4;
+    color: #06b6d4;
+    background: rgba(6, 182, 212, 0.08);
+}
+
+/* Tarjetas Táctiles de Productos (Mobile Cards) */
+.auditoria-lista-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.audit-card {
+    background: var(--card-bg, #1e293b);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    transition: border-color 0.2s ease, transform 0.15s ease;
+    cursor: pointer;
+}
+
+.audit-card:active {
+    transform: scale(0.99);
+}
+
+.audit-card.card-auditado {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.03);
+}
+
+.audit-card-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+}
+
+.audit-card-title-wrap {
+    flex: 1;
+    min-width: 0;
+}
+
+.audit-card-nombre {
+    font-family: 'Segoe UI', Inter, sans-serif;
+    font-size: 16px;
+    font-weight: 800;
+    color: var(--text-primary, #f8fafc);
+    line-height: 1.25;
+    word-break: break-word;
+}
+
+.audit-card-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    font-size: 11.5px;
+    color: var(--text-tertiary, #94a3b8);
+    flex-wrap: wrap;
+}
+
+.meta-depto {
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 700;
+    font-size: 10.5px;
+    text-transform: uppercase;
+}
+
+.meta-code {
+    font-family: 'Consolas', monospace;
+    font-weight: 700;
+    color: #38bdf8;
+}
+
+.meta-price {
+    font-weight: 700;
+    color: #10b981;
+}
+
+.audit-card-badge-wrap {
+    flex-shrink: 0;
+}
+
+.status-pill {
+    display: inline-block;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+}
+
+.status-pill.exacto {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.status-pill.faltante {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.status-pill.sobrante {
+    background: rgba(14, 165, 233, 0.15);
+    color: #0ea5e9;
+    border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+.status-pill.quiebre {
+    background: rgba(245, 158, 11, 0.15);
+    color: #f59e0b;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.status-pill.pendiente {
+    background: rgba(148, 163, 184, 0.12);
+    color: #94a3b8;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.audit-card-body {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 10px;
+    padding: 8px 12px;
+}
+
+.stock-box {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.stock-lbl {
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-tertiary, #94a3b8);
+    text-transform: uppercase;
+}
+
+.stock-val {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: var(--text-primary, #f8fafc);
+}
+
+.conteo-hecho .stock-val {
+    color: #10b981;
+}
+
+.conteo-pendiente .stock-val {
+    color: var(--text-muted, #64748b);
+}
+
+.btn-contar-card {
+    height: 38px;
+    padding: 0 16px;
+    background: #10b981;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+    flex-shrink: 0;
+}
+
+.btn-contar-card:active {
+    transform: scale(0.96);
+}
+
+.audit-vacio {
+    text-align: center;
+    padding: 40px 20px;
+    color: var(--text-tertiary, #94a3b8);
+}
+
+.vacio-ico {
+    font-size: 32px;
+    display: block;
+    margin-bottom: 8px;
+}
+
+/* ==============================================================================
+   ESCÁNER DE CÁMARA FULLSCREEN CON EFECTO LÁSER
+   ============================================================================== */
+.modal-escaner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    background: #000000;
+    z-index: 10000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.escaner-camara-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: rgba(15, 23, 42, 0.9);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    z-index: 2;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.escaner-titulo {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    color: #38bdf8;
+}
+
+.escaner-controles-top {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-escaner-ctrl {
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-escaner-ctrl:active {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.escaner-video-container {
+    position: relative;
+    flex: 1;
+    overflow: hidden;
+    background: #000000;
+}
+
+#videoEscaner {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.scanner-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    pointer-events: none;
+}
+
+.scanner-mask-top, .scanner-mask-bottom {
+    background: rgba(0, 0, 0, 0.55);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.scanner-middle-row {
+    display: flex;
+    flex-direction: row;
+    height: 260px;
+}
+
+.scanner-mask-side {
+    background: rgba(0, 0, 0, 0.55);
+    flex: 1;
+}
+
+.scanner-target {
+    position: relative;
+    width: 280px;
+    height: 260px;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.scanner-target.scanned {
+    border-color: #10b981 !important;
+    box-shadow: 0 0 35px #10b981, 0 0 0 9999px rgba(0, 0, 0, 0.55) !important;
+}
+
+.scanner-target .corner {
+    position: absolute;
+    width: 26px;
+    height: 26px;
+    border: 4px solid #06b6d4;
+    filter: drop-shadow(0 0 6px #06b6d4);
+}
+
+.scanner-target .corner-tl { top: -2px; left: -2px; border-right: none; border-bottom: none; border-top-left-radius: 14px; }
+.scanner-target .corner-tr { top: -2px; right: -2px; border-left: none; border-bottom: none; border-top-right-radius: 14px; }
+.scanner-target .corner-bl { bottom: -2px; left: -2px; border-right: none; border-top: none; border-bottom-left-radius: 14px; }
+.scanner-target .corner-br { bottom: -2px; right: -2px; border-left: none; border-top: none; border-bottom-right-radius: 14px; }
+
+/* Línea Láser Animada */
+.scanner-laser {
+    position: absolute;
+    left: 4px;
+    right: 4px;
+    height: 3px;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0) 0%, #06b6d4 20%, #22d3ee 50%, #06b6d4 80%, rgba(6, 182, 212, 0) 100%);
+    box-shadow: 0 0 16px #22d3ee, 0 0 8px #06b6d4;
+    border-radius: 999px;
+    animation: sweepLaser 2s ease-in-out infinite alternate;
+}
+
+@keyframes sweepLaser {
+    0% { top: 8%; opacity: 0.8; }
+    50% { top: 92%; opacity: 1; }
+    100% { top: 8%; opacity: 0.8; }
+}
+
+.scanner-target.scanned .scanner-laser {
+    background: #10b981;
+    box-shadow: 0 0 20px #10b981;
+}
+
+.scanner-prompt {
+    color: #e2e8f0;
+    font-size: 13.5px;
+    font-weight: 600;
+    text-align: center;
+    padding: 12px 20px;
+    background: rgba(15, 23, 42, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 999px;
+    margin-top: 24px;
+    letter-spacing: 0.02em;
+}
+
+/* ==============================================================================
+   DRAWER / BOTTOM SHEET TÁCTIL DE CONTEO FÍSICO
+   ============================================================================== */
+.bottom-sheet-drawer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    z-index: 9999;
+    display: none;
+}
+
+.drawer-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.65);
+    backdrop-filter: blur(4px);
+    opacity: 0;
+    transition: opacity 0.25s ease;
+}
+
+.drawer-content {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    max-height: 92vh;
+    max-height: 92dvh;
+    background: #0f172a;
+    border-top: 1.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 24px 24px 0 0;
+    padding: 12px 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.6);
+    transform: translateY(100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.bottom-sheet-drawer.open .drawer-backdrop {
+    opacity: 1;
+}
+
+.bottom-sheet-drawer.open .drawer-content {
+    transform: translateY(0);
+}
+
+.drawer-handle {
+    width: 44px;
+    height: 5px;
+    background: rgba(255, 255, 255, 0.25);
+    border-radius: 999px;
+    margin: 0 auto 4px;
+}
+
+.drawer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.drawer-depto {
+    display: inline-block;
+    font-size: 11px;
+    font-weight: 800;
+    color: #38bdf8;
+    background: rgba(56, 189, 248, 0.12);
+    padding: 2px 8px;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+.drawer-nombre {
+    margin: 0;
+    font-family: 'Segoe UI', Inter, sans-serif;
+    font-size: 20px;
+    font-weight: 900;
+    color: #ffffff;
+    line-height: 1.2;
+}
+
+.drawer-codigo {
+    font-size: 12px;
+    font-weight: 600;
+    color: #94a3b8;
+}
+
+.btn-drawer-cerrar {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: #94a3b8;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+/* Info de Stock de Sistema y Diferencia */
+.drawer-stock-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.info-stock-sist, .info-diferencia {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+}
+
+.info-stock-sist .lbl, .info-diferencia .lbl {
+    font-size: 10px;
+    font-weight: 800;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.info-stock-sist .val {
+    font-size: 15px;
+    font-weight: 800;
+    color: #f8fafc;
+}
+
+.info-diferencia.exacto .val { color: #10b981; }
+.info-diferencia.faltante .val { color: #ef4444; }
+.info-diferencia.sobrante .val { color: #0ea5e9; }
+
+/* Display de Conteo Real Grande */
+.drawer-conteo-display {
+    background: #020617;
+    border: 2px solid #3b82f6;
+    border-radius: 14px;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.2);
+}
+
+.display-lbl {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.display-val-wrap {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+}
+
+.display-val {
+    font-family: 'Consolas', monospace;
+    font-size: 36px;
+    font-weight: 900;
+    color: #ffffff;
+    letter-spacing: 0.04em;
+}
+
+.display-unit {
+    font-size: 18px;
+    font-weight: 800;
+    color: #38bdf8;
+}
+
+/* Botones de incremento rápido */
+.drawer-quick-increments {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 6px;
+}
+
+@media (min-width: 480px) {
+    .drawer-quick-increments {
+        grid-template-columns: repeat(6, 1fr);
+    }
+}
+
+.quick-btn {
+    height: 40px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    color: #ffffff;
+    font-size: 13.5px;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.quick-btn:active {
+    background: #3b82f6;
+    transform: scale(0.96);
+}
+
+.quick-btn.btn-cero {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+}
+
+/* Numpad Táctil para Conteo con Pulgar */
+.drawer-numpad {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+}
+
+.numpad-btn {
+    height: 52px;
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 12px;
+    color: #ffffff;
+    font-size: 22px;
+    font-weight: 800;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.1s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.numpad-btn:active {
+    background: #3b82f6;
+    transform: scale(0.95);
+}
+
+.numpad-action {
+    background: #334155;
+    color: #e2e8f0;
+}
+
+/* Selector de Motivo */
+.drawer-motivo-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.drawer-motivo-wrap label {
+    font-size: 11px;
+    font-weight: 700;
+    color: #94a3b8;
+    text-transform: uppercase;
+}
+
+.select-motivo {
+    height: 40px;
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    color: #ffffff;
+    padding: 0 12px;
+    font-size: 13.5px;
+    font-weight: 600;
+    outline: none;
+}
+
+/* Botón CTA Confirmar Ajuste Inmediato */
+.btn-confirmar-ajuste {
+    height: 54px;
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    border: none;
+    border-radius: 14px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 900;
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(16, 185, 129, 0.4);
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.btn-confirmar-ajuste:active {
+    transform: scale(0.97);
+    box-shadow: 0 2px 8px rgba(16, 185, 129, 0.5);
+}
+
+.btn-confirmar-ajuste .btn-ico {
+    font-size: 20px;
+}
+
+/* ==============================================================================
+   MODAL DE HISTORIAL
+   ============================================================================== */
+.modal-historial-wrap {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(6px);
+    z-index: 10001;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+}
+
+.modal-historial-dialog {
+    background: #0f172a;
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    border-radius: 18px;
+    width: 100%;
+    max-width: 600px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.7);
+}
+
+.modal-historial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #1e293b;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-historial-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.btn-cerrar-historial {
+    background: none;
+    border: none;
+    color: #94a3b8;
+    font-size: 18px;
+    cursor: pointer;
+}
+
+.modal-historial-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px;
+}
+
+.historial-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.hist-item {
+    background: #1e293b;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.hist-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.hist-prod {
+    font-size: 14.5px;
+    font-weight: 800;
+    color: #ffffff;
+}
+
+.hist-fecha {
+    font-size: 11px;
+    color: #94a3b8;
+}
+
+.hist-vals {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 12.5px;
+    color: #cbd5e1;
+}
+
+.hist-diff {
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11.5px;
+}
+
+.hist-diff.exacto { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+.hist-diff.faltante { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.hist-diff.sobrante { background: rgba(14, 165, 233, 0.15); color: #0ea5e9; }
+
+.hist-meta small {
+    font-size: 11px;
+    color: #64748b;
+}

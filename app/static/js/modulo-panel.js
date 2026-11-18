@@ -122,13 +122,13 @@
             ? '<p class="herramientas-vacio">Esta pantalla ya muestra lo esencial. No hay herramientas aparte.</p>'
             : '';
 
-        const marca = pantalla || (activo === 'cartera' && global.CarteraLibro && global.CarteraLibro.pantallaActual ? global.CarteraLibro.pantallaActual() : (activo === 'reporte' && global.ReporteJefe && global.ReporteJefe.pantallaActual ? global.ReporteJefe.pantallaActual() : ((pantallas[0] && pantallas[0].id) || '')));
+        const marca = pantalla || (activo === 'cartera' && global.CarteraLibro && global.CarteraLibro.pantallaActual ? global.CarteraLibro.pantallaActual() : (activo === 'reporte' && global.ReporteJefe && global.ReporteJefe.pantallaActual ? global.ReporteJefe.pantallaActual() : (activo === 'pedidos' && global.AuditoriaInventario && global.AuditoriaInventario.pantallaActual ? global.AuditoriaInventario.pantallaActual() : ((pantallas[0] && pantallas[0].id) || ''))));
 
         if (pantallas.length) {
             const lbl = document.createElement('div');
             lbl.className = 'nav-section-label';
             lbl.style.cssText = 'font-size:11px; font-weight:800; text-transform:uppercase; color:var(--text-tertiary, #64748b); padding:8px 12px 4px; letter-spacing:0.04em;';
-            lbl.textContent = activo === 'cartera' ? 'Planillas y vistas' : (activo === 'reporte' ? 'Vistas de reporte' : 'Herramientas');
+            lbl.textContent = activo === 'cartera' ? 'Planillas y vistas' : (activo === 'reporte' ? 'Vistas de reporte' : (activo === 'pedidos' ? 'Gestión de Stock' : 'Herramientas'));
             lista.appendChild(lbl);
         }
 
