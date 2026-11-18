@@ -52,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.97">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.98">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -205,14 +205,14 @@
                 <section class="ficha" id="ficha" hidden></section>
 
                 <!-- PLANILLA DE CARGOS -->
-                <div id="carteraCargos" class="card" hidden style="padding:16px;">
-                    <div class="planillas-topbar" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <div>
-                            <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text, #f8fafc); letter-spacing:-0.02em;">HISTORIAL DE CARGOS</h3>
-                            <small style="color:var(--text-muted, #94a3b8);">Ventas a crédito y cargos manuales. Borrados y cancelados no suman en vivos.</small>
+                <div id="carteraCargos" class="card planilla-cartera-card" hidden>
+                    <div class="planillas-topbar">
+                        <div class="planillas-info">
+                            <h3 class="planillas-titulo">HISTORIAL DE CARGOS</h3>
+                            <small class="planillas-subtitulo">Ventas a crédito y cargos manuales. Borrados y cancelados no suman en vivos.</small>
                         </div>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button type="button" class="btn-secundario" id="btnVolverCarteraCargos" style="padding:6px 14px; font-size:13px; cursor:pointer;">✕ Volver a Clientes</button>
+                        <div class="planillas-acciones">
+                            <button type="button" class="btn-secundario btn-volver-cartera" id="btnVolverCarteraCargos">← Volver a Clientes</button>
                         </div>
                     </div>
                     <!-- Chips período y filtros -->
@@ -228,8 +228,9 @@
                             <option value="cancelado">Cancelados</option>
                         </select>
                     </div>
-                    <input class="buscar" id="buscarCargos" type="search" placeholder="Buscar cliente, DNI, ticket o descripción" autocomplete="off" style="margin-bottom:12px;">
-                    <div class="table-wrap" style="max-height:65vh; overflow-y:auto;">
+                    <input class="buscar" id="buscarCargos" type="search" placeholder="Buscar cliente, DNI, ticket o descripción" autocomplete="off">
+                    <div class="tabla-scroll-hint"><span>↔ Deslizá la tabla para ver más columnas</span></div>
+                    <div class="table-wrap">
                         <table class="data-table" id="tablaCargos">
                             <thead>
                                 <tr>
@@ -247,18 +248,18 @@
                             <tbody id="cuerpoCargos"></tbody>
                         </table>
                     </div>
-                    <div id="pieCargos" style="margin-top:12px; font-size:13px; font-weight:800; color:#dc2626; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;"></div>
+                    <div id="pieCargos" class="pie-totales-cartera"></div>
                 </div>
 
                 <!-- PLANILLA DE COBROS -->
-                <div id="carteraCobros" class="card" hidden style="padding:16px;">
-                    <div class="planillas-topbar" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <div>
-                            <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text, #f8fafc); letter-spacing:-0.02em;">HISTORIAL DE COBROS</h3>
-                            <small style="color:var(--text-muted, #94a3b8);">Recibos COB- y pagos acreditados en cuenta corriente.</small>
+                <div id="carteraCobros" class="card planilla-cartera-card" hidden>
+                    <div class="planillas-topbar">
+                        <div class="planillas-info">
+                            <h3 class="planillas-titulo">HISTORIAL DE COBROS</h3>
+                            <small class="planillas-subtitulo">Recibos COB- y pagos acreditados en cuenta corriente.</small>
                         </div>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button type="button" class="btn-secundario" id="btnVolverCarteraCobros" style="padding:6px 14px; font-size:13px; cursor:pointer;">✕ Volver a Clientes</button>
+                        <div class="planillas-acciones">
+                            <button type="button" class="btn-secundario btn-volver-cartera" id="btnVolverCarteraCobros">← Volver a Clientes</button>
                         </div>
                     </div>
                     <!-- Chips período y medio -->
@@ -276,8 +277,9 @@
                             <option value="mixto">Mixto</option>
                         </select>
                     </div>
-                    <input class="buscar" id="buscarCobros" type="search" placeholder="Buscar cliente, DNI, COB- o id de pago" autocomplete="off" style="margin-bottom:12px;">
-                    <div class="table-wrap" style="max-height:65vh; overflow-y:auto;">
+                    <input class="buscar" id="buscarCobros" type="search" placeholder="Buscar cliente, DNI, COB- o id de pago" autocomplete="off">
+                    <div class="tabla-scroll-hint"><span>↔ Deslizá la tabla para ver más columnas</span></div>
+                    <div class="table-wrap">
                         <table class="data-table" id="tablaCobros">
                             <thead>
                                 <tr>
@@ -296,22 +298,22 @@
                             <tbody id="cuerpoCobros"></tbody>
                         </table>
                     </div>
-                    <div id="pieCobros" style="margin-top:12px; font-size:13px; font-weight:800; color:#059669; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;"></div>
+                    <div id="pieCobros" class="pie-totales-cartera"></div>
                 </div>
 
                 <!-- AUDITORÍA DE CARTERA -->
-                <div id="carteraAuditoria" class="card" hidden style="padding:16px;">
-                    <div class="planillas-topbar" style="display:flex; flex-wrap:wrap; gap:10px; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                        <div>
-                            <h3 style="margin:0; font-size:1.15rem; font-weight:800; color:var(--text, #f8fafc); letter-spacing:-0.02em;">AUDITORÍA DE CARTERA</h3>
-                            <small style="color:var(--text-muted, #94a3b8);">Libro de eventos: qué pasó, a quién, en qué PC, quién y cuándo. Control de integridad de saldos.</small>
+                <div id="carteraAuditoria" class="card planilla-cartera-card" hidden>
+                    <div class="planillas-topbar">
+                        <div class="planillas-info">
+                            <h3 class="planillas-titulo">AUDITORÍA DE CARTERA</h3>
+                            <small class="planillas-subtitulo">Libro de eventos: qué pasó, a quién, en qué PC, quién y cuándo. Control de integridad de saldos.</small>
                         </div>
-                        <div style="display:flex; gap:8px; align-items:center;">
-                            <button type="button" class="btn-secundario" id="btnVolverCarteraAuditoria" style="padding:6px 14px; font-size:13px; cursor:pointer;">✕ Volver a Clientes</button>
+                        <div class="planillas-acciones">
+                            <button type="button" class="btn-secundario btn-volver-cartera" id="btnVolverCarteraAuditoria">← Volver a Clientes</button>
                         </div>
                     </div>
                     <!-- Barra de integridad / Cuadre -->
-                    <div id="barraCuadreCartera" style="background:rgba(30,41,59,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px 16px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between; align-items:center;"></div>
+                    <div id="barraCuadreCartera"></div>
                     <!-- Chips acciones -->
                     <div class="chips-barra">
                         <button type="button" class="periodo-chip active" data-accion-auditoria="todas">Todas</button>
@@ -320,8 +322,9 @@
                         <button type="button" class="periodo-chip" data-accion-auditoria="borrados">Borrados</button>
                         <button type="button" class="periodo-chip" data-accion-auditoria="ficha">Ficha</button>
                     </div>
-                    <input class="buscar" id="buscarAuditoria" type="search" placeholder="Buscar cliente, COB-, PC, usuario o detalle" autocomplete="off" style="margin-bottom:12px;">
-                    <div class="table-wrap" style="max-height:65vh; overflow-y:auto;">
+                    <input class="buscar" id="buscarAuditoria" type="search" placeholder="Buscar cliente, COB-, PC, usuario o detalle" autocomplete="off">
+                    <div class="tabla-scroll-hint"><span>↔ Deslizá la tabla para ver más columnas</span></div>
+                    <div class="table-wrap">
                         <table class="data-table" id="tablaAuditoria">
                             <thead>
                                 <tr>
@@ -340,7 +343,7 @@
                             <tbody id="cuerpoAuditoria"></tbody>
                         </table>
                     </div>
-                    <div id="pieAuditoria" style="margin-top:12px; font-size:13px; font-weight:800; color:var(--text, #f8fafc); display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;"></div>
+                    <div id="pieAuditoria" class="pie-totales-cartera"></div>
                 </div>
             </div>
         </div>
@@ -400,11 +403,11 @@
     <script src="/static/js/barra/ventas.js?v=4"></script>
     <script src="/static/js/barra/cobros.js?v=6"></script>
     <script src="/static/js/barra/caja.js?v=5"></script>
-    <script src="/static/js/barra/cartera.js?v=4"></script>
+    <script src="/static/js/barra/cartera.js?v=5"></script>
     <script src="/static/js/barra/pedidos.js?v=2"></script>
     <script src="/static/js/barra/armar.js?v=3"></script>
     <script src="/static/js/barra/toque.js?v=5"></script>
-    <script src="/static/js/modulo-panel.js?v=7"></script>
+    <script src="/static/js/modulo-panel.js?v=8"></script>
     <script src="/static/js/barra/cartera-libro.js?v=16"></script>
     <script src="/static/js/espejo.js?v=12"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>

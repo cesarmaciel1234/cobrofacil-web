@@ -116,12 +116,36 @@
             : '';
 
         const marca = pantalla || (activo === 'cartera' && global.CarteraLibro && global.CarteraLibro.pantallaActual ? global.CarteraLibro.pantallaActual() : ((pantallas[0] && pantallas[0].id) || ''));
+
+        if (pantallas.length && activo === 'cartera') {
+            const lbl = document.createElement('div');
+            lbl.className = 'nav-section-label';
+            lbl.style.cssText = 'font-size:11px; font-weight:800; text-transform:uppercase; color:var(--text-tertiary, #64748b); padding:8px 12px 4px; letter-spacing:0.04em;';
+            lbl.textContent = 'Planillas y vistas';
+            lista.appendChild(lbl);
+        }
+
         pantallas.forEach((accion) => {
             const id = accion.id || '';
+            const isActive = (id === marca || (!id && !marca));
             const boton = document.createElement('button');
             boton.type = 'button';
-            boton.className = 'nav-item herramienta-btn' + ((id === marca || (!id && !marca)) ? ' active' : '');
-            boton.textContent = accion.titulo;
+            boton.className = 'nav-item herramienta-btn' + (isActive ? ' active' : '');
+            if (accion.icono || accion.desc) {
+                boton.style.cssText = 'min-height:48px; padding:8px 12px; margin-bottom:4px;';
+                const icoHtml = accion.icono ? `<span style="font-size:18px; margin-right:10px; display:inline-flex; align-items:center; flex-shrink:0;">${accion.icono}</span>` : '';
+                const descHtml = accion.desc ? `<div style="font-size:11px; color:var(--text-muted, #94a3b8); font-weight:500; margin-top:2px;">${accion.desc}</div>` : '';
+                boton.innerHTML = `<div style="display:flex; align-items:center; width:100%; min-width:0;">
+                    ${icoHtml}
+                    <div style="flex:1; min-width:0; text-align:left;">
+                        <div style="font-weight:700; font-size:13px; color:inherit; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${accion.titulo}</div>
+                        ${descHtml}
+                    </div>
+                    ${isActive ? '<span style="display:inline-block; width:8px; height:8px; border-radius:999px; background:#3b82f6; margin-left:8px; flex-shrink:0;"></span>' : ''}
+                </div>`;
+            } else {
+                boton.textContent = accion.titulo;
+            }
             boton.addEventListener('click', (ev) => {
                 ev.stopPropagation();
                 pantalla = id;
@@ -149,25 +173,61 @@
         const filtroActual = global.CarteraLibro && global.CarteraLibro.filtroActual
             ? global.CarteraLibro.filtroActual()
             : '';
-        filtros.forEach((accion) => {
-            const boton = document.createElement('button');
-            boton.type = 'button';
-            boton.className = 'nav-item herramienta-btn' + (filtroActual === accion.filtro ? ' active' : '');
-            boton.dataset.filtro = accion.filtro;
-            boton.textContent = accion.titulo;
-            boton.addEventListener('click', (ev) => {
-                ev.stopPropagation();
-                cerrarMenu();
-                if (global.CarteraLibro) {
-                    if (global.CarteraLibro.cambiarPantalla) global.CarteraLibro.cambiarPantalla('clientes');
-                    global.CarteraLibro.filtrar(accion.filtro);
-                }
-                lista.querySelectorAll('[data-filtro]').forEach((item) => {
-                    item.classList.toggle('active', item.dataset.filtro === accion.filtro);
+
+        if (filtros.length && activo === 'cartera') {
+            const lbl = document.createElement('div');
+            lbl.className = 'nav-section-label';
+            lbl.style.cssText = 'font-size:11px; font-weight:800; text-transform:uppercase; color:var(--text-tertiary, #64748b); padding:14px 12px 6px; letter-spacing:0.04em;';
+            lbl.textContent = 'Filtros rápidos (Clientes)';
+            lista.appendChild(lbl);
+
+            const grid = document.createElement('div');
+            grid.className = 'cartera-filtros-grid';
+            grid.style.cssText = 'display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:0 4px; margin-bottom:8px;';
+
+            filtros.forEach((accion) => {
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                const isAct = (filtroActual === accion.filtro);
+                boton.className = 'nav-item herramienta-btn filtro-pill-btn' + (isAct ? ' active' : '');
+                boton.dataset.filtro = accion.filtro;
+                boton.style.cssText = 'min-height:36px; padding:6px 8px; font-size:12px; font-weight:700; border-radius:12px; justify-content:center; text-align:center; width:100%;';
+                boton.textContent = accion.titulo;
+                boton.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    cerrarMenu();
+                    if (global.CarteraLibro) {
+                        if (global.CarteraLibro.cambiarPantalla) global.CarteraLibro.cambiarPantalla('clientes');
+                        global.CarteraLibro.filtrar(accion.filtro);
+                    }
+                    lista.querySelectorAll('[data-filtro]').forEach((item) => {
+                        item.classList.toggle('active', item.dataset.filtro === accion.filtro);
+                    });
                 });
+                grid.appendChild(boton);
             });
-            lista.appendChild(boton);
-        });
+            lista.appendChild(grid);
+        } else {
+            filtros.forEach((accion) => {
+                const boton = document.createElement('button');
+                boton.type = 'button';
+                boton.className = 'nav-item herramienta-btn' + (filtroActual === accion.filtro ? ' active' : '');
+                boton.dataset.filtro = accion.filtro;
+                boton.textContent = accion.titulo;
+                boton.addEventListener('click', (ev) => {
+                    ev.stopPropagation();
+                    cerrarMenu();
+                    if (global.CarteraLibro) {
+                        if (global.CarteraLibro.cambiarPantalla) global.CarteraLibro.cambiarPantalla('clientes');
+                        global.CarteraLibro.filtrar(accion.filtro);
+                    }
+                    lista.querySelectorAll('[data-filtro]').forEach((item) => {
+                        item.classList.toggle('active', item.dataset.filtro === accion.filtro);
+                    });
+                });
+                lista.appendChild(boton);
+            });
+        }
 
         vistas.forEach((accion) => {
             const boton = document.createElement('button');

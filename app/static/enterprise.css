@@ -921,7 +921,7 @@ table:not(.data-table):not(.xls-table) tr:hover td { background: var(--bg-hover)
         transition: transform 0.28s var(--ease);
         box-shadow: var(--shadow-lg);
         z-index: 700 !important;
-        width: 50vw;
+        width: min(320px, 86vw);
     }
     .nav-item svg {
         width: 20px !important;
@@ -2023,7 +2023,7 @@ select.periodo-pill.active option { color: #0F172A; }
 /* El menú lateral es el panel de herramientas. Se abre con Opciones, en cualquier ancho. */
 .sidebar {
     transform: translateX(-105%);
-    width: 50vw;
+    width: min(320px, 86vw);
 }
 .sidebar.open { transform: translateX(0); }
 .main { margin-left: 0 !important; }
@@ -2685,6 +2685,175 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
 #cargaLibroCuenta { color: #64748b; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .carga-libro-riel { height: 6px; margin-top: 8px; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
 #cargaLibroBarra { height: 100%; width: 0; border-radius: 99px; background: #6366f1; transition: width .4s ease; }
+
+/* ─── Cartera Planillas (Móvil y Escritorio) ─── */
+.planilla-cartera-card {
+    padding: 16px;
+    border-radius: 20px;
+    background: var(--bg-surface, #1e293b);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.planillas-topbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+.planillas-info {
+    min-width: 0;
+    flex: 1;
+}
+.planillas-titulo {
+    margin: 0;
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: var(--text, #f8fafc);
+    letter-spacing: -0.02em;
+}
+.planillas-subtitulo {
+    display: block;
+    margin-top: 2px;
+    color: var(--text-muted, #94a3b8);
+    font-size: 12px;
+    line-height: 1.4;
+}
+.planillas-acciones {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.btn-volver-cartera {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 700;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text, #f8fafc);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.1s ease;
+}
+.btn-volver-cartera:active {
+    transform: scale(0.97);
+}
+.tabla-scroll-hint {
+    display: none;
+}
+.pie-totales-cartera {
+    margin-top: 12px;
+    font-size: 13px;
+    font-weight: 800;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(15, 23, 42, 0.5);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+#pieCargos { color: #f87171; }
+#pieCobros { color: #34d399; }
+#pieAuditoria { color: var(--text, #f8fafc); }
+
+#barraCuadreCartera {
+    background: rgba(30, 41, 59, 0.75);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin-bottom: 12px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: space-between;
+    align-items: center;
+}
+
+@media (max-width: 640px) {
+    .planilla-cartera-card {
+        padding: 12px !important;
+        border-radius: 16px;
+        margin: 0 -4px;
+    }
+    .planillas-topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+    .btn-volver-cartera {
+        width: 100%;
+        min-height: 42px;
+    }
+    .chips-barra {
+        width: 100% !important;
+        flex-wrap: nowrap !important;
+        overflow-x: auto !important;
+        -webkit-overflow-scrolling: touch !important;
+        scrollbar-width: none;
+        padding: 6px !important;
+    }
+    .chips-barra::-webkit-scrollbar {
+        display: none;
+    }
+    .chips-barra .periodo-chip {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    .chips-barra select.buscar {
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+    .tabla-scroll-hint {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        font-size: 11px;
+        color: var(--text-tertiary, #94a3b8);
+        padding: 4px 0 8px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+    }
+    #barraCuadreCartera {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 10px;
+    }
+    #barraCuadreCartera > div {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 12px;
+        padding: 8px 10px;
+        min-width: 0;
+    }
+    #barraCuadreCartera > div:last-child {
+        grid-column: 1 / -1;
+    }
+    .table-wrap {
+        max-height: 55vh !important;
+        border-radius: 14px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        background: rgba(15, 23, 42, 0.45);
+    }
+    .data-table th {
+        position: sticky;
+        top: 0;
+        background: #1e293b !important;
+        z-index: 2;
+        padding: 10px 10px !important;
+        font-size: 11px !important;
+    }
+    .data-table td {
+        padding: 10px 10px !important;
+        font-size: 13px !important;
+    }
+}
 
 
 
