@@ -52,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=4.46">
+    <link rel="stylesheet" href="/static/enterprise.css?v=4.97">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -216,12 +216,12 @@
                         </div>
                     </div>
                     <!-- Chips período y filtros -->
-                    <div class="chips-barra" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+                    <div class="chips-barra">
                         <button type="button" class="periodo-chip active" data-periodo-cargos="Mes">Mes</button>
                         <button type="button" class="periodo-chip" data-periodo-cargos="Hoy">Hoy</button>
                         <button type="button" class="periodo-chip" data-periodo-cargos="Semana">Semana</button>
                         <button type="button" class="periodo-chip" data-periodo-cargos="Todas">Todas</button>
-                        <select id="filtroEstadoCargos" class="buscar" style="width:auto; padding:6px 12px; font-size:13px; margin:0;">
+                        <select id="filtroEstadoCargos" class="buscar">
                             <option value="todos">Estado: Todos</option>
                             <option value="vivo">Solo Vivos</option>
                             <option value="borrado">Borrados</option>
@@ -262,12 +262,12 @@
                         </div>
                     </div>
                     <!-- Chips período y medio -->
-                    <div class="chips-barra" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+                    <div class="chips-barra">
                         <button type="button" class="periodo-chip active" data-periodo-cobros="Mes">Mes</button>
                         <button type="button" class="periodo-chip" data-periodo-cobros="Hoy">Hoy</button>
                         <button type="button" class="periodo-chip" data-periodo-cobros="Semana">Semana</button>
                         <button type="button" class="periodo-chip" data-periodo-cobros="Todas">Todas</button>
-                        <select id="filtroMedioCobros" class="buscar" style="width:auto; padding:6px 12px; font-size:13px; margin:0;">
+                        <select id="filtroMedioCobros" class="buscar">
                             <option value="todos">Medio: Todos</option>
                             <option value="efectivo">Efectivo</option>
                             <option value="transferencia">Transferencia</option>
@@ -313,7 +313,7 @@
                     <!-- Barra de integridad / Cuadre -->
                     <div id="barraCuadreCartera" style="background:rgba(30,41,59,0.7); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:12px 16px; margin-bottom:12px; display:flex; flex-wrap:wrap; gap:16px; justify-content:space-between; align-items:center;"></div>
                     <!-- Chips acciones -->
-                    <div class="chips-barra" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:12px;">
+                    <div class="chips-barra">
                         <button type="button" class="periodo-chip active" data-accion-auditoria="todas">Todas</button>
                         <button type="button" class="periodo-chip" data-accion-auditoria="cargos">Cargos</button>
                         <button type="button" class="periodo-chip" data-accion-auditoria="abonos">Abonos</button>

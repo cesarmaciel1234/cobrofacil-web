@@ -103,18 +103,44 @@
         }
         .brand .empresa.on { background: #0f172a; color: #fff; }
         .sucursal-opcion {
-            display: block;
+            display: flex;
+            align-items: center;
             width: 100%;
-            height: 44px;
-            margin-top: 8px;
-            border: 1px solid var(--line);
-            border-radius: 12px;
-            background: #fff;
-            font-weight: 700;
+            min-height: 48px;
+            margin-top: 4px;
+            border: none;
+            border-radius: 14px;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 500;
+            color: #0f172a;
             text-align: left;
-            padding: 0 14px;
+            padding: 0 16px;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
         }
-        .sucursal-opcion.on { background: #0f172a; color: #fff; border-color: #0f172a; }
+        .sucursal-opcion:hover {
+            background-color: #f8fafc;
+        }
+        .sucursal-opcion.on {
+            background-color: #f1f5f9;
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .sucursal-opcion::before {
+            content: ' ';
+            display: inline-block;
+            width: 22px;
+            min-width: 22px;
+            margin-right: 8px;
+            font-size: 16px;
+            font-weight: 800;
+            color: #0f172a;
+            text-align: center;
+        }
+        .sucursal-opcion.on::before {
+            content: '✓';
+        }
         .page {
             padding: 18px 16px calc(84px + env(safe-area-inset-bottom, 0px));
         }
@@ -544,7 +570,7 @@
         <p class="nota">Filtros del libro: sucursal, antigüedad y tipo de cuenta.</p>
         <label>SUCURSAL
             <select id="sucursalFiltro" onchange="elegirSucursal()">
-                <option value="">Todas las sucursales</option>
+                <option value="">— Todas —</option>
             </select>
         </label>
         <div class="chips" id="filterTabs">
@@ -707,7 +733,7 @@
             const select = document.getElementById('sucursalFiltro');
             const previa = String(sucursalId || '');
             const opciones = (lista || []).map(item => `<option value="${esc(item.id)}">${esc(item.nombre)}</option>`).join('');
-            select.innerHTML = '<option value="">Todas las sucursales</option>' + opciones;
+            select.innerHTML = '<option value="">— Todas —</option>' + opciones;
             if ([...select.options].some(opcion => opcion.value === previa)) select.value = previa;
         }
 

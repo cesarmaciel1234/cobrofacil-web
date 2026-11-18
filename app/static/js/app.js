@@ -3292,7 +3292,7 @@ const $ = id => document.getElementById(id);
             } catch (_) {}
             document.getElementById('sucursalSheet')?.remove();
             const actual = activeSucursalId == null ? '' : String(activeSucursalId);
-            const opciones = [{ id: '', nombre: 'Todas' }].concat(
+            const opciones = [{ id: '', nombre: '— Todas —' }].concat(
                 sucursalesConocidas.map((s) => ({ id: String(s.id), nombre: s.nombre || ('Sucursal ' + s.id) }))
             );
             const fondo = document.createElement('div');
