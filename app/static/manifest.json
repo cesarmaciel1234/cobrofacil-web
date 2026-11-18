@@ -1,14 +1,14 @@
 {
-  "id": "/",
+  "id": "/?source=pwa",
   "name": "Cobro Fácil",
   "short_name": "Cobro Fácil",
-  "description": "Caja de la sucursal y tablero de todas las sucursales.",
+  "description": "Caja de la sucursal, control de stock con escáner y libro diario.",
   "lang": "es-AR",
   "dir": "ltr",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
-  "display_override": ["standalone", "minimal-ui", "browser"],
+  "display_override": ["standalone", "minimal-ui", "window-controls-overlay"],
   "background_color": "#0f172a",
   "theme_color": "#2563eb",
   "orientation": "any",
@@ -36,24 +36,31 @@
   ],
   "shortcuts": [
     {
-      "name": "Ventas Express",
-      "short_name": "Ventas",
-      "description": "Registrar remito rápido",
-      "url": "/?view=ventas-express&source=pwa",
+      "name": "Auditoría de Stock",
+      "short_name": "Auditoría",
+      "description": "Conteo físico táctil y escáner",
+      "url": "/?view=pedidos&pantalla=auditoria&source=pwa",
       "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "Cobranzas",
-      "short_name": "Cobrar",
-      "description": "Central de cobranzas",
-      "url": "/?view=cobranzas&source=pwa",
+      "name": "Caja y Arqueo",
+      "short_name": "Caja",
+      "description": "Caja y medios de pago del día",
+      "url": "/?view=contabilidad&source=pwa",
       "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
     },
     {
-      "name": "POS Mostrador",
-      "short_name": "POS",
-      "description": "Ventas de mostrador offline",
-      "url": "/pos?source=pwa",
+      "name": "Cartera de Clientes",
+      "short_name": "Cartera",
+      "description": "Cuentas corrientes y cobros",
+      "url": "/?view=cartera&source=pwa",
+      "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Pedidos y Faltantes",
+      "short_name": "Pedidos",
+      "description": "Sugerido de reposición",
+      "url": "/?view=pedidos&pantalla=faltantes&source=pwa",
       "icons": [{ "src": "/static/icons/icon-192.png", "sizes": "192x192" }]
     }
   ]

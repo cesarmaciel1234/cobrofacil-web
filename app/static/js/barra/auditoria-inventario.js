@@ -40,6 +40,23 @@
     let modoFacingActual = 'environment';
     let zxingReader = null;
     let escaneoEnProgreso = false;
+    let wakeLock = null;
+
+    async function solicitarWakeLock() {
+        if ('wakeLock' in navigator) {
+            try {
+                wakeLock = await navigator.wakeLock.request('screen');
+                wakeLock.addEventListener('release', () => { wakeLock = null; });
+            } catch (_) {}
+        }
+    }
+
+    function liberarWakeLock() {
+        if (wakeLock) {
+            wakeLock.release().catch(() => {});
+            wakeLock = null;
+        }
+    }
 
     function $(id) {
         return document.getElementById(id);
@@ -730,6 +747,7 @@
     }
 
     async function abrirEscanerCamara() {
+        solicitarWakeLock();
         const modal = $('modalEscanerCamara');
         const video = $('videoEscaner');
         const prompt = $('scannerPrompt');
@@ -805,6 +823,7 @@
     }
 
     function cerrarEscanerCamara() {
+        liberarWakeLock();
         escaneando = false;
         linternaEncendida = false;
         if (animFrameId) cancelAnimationFrame(animFrameId);
@@ -949,6 +968,7 @@
     // DRAWER / BOTTOM SHEET TÁCTIL DE CONTEO FÍSICO
     // -------------------------------------------------------------------------
     function abrirDrawerConteo(prod) {
+        solicitarWakeLock();
         productoEnConteo = prod;
         const esPesable = prod.es_pesable || prod.unidad === 'KG';
         const unidadTxt = esPesable ? 'KG' : 'UN';
@@ -980,6 +1000,7 @@
     }
 
     function cerrarDrawerConteo() {
+        liberarWakeLock();
         const drawer = $('drawerConteoTactil');
         if (!drawer) return;
         drawer.classList.remove('open');
@@ -1024,6 +1045,7 @@
     // Manejo de teclas táctiles del numpad
     function onNumpadKey(key) {
         if (!productoEnConteo) return;
+        vibrar([12]);
         const esPesable = productoEnConteo.es_pesable || productoEnConteo.unidad === 'KG';
 
         if (key === 'C') {

@@ -42,6 +42,9 @@
         if (!btn || !bar.contains(btn)) return;
         const nombre = btn.dataset.pwaView;
         if (!nombre) return;
+        if (navigator.vibrate) {
+            try { navigator.vibrate(12); } catch (_) {}
+        }
         if (nombre === vistaActual()) {
             if (nombre === 'reporte' && window.CrmBus && window.CrmBus.get('switchView')) {
                 window.CrmBus.emit('switchView', 'reporte');
