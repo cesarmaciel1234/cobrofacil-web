@@ -170,14 +170,102 @@
                 }
                 cargarCatalogoAuditoria();
             }
+            actualizarIconoFiltroHeader();
         } else {
             if (auditoriaWrap) auditoriaWrap.style.display = 'none';
             if (faltantesWrap) faltantesWrap.style.display = 'block';
+            const refresh = $('btnRefresh');
+            if (refresh) refresh.classList.toggle('filtrando', !!global.filtroProveedorPedido);
         }
 
         if (global.ModuloPanel && global.ModuloPanel.pintar) {
             global.ModuloPanel.pintar();
         }
+    }
+
+    // -------------------------------------------------------------------------
+    // FILTRO VÍA BOTÓN DEL HEADER (EMBUDO)
+    // -------------------------------------------------------------------------
+    function etiquetaFiltro(f) {
+        if (f === 'auditados') return 'Auditados hoy';
+        if (f === 'pendientes') return 'Pendientes';
+        if (f === 'diferencia') return 'Con diferencia';
+        if (f === 'quiebre') return 'Quiebre 0';
+        return 'Todos';
+    }
+
+    function actualizarIconoFiltroHeader() {
+        const refresh = $('btnRefresh');
+        if (refresh && pantallaActiva === 'auditoria') {
+            refresh.classList.toggle('filtrando', filtroEstado !== 'todos');
+        }
+    }
+
+    function abrirFiltroAuditoria() {
+        const existente = $('auditoriaFiltroSheet');
+        if (existente) existente.remove();
+
+        const opciones = [
+            { id: 'todos', label: 'Todos los artículos', cant: resumen.total_sku || catalogo.length, icono: '📋' },
+            { id: 'auditados', label: 'Auditados hoy', cant: resumen.auditados, icono: '✓', color: '#10b981' },
+            { id: 'pendientes', label: 'Pendientes de conteo', cant: resumen.pendientes, icono: '⏳', color: '#f59e0b' },
+            { id: 'diferencia', label: 'Con diferencia (sobrante/faltante)', cant: resumen.con_diferencia, icono: '⚠️', color: '#ef4444' },
+            { id: 'quiebre', label: 'Quiebre de stock (0 o negativo)', cant: resumen.quiebre, icono: '⚡', color: '#8b5cf6' }
+        ];
+
+        const sheet = document.createElement('div');
+        sheet.id = 'auditoriaFiltroSheet';
+        sheet.className = 'pedido-sheet-back';
+        sheet.innerHTML = `
+            <div class="pedido-sheet" role="dialog" aria-label="Filtro de Inventario">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <strong class="pedido-sheet-titulo" style="margin:0; font-size:17px; font-weight:800;">Filtro de Inventario</strong>
+                    <span style="font-size:12px; font-weight:700; color:#64748b; background:#f1f5f9; padding:3px 8px; border-radius:6px;">${resumen.total_sku || catalogo.length} artículos</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    ${opciones.map(opt => `
+                        <button type="button" class="pedido-opcion ${filtroEstado === opt.id ? 'active' : ''}" data-filtro-estado="${opt.id}" style="display:flex; justify-content:space-between; align-items:center; padding:12px 14px; text-align:left;">
+                            <span style="font-weight:700; font-size:14px; color:inherit; display:flex; align-items:center; gap:8px;">
+                                <span>${opt.icono}</span>
+                                <span>${opt.label}</span>
+                            </span>
+                            <b style="font-size:13px; font-weight:800; color:${opt.color || 'inherit'};">${opt.cant}</b>
+                        </button>
+                    `).join('')}
+                </div>
+                <div style="display:flex; gap:10px; margin-top:14px; padding-top:12px; border-top:1px solid #f1f5f9;">
+                    <button type="button" id="btnSheetHistorial" style="flex:1; padding:10px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; font-size:13px; font-weight:700; color:#334155; cursor:pointer;">📋 Historial</button>
+                    <button type="button" id="btnSheetExportar" style="flex:1; padding:10px; border:1px solid #e2e8f0; border-radius:10px; background:#f8fafc; font-size:13px; font-weight:700; color:#334155; cursor:pointer;">📥 Exportar</button>
+                </div>
+                <button type="button" class="pedido-cerrar" data-cerrar style="margin-top:10px;">Listo</button>
+            </div>
+        `;
+
+        sheet.addEventListener('click', (ev) => {
+            const btnOpt = ev.target.closest('[data-filtro-estado]');
+            if (btnOpt) {
+                filtroEstado = btnOpt.dataset.filtroEstado;
+                sheet.remove();
+                actualizarIconoFiltroHeader();
+                renderAuditoria();
+                return;
+            }
+            if (ev.target.closest('#btnSheetHistorial')) {
+                sheet.remove();
+                abrirModalHistorial();
+                return;
+            }
+            if (ev.target.closest('#btnSheetExportar')) {
+                sheet.remove();
+                exportarPlanillaCSV();
+                return;
+            }
+            if (ev.target === sheet || ev.target.closest('[data-cerrar]')) {
+                sheet.remove();
+            }
+        });
+
+        document.body.appendChild(sheet);
     }
 
     // -------------------------------------------------------------------------
@@ -259,8 +347,8 @@
 
         wrap.innerHTML = `
             <div class="auditoria-mobile-container" style="padding: 10px 12px 60px;">
-                <!-- Buscador Móvil con Ícono de Cámara para Escanear -->
-                <div class="auditoria-search-wrap" style="margin-bottom: 10px;">
+                <!-- Buscador Móvil en Blanco con Ícono de Cámara para Escanear -->
+                <div class="auditoria-search-wrap" style="margin-bottom: ${filtroEstado !== 'todos' ? '8px' : '12px'};">
                     <div class="auditoria-input-box">
                         <input type="search" id="auditoriaSearchInput" class="auditoria-search-input" 
                                placeholder="Buscar corte, código o escanear..." 
@@ -276,26 +364,17 @@
                     </button>
                 </div>
 
-                <!-- Chips Rápidos (Estilo simple como pedido) -->
-                <div class="auditoria-chips-scroll" style="margin-bottom: 12px;">
-                    <button type="button" class="chip-btn ${filtroEstado === 'todos' ? 'active' : ''}" data-f="todos">Todos (${resumen.total_sku})</button>
-                    <button type="button" class="chip-btn ${filtroEstado === 'auditados' ? 'active' : ''}" data-f="auditados">Auditados (${resumen.auditados})</button>
-                    <button type="button" class="chip-btn ${filtroEstado === 'pendientes' ? 'active' : ''}" data-f="pendientes">Pendientes (${resumen.pendientes})</button>
-                    <button type="button" class="chip-btn ${filtroEstado === 'diferencia' ? 'active' : ''}" data-f="diferencia">Con diferencia (${resumen.con_diferencia})</button>
-                    <button type="button" class="chip-btn ${filtroEstado === 'quiebre' ? 'active' : ''}" data-f="quiebre">Quiebre 0 (${resumen.quiebre})</button>
-                </div>
-
-                <!-- Barra de acciones secundarias discreta -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 4px;">
-                    <span style="font-size: 11.5px; color: #64748b; font-weight: 600;">
-                        ${fuenteConexion === 'mariadb_maestra' ? '⚡ MariaDB Maestra (192.168.0.8)' : '📶 Modo Local'}
+                ${filtroEstado !== 'todos' ? `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:0 2px;">
+                    <span style="font-size:12.5px; font-weight:700; color:#2563eb; background:#eff6ff; padding:3px 10px; border-radius:999px; border:1px solid #bfdbfe; display:inline-flex; align-items:center; gap:6px;">
+                        <span>Filtro: ${etiquetaFiltro(filtroEstado)} (${filtrados.length})</span>
+                        <button type="button" id="btnQuitarFiltroAuditoria" style="background:none; border:none; color:#2563eb; font-size:13px; font-weight:800; cursor:pointer; padding:0 2px; line-height:1;" aria-label="Quitar filtro">✕</button>
                     </span>
-                    <div style="display: flex; gap: 8px;">
-                        <button type="button" id="btnHistorialAuditoria" style="background: none; border: none; color: #3b82f6; font-size: 12px; font-weight: 700; cursor: pointer; padding: 2px 4px;">Historial</button>
-                        <span style="color: #cbd5e1;">·</span>
-                        <button type="button" id="btnExportarAuditoria" style="background: none; border: none; color: #3b82f6; font-size: 12px; font-weight: 700; cursor: pointer; padding: 2px 4px;">Exportar</button>
-                    </div>
-                </div>
+                    <button type="button" id="btnAbrirFiltroDesdeBarra" style="background:none; border:none; color:#64748b; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5z"/></svg>
+                        Cambiar
+                    </button>
+                </div>` : ''}
 
                 <!-- Lista Simple e Idéntica a Pedidos (pedido-lista y pedido-fila) -->
                 <div class="pedido-lista">
@@ -303,6 +382,8 @@
                 </div>
             </div>
         `;
+
+        actualizarIconoFiltroHeader();
 
         // Event Listeners
         vincularEventosAuditoria();
@@ -351,6 +432,25 @@
             btnEscaner.addEventListener('click', (e) => {
                 e.preventDefault();
                 abrirEscanerCamara();
+            });
+        }
+
+        // Filtro rápido activo en barra
+        const btnQuitar = $('btnQuitarFiltroAuditoria');
+        if (btnQuitar) {
+            btnQuitar.addEventListener('click', (e) => {
+                e.stopPropagation();
+                filtroEstado = 'todos';
+                actualizarIconoFiltroHeader();
+                renderAuditoria();
+            });
+        }
+
+        const btnAbrirBarra = $('btnAbrirFiltroDesdeBarra');
+        if (btnAbrirBarra) {
+            btnAbrirBarra.addEventListener('click', (e) => {
+                e.stopPropagation();
+                abrirFiltroAuditoria();
             });
         }
 
@@ -1217,6 +1317,8 @@
         abrirDrawerConteo,
         abrirEscanerCamara,
         cerrarEscanerCamara,
+        abrirFiltro: abrirFiltroAuditoria,
+        filtroActivo: () => filtroEstado !== 'todos',
         pantallaActual: () => pantallaActiva
     };
 

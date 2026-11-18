@@ -176,20 +176,27 @@
 .auditoria-search-input {
     width: 100%;
     height: 48px;
-    background: var(--card-bg, #1e293b);
-    border: 1.5px solid rgba(255, 255, 255, 0.12);
+    background: #ffffff;
+    border: 1.5px solid #cbd5e1;
     border-radius: 12px;
     padding: 0 40px 0 16px;
     font-size: 15px;
-    color: var(--text-primary, #f8fafc);
+    font-weight: 600;
+    color: #0f172a;
     outline: none;
     box-sizing: border-box;
-    transition: border-color 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.auditoria-search-input::placeholder {
+    color: #94a3b8;
+    font-weight: 500;
 }
 
 .auditoria-search-input:focus {
     border-color: #3b82f6;
-    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
 }
 
 .btn-clear-search {
@@ -197,12 +204,24 @@
     right: 12px;
     top: 50%;
     transform: translateY(-50%);
-    background: none;
+    background: #e2e8f0;
     border: none;
-    color: #94a3b8;
-    font-size: 16px;
+    border-radius: 50%;
+    width: 22px;
+    height: 22px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
     cursor: pointer;
-    padding: 4px 6px;
+    padding: 0;
+    line-height: 1;
+}
+
+.btn-clear-search:active {
+    background: #cbd5e1;
 }
 
 /* Botón Destacado de Cámara Escáner */

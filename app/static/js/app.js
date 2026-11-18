@@ -4750,13 +4750,21 @@ const $ = id => document.getElementById(id);
                 const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja || name === 'cartera';
                 refresh.classList.toggle('es-filtro', filtrar);
                 if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
-                else if (name === 'pedidos') refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
+                else if (name === 'pedidos') {
+                    const esAuditoria = (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual && window.AuditoriaInventario.pantallaActual() === 'auditoria');
+                    if (esAuditoria) {
+                        refresh.classList.toggle('filtrando', !!(window.AuditoriaInventario.filtroActivo && window.AuditoriaInventario.filtroActivo()));
+                    } else {
+                        refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
+                    }
+                }
                 else if (name === 'reporte') refresh.classList.toggle('filtrando', (window.vitrinaPeriodo || 'Hoy') !== 'Hoy');
                 else if (digital) refresh.classList.toggle('filtrando', periodoDigital !== 'Semana');
                 else if (caja) refresh.classList.toggle('filtrando', (periodoCaja || 'Hoy') !== 'Hoy');
                 else if (name === 'cartera') refresh.classList.toggle('filtrando', !!(window.CarteraLibro?.filtroActivo?.()));
                 else refresh.classList.remove('filtrando');
-                const etiqueta = name === 'cartera' ? 'Filtrar cartera' : (name === 'pedidos' ? 'Filtrar proveedor' : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar')));
+                const esAuditoria = (name === 'pedidos' && window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual && window.AuditoriaInventario.pantallaActual() === 'auditoria');
+                const etiqueta = name === 'cartera' ? 'Filtrar cartera' : (name === 'pedidos' ? (esAuditoria ? 'Filtrar inventario' : 'Filtrar proveedor') : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar')));
                 refresh.setAttribute('aria-label', etiqueta);
                 refresh.title = etiqueta;
                 const icono = refresh.querySelector('svg');
@@ -4969,7 +4977,17 @@ const $ = id => document.getElementById(id);
                         pintarLibroDigital();
                     }
                 });
-                else abrirFiltroProveedor();
+                else if (nombre === 'pedidos') {
+                    if (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual && window.AuditoriaInventario.pantallaActual() === 'auditoria') {
+                        if (window.AuditoriaInventario.abrirFiltro) {
+                            window.AuditoriaInventario.abrirFiltro();
+                            return;
+                        }
+                    }
+                    abrirFiltroProveedor();
+                } else {
+                    abrirFiltroProveedor();
+                }
                 return;
             }
             if (btn.disabled) return;
