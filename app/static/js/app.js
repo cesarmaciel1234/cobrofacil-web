@@ -3269,6 +3269,9 @@ const $ = id => document.getElementById(id);
             if (window.CarteraLibro) {
                 void window.CarteraLibro.sucursal(id);
             }
+            if (window.ReporteJefe && window.ReporteJefe.setSucursal) {
+                window.ReporteJefe.setSucursal(id);
+            }
             const activeView = document.querySelector('.view.active');
             const vName = activeView ? activeView.id.replace('view-', '') : 'reporte';
             if (vName !== 'cartera') {
@@ -6378,6 +6381,17 @@ const $ = id => document.getElementById(id);
                     }
                     if (window.CarteraLibro && window.CarteraLibro.cambiarPantalla) {
                         window.CarteraLibro.cambiarPantalla(id || 'clientes');
+                    }
+                    return;
+                }
+                if (vista === 'reporte') {
+                    marcarEntrada('reporte');
+                    const abierta = document.querySelector('.view.active');
+                    if (!abierta || abierta.id !== 'view-reporte') {
+                        switchView('reporte');
+                    }
+                    if (window.ReporteJefe && window.ReporteJefe.cambiarPantalla) {
+                        window.ReporteJefe.cambiarPantalla(id || 'vitrina');
                     }
                     return;
                 }

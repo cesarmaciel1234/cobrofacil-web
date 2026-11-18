@@ -52,7 +52,7 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=5.5">
+    <link rel="stylesheet" href="/static/enterprise.css?v=5.6">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -137,20 +137,127 @@
                 <div class="carga-libro-riel" aria-hidden="true"><div id="cargaLibroBarra"></div></div>
             </div>
             <div class="view active" id="view-reporte">
-                <p id="reporteDia" class="periodo-chip">Hoy</p>
-                <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">
-                    <div class="vitrina-wrap">
-                        <div class="vitrina-banner" style="opacity: 0.75;">
-                            <span>⚡</span>
-                            <span>Conectando con el espejo local de la tienda…</span>
+                <div id="reporteVitrina">
+                    <p id="reporteDia" class="periodo-chip">Hoy</p>
+                    <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">
+                        <div class="vitrina-wrap">
+                            <div class="vitrina-banner" style="opacity: 0.75;">
+                                <span>⚡</span>
+                                <span>Conectando con el espejo local de la tienda…</span>
+                            </div>
+                            <div class="vitrina-grid">
+                                <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Tickets del día</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Operaciones registradas</div></div>
+                                <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Ganancia parcial</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Margen sobre costo</div></div>
+                                <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Deuda clientes</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Saldo en la calle</div></div>
+                                <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Pagos clientes</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Cobranzas de cuenta corriente</div></div>
+                                <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Tickets digitales</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Con ticket · libro de ventas</div></div>
+                                <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Cancelaciones</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Ventas canceladas</div></div>
+                            </div>
                         </div>
-                        <div class="vitrina-grid">
-                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Tickets del día</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Operaciones registradas</div></div>
-                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Ganancia parcial</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Margen sobre costo</div></div>
-                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Deuda clientes</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Saldo en la calle</div></div>
-                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Pagos clientes</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Cobranzas de cuenta corriente</div></div>
-                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Tickets digitales</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Con ticket · libro de ventas</div></div>
-                            <div class="vitrina-card"><div class="vitrina-card-top"><span class="vitrina-card-lbl">Cancelaciones</span></div><div class="vitrina-card-val skeleton-pulse">···</div><div class="vitrina-card-sub">Ventas canceladas</div></div>
+                    </div>
+                </div>
+
+                <!-- VISTA REPORTE FINANCIERO (CEREBRO JEFE & CURVAS) -->
+                <div id="reporteFinanciero" class="card reporte-financiero-card" hidden>
+                    <div class="rf-header-bar">
+                        <div class="rf-title-block">
+                            <h2 class="rf-main-title" id="rfTitulo">Resumen de Ventas (Semana Actual)</h2>
+                            <span class="rf-subtitle" id="rfSubtitulo">Cerebro Jefe · Ventas, costos y ganancia neta</span>
+                        </div>
+                    </div>
+
+                    <!-- Períodos y Comparativa -->
+                    <div class="rf-controls-row">
+                        <div class="chips-barra rf-chips" id="rfPeriodoChips">
+                            <button type="button" class="periodo-chip" data-rf-periodo="Hoy">Hoy</button>
+                            <button type="button" class="periodo-chip" data-rf-periodo="Ayer">Ayer</button>
+                            <button type="button" class="periodo-chip active" data-rf-periodo="Semana Actual">Semana Actual</button>
+                            <button type="button" class="periodo-chip" data-rf-periodo="Semana p.">Semana p.</button>
+                            <button type="button" class="periodo-chip" data-rf-periodo="Mes Actual">Mes Actual</button>
+                            <button type="button" class="periodo-chip" data-rf-periodo="Mes Anterior">Mes Anterior</button>
+                            <button type="button" class="periodo-chip" data-rf-periodo="Año actual">Año actual</button>
+                        </div>
+                        <label class="rf-comparar-toggle" id="lblRfComparar">
+                            <input type="checkbox" id="chkRfComparar">
+                            <span>Comparar con período anterior</span>
+                        </label>
+                    </div>
+
+                    <!-- 🤖 Cerebro Jefe -->
+                    <div class="rf-cerebro-card" id="rfCerebro">
+                        <div class="rf-cerebro-head">
+                            <span class="rf-cerebro-badge">🤖 Cerebro Jefe</span>
+                        </div>
+                        <ul class="rf-cerebro-list" id="rfCerebroList">
+                            <li>Analizando métricas financieras…</li>
+                        </ul>
+                    </div>
+
+                    <!-- Gráfica Curva de Ventas y Ganancia -->
+                    <div class="rf-chart-container">
+                        <div class="rf-chart-header">
+                            <div class="rf-chart-legend">
+                                <span class="legend-dot dot-ventas"></span><span>Ventas</span>
+                                <span class="legend-dot dot-ganancia"></span><span>Ganancia (si hay costo)</span>
+                                <span class="legend-dot dot-prev" id="dotPrev" style="display:none;"></span><span id="lblPrev" style="display:none;">Período anterior</span>
+                            </div>
+                        </div>
+                        <div class="rf-svg-wrap" id="rfChartWrap">
+                            <svg id="rfChartSvg" viewBox="0 0 760 260" preserveAspectRatio="none" class="rf-curve-svg"></svg>
+                        </div>
+                    </div>
+
+                    <!-- Hero KPIs Grid -->
+                    <div class="rf-kpis-grid" id="rfKpis">
+                        <div class="rf-kpi-box">
+                            <span class="rf-kpi-lbl">Ventas totales</span>
+                            <strong class="rf-kpi-val" id="rfKpiVentas">$0,00</strong>
+                            <small class="rf-kpi-sub" id="rfKpiVentasDiff">Venta bruta acumulada</small>
+                        </div>
+                        <div class="rf-kpi-box kpi-highlight-green">
+                            <span class="rf-kpi-lbl">Ganancia neta</span>
+                            <strong class="rf-kpi-val" id="rfKpiGanancia">$0,00</strong>
+                            <small class="rf-kpi-sub" id="rfKpiGananciaSub">Margen 0%</small>
+                        </div>
+                        <div class="rf-kpi-box">
+                            <span class="rf-kpi-lbl">Tickets emitidos</span>
+                            <strong class="rf-kpi-val" id="rfKpiTickets">0</strong>
+                            <small class="rf-kpi-sub" id="rfKpiTicketsDiff">Operaciones</small>
+                        </div>
+                        <div class="rf-kpi-box">
+                            <span class="rf-kpi-lbl">Ticket medio</span>
+                            <strong class="rf-kpi-val" id="rfKpiPromedio">$0,00</strong>
+                            <small class="rf-kpi-sub" id="rfKpiCobertura">Cobertura costo 0%</small>
+                        </div>
+                    </div>
+
+                    <!-- Distribución: Departamentos y Medios de Pago -->
+                    <div class="rf-distribucion-grid">
+                        <div class="rf-dist-card">
+                            <h3 class="rf-dist-title">🏆 Ventas por Departamento</h3>
+                            <div class="rf-dist-list" id="rfDeptosList"></div>
+                        </div>
+                        <div class="rf-dist-card">
+                            <h3 class="rf-dist-title">💳 Medios de Pago</h3>
+                            <div class="rf-dist-list" id="rfPagosList"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tabla Días / Serie -->
+                    <div class="rf-tabla-card">
+                        <h3 class="rf-dist-title" id="rfTablaTitulo">📅 Detalle por Día</h3>
+                        <div class="table-wrap">
+                            <table class="data-table" id="rfTablaDetalle">
+                                <thead>
+                                    <tr>
+                                        <th>Fecha / Día</th>
+                                        <th style="text-align:right;">Ventas</th>
+                                        <th style="text-align:right;">Ganancia</th>
+                                        <th style="text-align:right;">Tickets</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="rfTablaCuerpo"></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -399,14 +506,15 @@
     <script src="/static/js/crm-loader.js?v=3.12"></script>
     <script src="/static/js/crm-delete.js?v=3.7"></script>
     <script src="/static/js/crm-backup.js?v=3.7"></script>
-    <script src="/static/js/barra/ventas.js?v=4"></script>
+    <script src="/static/js/barra/ventas.js?v=5"></script>
     <script src="/static/js/barra/cobros.js?v=6"></script>
     <script src="/static/js/barra/caja.js?v=5"></script>
     <script src="/static/js/barra/cartera.js?v=6"></script>
     <script src="/static/js/barra/pedidos.js?v=2"></script>
     <script src="/static/js/barra/armar.js?v=3"></script>
     <script src="/static/js/barra/toque.js?v=5"></script>
-    <script src="/static/js/modulo-panel.js?v=10"></script>
+    <script src="/static/js/modulo-panel.js?v=11"></script>
+    <script src="/static/js/barra/reporte-financiero.js?v=1"></script>
     <script src="/static/js/barra/cartera-libro.js?v=21"></script>
     <script src="/static/js/espejo.js?v=12"></script>
     <script src="/static/js/espejo-engine.js?v=5"></script>

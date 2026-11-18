@@ -1498,6 +1498,17 @@ def _armar_panel(
 ) -> dict:
     sucursales_disp = listar_sucursales()
 
+    if nombre in ("financiero", "reporte_financiero"):
+        from app.services.pos_vitrina import calcular_reporte_financiero
+        comparar = bool(filtro and filtro.get("comparar"))
+        return calcular_reporte_financiero(
+            periodo=periodo,
+            sucursal_id=sucursal_id,
+            desde=desde,
+            hasta=hasta,
+            comparar=comparar,
+        )
+
     if nombre in ("cargos", "cartera_cargos"):
         return _cargos_cartera(sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro)
     if nombre in ("cobros", "cartera_cobros"):

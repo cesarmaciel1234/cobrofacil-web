@@ -92,21 +92,33 @@ def resolver_rango(
         d_str = hoy.isoformat()
         return f"{d_str} 00:00:00", f"{d_str} 23:59:59", "Hoy"
 
-    if p in ("semana", "semana actual"):
-        inicio = hoy - timedelta(days=hoy.weekday())
-        return f"{inicio.isoformat()} 00:00:00", f"{hoy.isoformat()} 23:59:59", "Semana"
+    if p in ("ayer", "dia_anterior"):
+        ayer = hoy - timedelta(days=1)
+        d_str = ayer.isoformat()
+        return f"{d_str} 00:00:00", f"{d_str} 23:59:59", "Ayer"
 
-    if p in ("semana p.", "semana pasada", "semanap"):
+    if p in ("semana", "semana actual", "semana_actual"):
+        inicio = hoy - timedelta(days=hoy.weekday())
+        fin = inicio + timedelta(days=6)
+        return f"{inicio.isoformat()} 00:00:00", f"{fin.isoformat()} 23:59:59", "Semana Actual"
+
+    if p in ("semana p.", "semana pasada", "semanap", "semana_anterior"):
         lunes_esta = hoy - timedelta(days=hoy.weekday())
         lunes_anterior = lunes_esta - timedelta(days=7)
         domingo_anterior = lunes_anterior + timedelta(days=6)
         return f"{lunes_anterior.isoformat()} 00:00:00", f"{domingo_anterior.isoformat()} 23:59:59", "Semana p."
 
-    if p in ("mes", "mes actual"):
+    if p in ("mes", "mes actual", "mes_actual"):
         ultimo_dia = calendar.monthrange(hoy.year, hoy.month)[1]
         inicio = hoy.replace(day=1)
         fin = hoy.replace(day=ultimo_dia)
-        return f"{inicio.isoformat()} 00:00:00", f"{fin.isoformat()} 23:59:59", "Mes"
+        return f"{inicio.isoformat()} 00:00:00", f"{fin.isoformat()} 23:59:59", "Mes Actual"
+
+    if p in ("mes anterior", "mes pasado", "mes_anterior", "mesp"):
+        primer_dia_este = hoy.replace(day=1)
+        ultimo_dia_ant = primer_dia_este - timedelta(days=1)
+        primer_dia_ant = ultimo_dia_ant.replace(day=1)
+        return f"{primer_dia_ant.isoformat()} 00:00:00", f"{ultimo_dia_ant.isoformat()} 23:59:59", "Mes Anterior"
 
     if p in ("todas", "todo", "todos", "historico", "historica"):
         return "1970-01-01 00:00:00", "2099-12-31 23:59:59", "Todas"
@@ -437,4 +449,374 @@ def calcular_vitrina(
             "texto": str(cancelaciones_cant) if cancelaciones_monto == 0 else f"{cancelaciones_cant} · {_formatear_pesos(cancelaciones_monto)}",
             "subtitulo": "",
         },
+    }
+
+
+def _rango_anterior(desde_iso: str, hasta_iso: str, periodo: str, hoy: date) -> tuple[str, str]:
+    p = (periodo or "").strip().lower()
+    d0 = datetime.fromisoformat(desde_iso[:19])
+    d1 = datetime.fromisoformat(hasta_iso[:19])
+    duracion = (d1.date() - d0.date()).days + 1
+    if p in ("hoy", "dia", "diario"):
+        prev_d0 = d0 - timedelta(days=1)
+        prev_d1 = d1 - timedelta(days=1)
+    elif p in ("ayer", "dia_anterior"):
+        prev_d0 = d0 - timedelta(days=1)
+        prev_d1 = d1 - timedelta(days=1)
+    elif p in ("semana", "semana actual", "semana_actual"):
+        prev_d0 = d0 - timedelta(days=7)
+        prev_d1 = d1 - timedelta(days=7)
+    elif p in ("semana p.", "semana pasada", "semanap"):
+        prev_d0 = d0 - timedelta(days=7)
+        prev_d1 = d1 - timedelta(days=7)
+    elif p in ("mes", "mes actual", "mes_actual"):
+        primer_este = d0.date().replace(day=1)
+        ult_ant = primer_este - timedelta(days=1)
+        primer_ant = ult_ant.replace(day=1)
+        return f"{primer_ant.isoformat()} 00:00:00", f"{ult_ant.isoformat()} 23:59:59"
+    elif p in ("mes anterior", "mes pasado", "mes_anterior", "mesp"):
+        primer_este = d0.date().replace(day=1)
+        ult_ant = primer_este - timedelta(days=1)
+        primer_ant = ult_ant.replace(day=1)
+        return f"{primer_ant.isoformat()} 00:00:00", f"{ult_ant.isoformat()} 23:59:59"
+    elif p in ("año", "anio", "año actual"):
+        return f"{d0.year - 1}-01-01 00:00:00", f"{d0.year - 1}-12-31 23:59:59"
+    else:
+        prev_d0 = d0 - timedelta(days=duracion)
+        prev_d1 = d1 - timedelta(days=duracion)
+    return f"{prev_d0.strftime('%Y-%m-%d %H:%M:%S')}", f"{prev_d1.strftime('%Y-%m-%d %H:%M:%S')}"
+
+
+def calcular_reporte_financiero(
+    periodo: str = "Semana Actual",
+    sucursal_id: int | None = None,
+    desde: str | None = None,
+    hasta: str | None = None,
+    comparar: bool = False,
+) -> dict[str, Any]:
+    """
+    Reporte Financiero oficial (Cerebro Jefe).
+    Calcula KPIs de ventas, ganancia sobre costo, serie temporal para curvas interactivas,
+    departamentos, medios de pago y diagnósticos automáticos del Cerebro Jefe.
+    """
+    hoy_date = datetime.now(_ZONA).date()
+    desde_iso, hasta_iso, nombre_periodo = resolver_rango(
+        periodo=periodo,
+        desde_custom=desde,
+        hasta_custom=hasta,
+        hoy=hoy_date,
+    )
+
+    prev_desde_iso, prev_hasta_iso = _rango_anterior(desde_iso, hasta_iso, periodo, hoy_date)
+
+    # 1. Ventas actuales
+    col_v, filas_v = filas_de("ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+    idx_v = _indice(col_v)
+
+    # 2. Productos (costo, depto, categoria)
+    col_p, filas_p = filas_de("productos", sucursal_id)
+    if not col_p:
+        col_p, filas_p = filas_de("articulos", sucursal_id)
+    idx_p = _indice(col_p)
+
+    mapa_costos: dict[str, float] = {}
+    mapa_deptos: dict[str, str] = {}
+    for f in filas_p:
+        pid = str(_valor(f, idx_p, "id") or "")
+        if pid:
+            mapa_costos[pid] = _numero(_valor(f, idx_p, "costo", "precio_costo"))
+            depto = str(_valor(f, idx_p, "departamento", "categoria") or "").strip().upper()
+            if not depto or depto in ("S/D", "SD", "NONE", "NULL", "SIN DEPARTAMENTO"):
+                depto = "CARNE"
+            mapa_deptos[pid] = depto
+
+    # 3. Detalles de ventas
+    col_dv, filas_dv = filas_de("detalles_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+    if not col_dv:
+        col_dv, filas_dv = filas_de("detalle_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+    idx_dv = _indice(col_dv)
+
+    items_por_venta: dict[str, list[dict]] = {}
+    for f in filas_dv:
+        vid = str(_valor(f, idx_dv, "id_venta", "venta_id") or "")
+        if not vid:
+            continue
+        pid = str(_valor(f, idx_dv, "id_producto", "producto_id") or "")
+        cant = _numero(_valor(f, idx_dv, "cantidad", "cant"))
+        subtotal = _numero(_valor(f, idx_dv, "subtotal", "total"))
+        if vid not in items_por_venta:
+            items_por_venta[vid] = []
+        items_por_venta[vid].append({"pid": pid, "cant": cant, "subtotal": subtotal})
+
+    p_norm = (periodo or "semana").strip().lower()
+    slots: list[dict[str, Any]] = []
+
+    if p_norm in ("hoy", "dia", "diario", "ayer", "dia_anterior"):
+        for h in range(8, 23):
+            k = f"{h:02d}"
+            slots.append({"key": k, "label": f"{h:02d}h", "ventas": 0.0, "ganancia": 0.0, "tickets": 0, "ventas_prev": 0.0, "ganancia_prev": 0.0})
+    elif p_norm in ("año", "anio", "año actual"):
+        meses_nom = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        for i, m in enumerate(meses_nom):
+            k = f"{i+1:02d}"
+            slots.append({"key": k, "label": m, "ventas": 0.0, "ganancia": 0.0, "tickets": 0, "ventas_prev": 0.0, "ganancia_prev": 0.0})
+    elif p_norm in ("semana", "semana actual", "semana_actual", "semana p.", "semana pasada", "semanap"):
+        dias_nom = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        d0 = datetime.fromisoformat(desde_iso[:10])
+        for i in range(7):
+            curr_d = d0 + timedelta(days=i)
+            slots.append({
+                "key": curr_d.strftime("%Y-%m-%d"),
+                "label": dias_nom[i],
+                "fecha": curr_d.strftime("%d/%m"),
+                "ventas": 0.0,
+                "ganancia": 0.0,
+                "tickets": 0,
+                "ventas_prev": 0.0,
+                "ganancia_prev": 0.0,
+            })
+    else:
+        d0 = datetime.fromisoformat(desde_iso[:10])
+        d1 = datetime.fromisoformat(hasta_iso[:10])
+        diff = (d1.date() - d0.date()).days + 1
+        dias_nom = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        for i in range(max(1, diff)):
+            curr_d = d0 + timedelta(days=i)
+            slots.append({
+                "key": curr_d.strftime("%Y-%m-%d"),
+                "label": f"{dias_nom[curr_d.weekday()]} {curr_d.strftime('%d')}",
+                "fecha": curr_d.strftime("%d/%m"),
+                "ventas": 0.0,
+                "ganancia": 0.0,
+                "tickets": 0,
+                "ventas_prev": 0.0,
+                "ganancia_prev": 0.0,
+            })
+
+    slot_map: dict[str, dict] = {s["key"]: s for s in slots}
+
+    total_ventas = 0.0
+    total_tickets = 0
+    total_costo = 0.0
+    venta_con_costo = 0.0
+    hay_costo_cargado = False
+    pagos_map: dict[str, float] = {}
+    deptos_map: dict[str, float] = {}
+
+    for fila in filas_v:
+        fecha_str = str(_valor(fila, idx_v, "fecha") or "").replace("T", " ")
+        if not (desde_iso <= fecha_str <= hasta_iso):
+            dia = fecha_str[:10]
+            if not (len(dia) == 10 and dia[4] == "-" and desde_iso[:10] <= dia <= hasta_iso[:10]):
+                continue
+
+        if not _es_viva(_valor(fila, idx_v, "estado")):
+            continue
+
+        vid = str(_valor(fila, idx_v, "id") or "")
+        tot = _numero(_valor(fila, idx_v, "total"))
+        pago = str(_valor(fila, idx_v, "metodo_pago", "medio_pago") or "Efectivo").strip()
+        if not pago or pago.upper() == "NONE":
+            pago = "Efectivo"
+
+        total_ventas += tot
+        total_tickets += 1
+        pagos_map[pago] = pagos_map.get(pago, 0.0) + tot
+
+        v_items = items_por_venta.get(vid, [])
+        v_costo = 0.0
+        for item in v_items:
+            pid = item["pid"]
+            c_u = mapa_costos.get(pid, 0.0)
+            st = item["subtotal"]
+            depto = mapa_deptos.get(pid, "CARNE")
+            deptos_map[depto] = deptos_map.get(depto, 0.0) + st
+            if c_u > 0.009:
+                hay_costo_cargado = True
+                v_costo += item["cant"] * c_u
+                venta_con_costo += st
+
+        total_costo += v_costo
+
+        k = ""
+        if p_norm in ("hoy", "dia", "diario"):
+            k = fecha_str[11:13] if len(fecha_str) >= 13 else "12"
+        elif p_norm in ("año", "anio", "año actual"):
+            k = fecha_str[5:7] if len(fecha_str) >= 7 else "01"
+        else:
+            k = fecha_str[:10]
+
+        target_slot = slot_map.get(k)
+        if target_slot:
+            target_slot["ventas"] += tot
+            target_slot["tickets"] += 1
+            if hay_costo_cargado:
+                target_slot["ganancia"] += (tot - v_costo)
+            else:
+                target_slot["ganancia"] += tot
+
+    total_ventas_prev = 0.0
+    total_tickets_prev = 0
+    total_costo_prev = 0.0
+    hay_costo_prev = False
+
+    if comparar:
+        col_vp, filas_vp = filas_de("ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
+        idx_vp = _indice(col_vp)
+        col_dvp, filas_dvp = filas_de("detalles_ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
+        if not col_dvp:
+            col_dvp, filas_dvp = filas_de("detalle_ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
+        idx_dvp = _indice(col_dvp)
+
+        items_prev_map: dict[str, list[dict]] = {}
+        for f in filas_dvp:
+            vid = str(_valor(f, idx_dvp, "id_venta", "venta_id") or "")
+            if not vid:
+                continue
+            pid = str(_valor(f, idx_dvp, "id_producto", "producto_id") or "")
+            cant = _numero(_valor(f, idx_dvp, "cantidad", "cant"))
+            subtotal = _numero(_valor(f, idx_dvp, "subtotal", "total"))
+            if vid not in items_prev_map:
+                items_prev_map[vid] = []
+            items_prev_map[vid].append({"pid": pid, "cant": cant, "subtotal": subtotal})
+
+        d0_prev = datetime.fromisoformat(prev_desde_iso[:10])
+        for fila in filas_vp:
+            fecha_str = str(_valor(fila, idx_vp, "fecha") or "").replace("T", " ")
+            if not (prev_desde_iso <= fecha_str <= prev_hasta_iso):
+                dia = fecha_str[:10]
+                if not (len(dia) == 10 and dia[4] == "-" and prev_desde_iso[:10] <= dia <= prev_hasta_iso[:10]):
+                    continue
+            if not _es_viva(_valor(fila, idx_vp, "estado")):
+                continue
+
+            vid = str(_valor(fila, idx_vp, "id") or "")
+            tot = _numero(_valor(fila, idx_vp, "total"))
+            total_ventas_prev += tot
+            total_tickets_prev += 1
+
+            v_costo = 0.0
+            for item in items_prev_map.get(vid, []):
+                c_u = mapa_costos.get(item["pid"], 0.0)
+                if c_u > 0.009:
+                    hay_costo_prev = True
+                    v_costo += item["cant"] * c_u
+
+            total_costo_prev += v_costo
+
+            if p_norm in ("hoy", "dia", "diario"):
+                h_k = fecha_str[11:13] if len(fecha_str) >= 13 else "12"
+                slot_obj = slot_map.get(h_k)
+                if slot_obj:
+                    slot_obj["ventas_prev"] += tot
+                    slot_obj["ganancia_prev"] += (tot - v_costo)
+            elif p_norm in ("año", "anio", "año actual"):
+                m_k = fecha_str[5:7] if len(fecha_str) >= 7 else "01"
+                slot_obj = slot_map.get(m_k)
+                if slot_obj:
+                    slot_obj["ventas_prev"] += tot
+                    slot_obj["ganancia_prev"] += (tot - v_costo)
+            else:
+                try:
+                    f_d = datetime.fromisoformat(fecha_str[:10]).date()
+                    delta_dias = (f_d - d0_prev.date()).days
+                    if 0 <= delta_dias < len(slots):
+                        slots[delta_dias]["ventas_prev"] += tot
+                        slots[delta_dias]["ganancia_prev"] += (tot - v_costo)
+                except Exception:
+                    pass
+
+    ticket_medio = round(total_ventas / total_tickets, 2) if total_tickets else 0.0
+    ganancia_neta = round(total_ventas - total_costo, 2) if hay_costo_cargado else None
+    margen = round((ganancia_neta / total_ventas) * 100, 1) if (ganancia_neta is not None and total_ventas > 0) else None
+    cobertura = round((venta_con_costo / total_ventas) * 100, 1) if total_ventas > 0 else 0.0
+
+    ganancia_prev = round(total_ventas_prev - total_costo_prev, 2) if (comparar and hay_costo_prev) else None
+    ventas_diff_pct = round(((total_ventas - total_ventas_prev) / total_ventas_prev) * 100, 1) if (comparar and total_ventas_prev > 0) else 0.0
+    ganancia_diff_pct = round(((ganancia_neta - ganancia_prev) / ganancia_prev) * 100, 1) if (comparar and ganancia_neta is not None and ganancia_prev and ganancia_prev > 0) else 0.0
+
+    for s in slots:
+        s["ventas"] = round(s["ventas"], 2)
+        s["ganancia"] = round(s["ganancia"], 2)
+        s["ventas_prev"] = round(s["ventas_prev"], 2)
+        s["ganancia_prev"] = round(s["ganancia_prev"], 2)
+
+    pico_slot = max(slots, key=lambda s: s["ventas"]) if slots else None
+    if pico_slot and pico_slot["ventas"] > 0:
+        pico_txt = f"El mejor desempeño fue el día {pico_slot['label']} con {_formatear_pesos(pico_slot['ventas'])}. Asegurate de replicar la estrategia de ese día."
+    else:
+        pico_txt = "Aún no se registran picos de ventas en este período."
+
+    top_depto = max(deptos_map.items(), key=lambda d: d[1])[0] if deptos_map else "CARNE"
+    depto_txt = f"{top_depto} está liderando en volumen. Considerá ubicar promociones cruzadas cerca de esta sección."
+
+    top_pago = max(pagos_map.items(), key=lambda p: p[1])[0] if pagos_map else "Efectivo"
+    pago_txt = f"La mayoría de tus clientes prefiere usar {top_pago}. Analizá si las comisiones de este método están optimizadas."
+
+    if hay_costo_cargado and ganancia_neta is not None:
+        costo_txt = f"Ganancia neta {_formatear_pesos(ganancia_neta)} con margen del {margen:.0f}%. Cobertura de costo: {cobertura}%."
+    else:
+        costo_txt = "Falta precio de costo en algunos productos. Cargá inventario y costo para firmar la ganancia neta exacta."
+
+    top_deptos = []
+    tot_d = sum(deptos_map.values()) or 1.0
+    for dep, v in sorted(deptos_map.items(), key=lambda x: x[1], reverse=True):
+        top_deptos.append({
+            "nombre": dep,
+            "total": round(v, 2),
+            "texto": _formatear_pesos(v),
+            "porcentaje": round((v / tot_d) * 100, 1),
+        })
+
+    top_pagos = []
+    tot_p = sum(pagos_map.values()) or 1.0
+    for pag, v in sorted(pagos_map.items(), key=lambda x: x[1], reverse=True):
+        top_pagos.append({
+            "medio": pag,
+            "total": round(v, 2),
+            "texto": _formatear_pesos(v),
+            "porcentaje": round((v / tot_p) * 100, 1),
+        })
+
+    from app.services.pos_base import listar_sucursales
+
+    return {
+        "ok": True,
+        "panel": "financiero",
+        "periodo": nombre_periodo,
+        "titulo": f"Resumen de Ventas ({nombre_periodo})",
+        "desde": desde_iso[:10],
+        "hasta": hasta_iso[:10],
+        "comparar": comparar,
+        "kpis": {
+            "ventas": round(total_ventas, 2),
+            "ventas_texto": _formatear_pesos(total_ventas),
+            "tickets": total_tickets,
+            "ticket_medio": ticket_medio,
+            "ticket_medio_texto": _formatear_pesos(ticket_medio),
+            "costo": round(total_costo, 2),
+            "costo_texto": _formatear_pesos(total_costo),
+            "hay_costo": hay_costo_cargado,
+            "ganancia": ganancia_neta,
+            "ganancia_texto": _formatear_pesos(ganancia_neta) if hay_costo_cargado else "Sin costo",
+            "margen": margen,
+            "cobertura": cobertura,
+            "ventas_prev": round(total_ventas_prev, 2),
+            "ventas_prev_texto": _formatear_pesos(total_ventas_prev),
+            "ventas_diff_pct": ventas_diff_pct,
+            "ganancia_prev": ganancia_prev,
+            "ganancia_prev_texto": _formatear_pesos(ganancia_prev) if ganancia_prev is not None else "Sin costo",
+            "ganancia_diff_pct": ganancia_diff_pct,
+        },
+        "cerebro_jefe": [
+            {"tipo": "pico", "icono": "📈", "titulo": "Pico de Ventas", "texto": pico_txt},
+            {"tipo": "depto", "icono": "🏆", "titulo": "Departamento Estrella", "texto": depto_txt},
+            {"tipo": "pago", "icono": "💳", "titulo": "Preferencia de Pago", "texto": pago_txt},
+            {"tipo": "costo", "icono": "💰", "titulo": "Costo e Inventario", "texto": costo_txt},
+        ],
+        "serie": slots,
+        "deptos": top_deptos,
+        "pagos": top_pagos,
+        "sucursales": listar_sucursales(),
+        "sucursal_id": sucursal_id,
     }
