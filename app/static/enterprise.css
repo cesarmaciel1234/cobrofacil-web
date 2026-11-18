@@ -3390,6 +3390,9 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
 .legend-dot {
     width: 10px;
     height: 10px;
+    min-width: 10px;
+    min-height: 10px;
+    flex-shrink: 0;
     border-radius: 50%;
     display: inline-block;
 }
@@ -3425,7 +3428,9 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
     transform: translateY(-2px);
     box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
+.rf-kpi-lbl,
 .rf-kpi-label {
+    display: block;
     font-size: 11px;
     font-weight: 700;
     text-transform: uppercase;
@@ -3433,16 +3438,23 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
     color: #64748b;
     margin-bottom: 4px;
 }
+.rf-kpi-val,
 .rf-kpi-valor {
+    display: block;
     font-size: 20px;
     font-weight: 800;
     color: #0f172a;
     letter-spacing: -0.02em;
 }
+.kpi-highlight-green .rf-kpi-val,
+.kpi-highlight-green .rf-kpi-valor,
+.rf-kpi-val.ganancia-color,
 .rf-kpi-valor.ganancia-color {
-    color: #059669;
+    color: #059669 !important;
 }
+.rf-kpi-sub,
 .rf-kpi-diff {
+    display: block;
     font-size: 11px;
     color: #64748b;
     margin-top: 4px;

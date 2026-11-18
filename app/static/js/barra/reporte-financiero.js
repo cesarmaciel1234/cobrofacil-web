@@ -115,6 +115,16 @@
         }
 
         if ($('rfKpiTickets')) $('rfKpiTickets').textContent = (k.tickets || 0).toLocaleString('es-AR');
+        if ($('rfKpiTicketsDiff')) {
+            if (data.comparar && k.tickets_prev != null) {
+                const tDiff = (k.tickets || 0) - (k.tickets_prev || 0);
+                const tSign = tDiff > 0 ? '+' : '';
+                $('rfKpiTicketsDiff').textContent = `${tSign}${tDiff} vs anterior (${k.tickets_prev || 0})`;
+            } else {
+                $('rfKpiTicketsDiff').textContent = 'Operaciones';
+            }
+        }
+
         if ($('rfKpiPromedio')) $('rfKpiPromedio').textContent = k.ticket_medio_texto || formatPesos(k.ticket_medio);
         if ($('rfKpiCobertura')) {
             $('rfKpiCobertura').textContent = `Cobertura costo: ${k.cobertura || 0}%`;
@@ -225,15 +235,19 @@
             if (!pts.length) return '';
             if (pts.length === 1) return `M ${pts[0].x} ${pts[0].y}`;
             let d = `M ${pts[0].x} ${pts[0].y}`;
+            const baseline = H - padB;
             for (let i = 0; i < pts.length - 1; i++) {
                 const p0 = pts[i === 0 ? i : i - 1];
                 const p1 = pts[i];
                 const p2 = pts[i + 1];
                 const p3 = pts[i + 2 < pts.length ? i + 2 : i + 1];
-                const cp1x = p1.x + (p2.x - p0.x) / 6;
-                const cp1y = p1.y + (p2.y - p0.y) / 6;
-                const cp2x = p2.x - (p3.x - p1.x) / 6;
-                const cp2y = p2.y - (p3.y - p1.y) / 6;
+                let cp1x = p1.x + (p2.x - p0.x) / 6;
+                let cp1y = p1.y + (p2.y - p0.y) / 6;
+                let cp2x = p2.x - (p3.x - p1.x) / 6;
+                let cp2y = p2.y - (p3.y - p1.y) / 6;
+                // Clamp y between top padding and baseline (never overshoot below 0)
+                cp1y = Math.min(baseline, Math.max(padT, cp1y));
+                cp2y = Math.min(baseline, Math.max(padT, cp2y));
                 d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
             }
             return d;
@@ -256,10 +270,14 @@
         }
 
         let xLabels = '';
-        ptsVentas.forEach((p) => {
-            xLabels += `
-                <text x="${p.x}" y="${H - 12}" fill="#94a3b8" font-size="11" text-anchor="middle" font-weight="700">${p.item.label}</text>
-            `;
+        const modulo = N > 14 ? Math.ceil(N / 7) : 1;
+        ptsVentas.forEach((p, idx) => {
+            if (N <= 14 || idx === 0 || idx === N - 1 || idx % modulo === 0) {
+                const txt = (N > 14 && p.item.fecha) ? p.item.fecha : p.item.label;
+                xLabels += `
+                    <text x="${p.x}" y="${H - 12}" fill="#94a3b8" font-size="10" text-anchor="middle" font-weight="700">${txt}</text>
+                `;
+            }
         });
 
         let pointsHtml = '';
