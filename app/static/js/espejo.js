@@ -509,7 +509,7 @@
                 if (!dia) return;
                 const diaTs = new Date(dia + 'T12:00:00').getTime();
                 const d = Math.max(0, Math.floor((hoyTs - diaTs) / (1000 * 60 * 60 * 24)));
-                if (!diasPorCliente.has(cid) || d < diasPorCliente.get(cid)) {
+                if (!diasPorCliente.has(cid) || d > diasPorCliente.get(cid)) {
                     diasPorCliente.set(cid, d);
                 }
             });
@@ -529,9 +529,17 @@
             const dir = String(f.direccion || '');
             const diasRaw = f.dias !== undefined && f.dias !== null && f.dias !== '' ? Number(f.dias) : null;
             const dias = diasRaw !== null ? diasRaw : (saldo > 0 ? (diasPorCliente.get(id) ?? null) : null);
-            const tarifa = String(f.tarifa || '5%');
-            const tasaNum = parseFloat(tarifa) || 5;
-            const mant = f.mantenimiento != null ? Number(f.mantenimiento) : (saldo > 0 && dias != null ? Math.round(saldo * (tasaNum / 100) * (dias / 30) * 100) / 100 : 0);
+            const enRiesgo = (limite > 0 && saldo >= limite) || (dias !== null && dias > 30) || !!f.en_riesgo;
+            const tarifa = f.tarifa || (enRiesgo ? '10%' : '5%');
+            let mant = f.mantenimiento != null ? Number(f.mantenimiento) : 0;
+            if (f.mantenimiento == null && saldo > 0 && dias != null && dias > 0) {
+                const diasBase = Math.min(dias, 30);
+                const diasApal = Math.max(0, dias - 30);
+                const intBase = saldo * 0.05 * (diasBase / 30);
+                const intApal = saldo * 0.10 * (diasApal / 30);
+                mant = Math.round((intBase + intApal) * 100) / 100;
+            }
+            const totalAPagar = f.total_a_pagar != null ? Number(f.total_a_pagar) : (saldo > 0 ? Math.round((saldo + mant) * 100) / 100 : saldo);
 
             const item = {
                 id: id,
@@ -553,8 +561,9 @@
                 dias: dias,
                 tarifa: tarifa,
                 mantenimiento: mant,
-                en_riesgo: (limite > 0 && saldo >= limite) || (dias !== null && dias > 30),
-                estado: saldo > 0 ? 'Con saldo' : 'Al día',
+                total_a_pagar: totalAPagar,
+                en_riesgo: enRiesgo,
+                estado: saldo > 0 ? (enRiesgo ? 'Atención' : 'Normal') : 'Al día',
                 sucursal_id: f.sucursal_id,
                 sucursal_nombre: f.sucursal_nombre,
             };
@@ -574,6 +583,7 @@
                             previo.deuda_pos += saldo;
                             previo.deuda += saldo;
                             previo.mantenimiento = Math.round((previo.mantenimiento + mant) * 100) / 100;
+                            previo.total_a_pagar = Math.round((previo.total_a_pagar + totalAPagar) * 100) / 100;
                         }
                     }
                     return;
@@ -590,6 +600,7 @@
                             previo.deuda_pos += saldo;
                             previo.deuda += saldo;
                             previo.mantenimiento = Math.round((previo.mantenimiento + mant) * 100) / 100;
+                            previo.total_a_pagar = Math.round((previo.total_a_pagar + totalAPagar) * 100) / 100;
                         }
                     }
                     return;
@@ -606,25 +617,42 @@
      */
     function cartera(sucursalId) {
         const lista = clientes(sucursalId);
+        const ccTodas = filasTabla('cuenta_corriente', sucursalId);
+        const hoy = hoyDe();
         let totalDeuda = 0;
         let totalCuentas = 0;
         let cuentasEnRiesgo = 0;
         let deudaEnRiesgo = 0;
         lista.forEach((c) => {
             const saldo = Number(c.deuda != null ? c.deuda : (c.saldo_actual || 0));
+            const mant = Number(c.mantenimiento || 0);
+            const total = saldo > 0 ? (saldo + mant) : saldo;
             if (saldo > 0) {
-                totalDeuda += saldo;
+                totalDeuda += total;
                 totalCuentas += 1;
             }
             if (c.en_riesgo) {
                 cuentasEnRiesgo += 1;
-                if (saldo > 0) deudaEnRiesgo += saldo;
+                if (saldo > 0) deudaEnRiesgo += total;
             }
         });
         const topDeudores = lista
             .filter((c) => (c.deuda || c.saldo_actual || 0) > 0)
-            .sort((a, b) => (b.deuda || b.saldo_actual || 0) - (a.deuda || a.saldo_actual || 0))
+            .sort((a, b) => (b.total_a_pagar || b.deuda || 0) - (a.total_a_pagar || a.deuda || 0))
             .slice(0, 15);
+
+        let cobrosDelMes = 0;
+        const mesActual = hoy.substring(0, 7);
+        if (ccTodas.length > 0) {
+            ccTodas.forEach((cc) => {
+                if (String(cc.tipo || '').toUpperCase() === 'ABONO' || Number(cc.haber) > 0) {
+                    const dia = diaDe(cc.fecha);
+                    if (dia && dia.startsWith(mesActual)) {
+                        cobrosDelMes += Number(cc.monto || cc.haber || 0);
+                    }
+                }
+            });
+        }
 
         const totalCalle = Math.round(totalDeuda * 100) / 100;
         return {
@@ -641,8 +669,8 @@
                 total_cuentas: lista.length,
                 cuentas_activas: totalCuentas,
                 con_deuda: totalCuentas,
-                cobros_del_mes: 0,
-                cobros_mes: 0,
+                cobros_del_mes: Math.round(cobrosDelMes * 100) / 100,
+                cobros_mes: Math.round(cobrosDelMes * 100) / 100,
                 top_deudores: topDeudores,
                 clientes: lista,
             },

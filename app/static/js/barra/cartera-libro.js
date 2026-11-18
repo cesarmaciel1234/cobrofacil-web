@@ -853,28 +853,24 @@
             vacio.textContent = 'Cargando el libro…';
         }
         try {
-            // 1. Consulta al Espejo local primero (0ms de latencia, cero conflicto en la nube)
-            if (window.Espejo && Espejo.cartera) {
+            const consulta = sucursalId ? ('sucursal_id=' + encodeURIComponent(sucursalId)) : '';
+            // Si la memoria está vacía, mostramos el espejo local como fallback inicial instantáneo
+            if (!allClients.length && window.Espejo && Espejo.cartera) {
                 const carteraEspejo = Espejo.cartera(sucursalId);
                 if (carteraEspejo && carteraEspejo.cartera && carteraEspejo.cartera.clientes && carteraEspejo.cartera.clientes.length) {
                     aplicarLibro(carteraEspejo);
-                    if (window.EspejoEngine && EspejoEngine.syncDelta) {
-                        void EspejoEngine.syncDelta();
-                    }
-                    if (!navigator.onLine) return;
                 }
             }
 
-            const consulta = sucursalId ? ('sucursal_id=' + encodeURIComponent(sucursalId)) : '';
             if (window.Nodo) {
                 const previo = Nodo.tomar('cartera', consulta);
-                if (previo) aplicarLibro(previo);
+                if (previo && previo.cartera) aplicarLibro(previo);
                 const dato = await Nodo.encargar('cartera', consulta);
-                if (dato) {
+                if (dato && dato.cartera) {
                     try { localStorage.setItem(claveCacheCartera(), JSON.stringify(dato)); } catch (e) {}
                     aplicarLibro(dato);
+                    return;
                 }
-                return;
             }
             let url = `${API_BASE}/pos/jefe?panel=admin`;
             if (sucursalId) url += '&sucursal_id=' + encodeURIComponent(sucursalId);
@@ -885,8 +881,10 @@
             }
             if (!response.ok) throw new Error('libro');
             const dato = await response.json();
-            try { localStorage.setItem(claveCacheCartera(), JSON.stringify(dato)); } catch (e) {}
-            aplicarLibro(dato);
+            if (dato && dato.cartera) {
+                try { localStorage.setItem(claveCacheCartera(), JSON.stringify(dato)); } catch (e) {}
+                aplicarLibro(dato);
+            }
         } catch (e) {
             if (!allClients.length && vacio) {
                 vacio.hidden = false;
@@ -1662,10 +1660,28 @@
     if (window.Espejo && Espejo.alActualizar) {
         Espejo.alActualizar(() => {
             if (vistaActiva && vistaActiva()) {
-                const carteraEspejo = Espejo.cartera(sucursalId);
-                if (carteraEspejo && carteraEspejo.cartera && carteraEspejo.cartera.clientes) {
-                    aplicarLibro(carteraEspejo);
+                if (navigator.onLine && window.Nodo) {
+                    const consulta = sucursalId ? ('sucursal_id=' + encodeURIComponent(sucursalId)) : '';
+                    Nodo.encargar('cartera', consulta).then((d) => {
+                        if (d && d.cartera) aplicarLibro(d);
+                    }).catch(() => {
+                        const carteraEspejo = Espejo.cartera(sucursalId);
+                        if (carteraEspejo?.cartera?.clientes) aplicarLibro(carteraEspejo);
+                    });
+                } else {
+                    const carteraEspejo = Espejo.cartera(sucursalId);
+                    if (carteraEspejo && carteraEspejo.cartera && carteraEspejo.cartera.clientes) {
+                        aplicarLibro(carteraEspejo);
+                    }
                 }
+            }
+        });
+    }
+
+    if (window.Nodo && Nodo.alCambiar) {
+        Nodo.alCambiar((pieza, consulta, dato) => {
+            if (pieza === 'cartera' && dato && dato.cartera && vistaActiva && vistaActiva()) {
+                aplicarLibro(dato);
             }
         });
     }
