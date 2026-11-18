@@ -21,11 +21,17 @@ def _num(valor) -> float:
         return 0.0
 
 
-def _activacion(configs: list[dict]) -> str:
+def _activacion(configs: list[dict], sucursal_id: int | None = None) -> str:
+    fechas = []
     for fila in configs:
         clave = str(fila.get("clave") or fila.get("key") or "").strip()
         if clave == "interes_ticket_activado_en" and fila.get("valor") not in (None, ""):
-            return str(fila["valor"])
+            sid = fila.get("sucursal_id")
+            if sucursal_id is not None and sid not in (None, "") and int(sid) != int(sucursal_id):
+                continue
+            fechas.append(str(fila["valor"]).strip())
+    if fechas:
+        return min(fechas)
     return _ACTIVACION
 
 

@@ -592,7 +592,7 @@ def _interes_del_libro(
 
     col_cfg, filas_cfg = filas_de("configuracion", sucursal_id)
     configs = _dicts(col_cfg, filas_cfg) if col_cfg else []
-    activacion = _activacion(configs)
+    activacion = _activacion(configs, sucursal_id)
     tasa_base, tasa_apal, plazo = _politica(configs)
     tarifa_base = f"{_porcentaje(tasa_base)}%"
     tarifa_morosa = f"{_porcentaje(tasa_base + tasa_apal)}%"

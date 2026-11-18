@@ -669,7 +669,7 @@
         const d = client.dias != null ? Number(client.dias) : null;
         if (d != null) {
             if (d >= 30) return `<span class="client-status-badge badge-mora-grave">🚨 ${d}d mora</span>`;
-            if (d > 0) return `<span class="client-status-badge badge-mora-leve">⚠️ ${d}d mora</span>`;
+            if (d > 0) return `<span class="client-status-badge badge-en-plazo">⏱️ ${d}d plazo</span>`;
             return '<span class="client-status-badge badge-al-dia">✓ Al día</span>';
         }
         return '<span class="client-status-badge badge-deuda">Con saldo</span>';
