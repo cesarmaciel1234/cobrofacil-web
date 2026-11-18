@@ -169,51 +169,57 @@
             return true;
         });
 
-        // Obtener lista única de departamentos
-        const deptosSet = new Set(catalogo.map((p) => p.departamento).filter(Boolean));
-        const deptosList = Array.from(deptosSet).sort();
+        const filas = filtrados.length
+            ? filtrados.map((p) => {
+                const esPesable = p.es_pesable || p.unidad === 'KG';
+                const unidadTxt = esPesable ? 'kg' : 'un';
+                const decimales = esPesable ? 3 : 0;
+                const stockFmt = formatearNumero(p.stock, decimales);
+                const auditado = p.auditado_hoy && p.ultimo_conteo !== null;
+                const conteoFmt = auditado ? formatearNumero(p.ultimo_conteo, decimales) : '';
+                const diff = auditado ? (p.diferencia || 0) : 0;
+                const diffFmt = auditado ? ((diff >= 0 ? '+' : '') + formatearNumero(diff, decimales)) : '';
 
-        const badgeConexion = fuenteConexion === 'mariadb_maestra'
-            ? '<span class="audit-badge-online">⚡ Conexión Directa MariaDB (192.168.0.8)</span>'
-            : '<span class="audit-badge-offline">📶 Servidor Nube / Caché Offline</span>';
+                let subHtml = '';
+                if (auditado) {
+                    const diffColor = Math.abs(diff) < 0.001 ? '#10b981' : (diff < 0 ? '#ef4444' : '#0ea5e9');
+                    const diffLabel = Math.abs(diff) < 0.001 ? 'exacto' : (diff < 0 ? 'faltante' : 'sobrante');
+                    subHtml = `<span class="pedido-meta">
+                        <b class="pedido-stock" style="color:#10b981;">${conteoFmt} ${unidadTxt} real</b>
+                        <span class="pedido-pedir" style="color:${diffColor}; font-weight:700;">(${diffFmt} ${diffLabel})</span>
+                    </span>`;
+                } else {
+                    const stockColor = p.stock <= 0 ? '#ef4444' : '#1e293b';
+                    subHtml = `<span class="pedido-meta">
+                        <b class="pedido-stock" style="color:${stockColor};">${stockFmt}</b>
+                        <span class="pedido-pedir">en sistema ${unidadTxt}</span>
+                    </span>`;
+                }
+
+                let btnHtml = '';
+                if (auditado) {
+                    btnHtml = `<button type="button" class="pedido-mas en-carrito" style="background:#10b981; color:#fff;" data-contar="${p.id}" aria-label="Ajustar">
+                        <b>${conteoFmt}</b>
+                        <small>${unidadTxt}</small>
+                    </button>`;
+                } else {
+                    btnHtml = `<button type="button" class="pedido-mas" data-contar="${p.id}" aria-label="Contar">+</button>`;
+                }
+
+                return `<div class="pedido-fila" data-pid="${p.id}">
+                    <button type="button" class="pedido-cuerpo" data-contar="${p.id}">
+                        <span class="pedido-nombre">${p.nombre}</span>
+                        ${subHtml}
+                    </button>
+                    ${btnHtml}
+                </div>`;
+            }).join('')
+            : `<p class="pedido-vacio" style="padding: 24px; text-align: center; color: #94a3b8;">No hay artículos con ese filtro.</p>`;
 
         wrap.innerHTML = `
-            <div class="auditoria-container">
-                <!-- Barra de Estado y Acciones Rápidas -->
-                <div class="auditoria-top-bar">
-                    ${badgeConexion}
-                    <div class="auditoria-top-actions">
-                        <button type="button" class="btn-audit-sec" id="btnHistorialAuditoria" title="Ver historial de conteos">📋 Historial</button>
-                        <button type="button" class="btn-audit-sec" id="btnExportarAuditoria" title="Descargar planilla Excel/CSV">📊 Exportar</button>
-                    </div>
-                </div>
-
-                <!-- KPIs en Vivo (4 Cards táctiles) -->
-                <div class="auditoria-kpi-grid">
-                    <div class="audit-kpi-card ${filtroEstado === 'todos' ? 'active' : ''}" data-filtro="todos">
-                        <span class="kpi-label">TOTAL SKU</span>
-                        <b class="kpi-val">${resumen.total_sku}</b>
-                        <span class="kpi-sub">artículos activos</span>
-                    </div>
-                    <div class="audit-kpi-card ${filtroEstado === 'auditados' ? 'active' : ''}" data-filtro="auditados">
-                        <span class="kpi-label">AUDITADOS</span>
-                        <b class="kpi-val kpi-green">${resumen.auditados} / ${resumen.total_sku}</b>
-                        <span class="kpi-sub">${resumen.total_sku > 0 ? Math.round((resumen.auditados / resumen.total_sku) * 100) : 0}% contados</span>
-                    </div>
-                    <div class="audit-kpi-card ${filtroEstado === 'diferencia' ? 'active' : ''}" data-filtro="diferencia">
-                        <span class="kpi-label">CON DIFERENCIA</span>
-                        <b class="kpi-val ${resumen.con_diferencia > 0 ? 'kpi-red' : ''}">${resumen.con_diferencia}</b>
-                        <span class="kpi-sub">${resumen.faltantes} falt. · ${resumen.sobrantes} sobr.</span>
-                    </div>
-                    <div class="audit-kpi-card ${filtroEstado === 'quiebre' ? 'active' : ''}" data-filtro="quiebre">
-                        <span class="kpi-label">EN QUIEBRE</span>
-                        <b class="kpi-val ${resumen.quiebre > 0 ? 'kpi-orange' : ''}">${resumen.quiebre}</b>
-                        <span class="kpi-sub">stock en cero</span>
-                    </div>
-                </div>
-
-                <!-- Buscador Móvil Mejorado con Ícono de Cámara para Escanear -->
-                <div class="auditoria-search-wrap">
+            <div class="auditoria-mobile-container" style="padding: 10px 12px 60px;">
+                <!-- Buscador Móvil con Ícono de Cámara para Escanear -->
+                <div class="auditoria-search-wrap" style="margin-bottom: 10px;">
                     <div class="auditoria-input-box">
                         <input type="search" id="auditoriaSearchInput" class="auditoria-search-input" 
                                placeholder="Buscar corte, código o escanear..." 
@@ -229,8 +235,8 @@
                     </button>
                 </div>
 
-                <!-- Chips de Filtrado Horizontal -->
-                <div class="auditoria-chips-scroll">
+                <!-- Chips Rápidos (Estilo simple como pedido) -->
+                <div class="auditoria-chips-scroll" style="margin-bottom: 12px;">
                     <button type="button" class="chip-btn ${filtroEstado === 'todos' ? 'active' : ''}" data-f="todos">Todos (${resumen.total_sku})</button>
                     <button type="button" class="chip-btn ${filtroEstado === 'auditados' ? 'active' : ''}" data-f="auditados">Auditados (${resumen.auditados})</button>
                     <button type="button" class="chip-btn ${filtroEstado === 'pendientes' ? 'active' : ''}" data-f="pendientes">Pendientes (${resumen.pendientes})</button>
@@ -238,74 +244,21 @@
                     <button type="button" class="chip-btn ${filtroEstado === 'quiebre' ? 'active' : ''}" data-f="quiebre">Quiebre 0 (${resumen.quiebre})</button>
                 </div>
 
-                <!-- Filtro por Departamento / Rubro -->
-                <div class="auditoria-deptos-scroll">
-                    <button type="button" class="depto-chip ${!filtroDepto ? 'active' : ''}" data-depto="">Todos los rubros</button>
-                    ${deptosList.map((d) => `<button type="button" class="depto-chip ${filtroDepto === d ? 'active' : ''}" data-depto="${d}">${d}</button>`).join('')}
+                <!-- Barra de acciones secundarias discreta -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; padding: 0 4px;">
+                    <span style="font-size: 11.5px; color: #64748b; font-weight: 600;">
+                        ${fuenteConexion === 'mariadb_maestra' ? '⚡ MariaDB Maestra (192.168.0.8)' : '📶 Modo Local'}
+                    </span>
+                    <div style="display: flex; gap: 8px;">
+                        <button type="button" id="btnHistorialAuditoria" style="background: none; border: none; color: #3b82f6; font-size: 12px; font-weight: 700; cursor: pointer; padding: 2px 4px;">Historial</button>
+                        <span style="color: #cbd5e1;">·</span>
+                        <button type="button" id="btnExportarAuditoria" style="background: none; border: none; color: #3b82f6; font-size: 12px; font-weight: 700; cursor: pointer; padding: 2px 4px;">Exportar</button>
+                    </div>
                 </div>
 
-                <!-- Lista Táctil de Productos (Mobile Cards) -->
-                <div class="auditoria-lista-cards">
-                    ${filtrados.length === 0 ? `
-                        <div class="audit-vacio">
-                            <span class="vacio-ico">🔍</span>
-                            <p>No se encontraron artículos con ese filtro.</p>
-                            ${textoBusqueda || filtroEstado !== 'todos' || filtroDepto ? '<button type="button" class="btn-audit-sec" id="btnRestablecerFiltros">Restablecer filtros</button>' : ''}
-                        </div>
-                    ` : filtrados.map((p) => {
-                        const esPesable = p.es_pesable || p.unidad === 'KG';
-                        const unidadTxt = esPesable ? 'KG' : 'UN';
-                        const decimales = esPesable ? 3 : 0;
-                        const stockFmt = formatearNumero(p.stock, decimales);
-                        
-                        let badgeEstado = '';
-                        if (p.auditado_hoy) {
-                            const diff = p.diferencia || 0;
-                            if (Math.abs(diff) < 0.001) {
-                                badgeEstado = '<span class="status-pill exacto">✓ Exacto</span>';
-                            } else if (diff < 0) {
-                                badgeEstado = `<span class="status-pill faltante">Faltante ${formatearNumero(diff, decimales)} ${unidadTxt}</span>`;
-                            } else {
-                                badgeEstado = `<span class="status-pill sobrante">+${formatearNumero(diff, decimales)} ${unidadTxt} Sobrante</span>`;
-                            }
-                        } else if (p.stock <= 0.0001) {
-                            badgeEstado = '<span class="status-pill quiebre">Quiebre (0)</span>';
-                        } else {
-                            badgeEstado = '<span class="status-pill pendiente">Pendiente</span>';
-                        }
-
-                        return `
-                            <div class="audit-card ${p.auditado_hoy ? 'card-auditado' : ''}" data-pid="${p.id}">
-                                <div class="audit-card-head">
-                                    <div class="audit-card-title-wrap">
-                                        <div class="audit-card-nombre">${p.nombre}</div>
-                                        <div class="audit-card-meta">
-                                            <span class="meta-depto">${p.departamento || 'GENERAL'}</span>
-                                            ${p.codigo ? `<span class="meta-code">Cód: ${p.codigo}</span>` : `<span class="meta-code">ID: ${p.id}</span>`}
-                                            <span class="meta-price">${formatearPlata(p.precio)}</span>
-                                        </div>
-                                    </div>
-                                    <div class="audit-card-badge-wrap">
-                                        ${badgeEstado}
-                                    </div>
-                                </div>
-
-                                <div class="audit-card-body">
-                                    <div class="stock-box">
-                                        <span class="stock-lbl">Sistema</span>
-                                        <b class="stock-val">${stockFmt} <small>${unidadTxt}</small></b>
-                                    </div>
-                                    <div class="stock-box ${p.auditado_hoy ? 'conteo-hecho' : 'conteo-pendiente'}">
-                                        <span class="stock-lbl">Conteo Real</span>
-                                        <b class="stock-val">${p.auditado_hoy ? formatearNumero(p.ultimo_conteo, decimales) : '—'} <small>${p.auditado_hoy ? unidadTxt : ''}</small></b>
-                                    </div>
-                                    <button type="button" class="btn-contar-card" data-contar="${p.id}">
-                                        ${p.auditado_hoy ? '✎ Recalcular' : '⚡ Contar'}
-                                    </button>
-                                </div>
-                            </div>
-                        `;
-                    }).join('')}
+                <!-- Lista Simple e Idéntica a Pedidos (pedido-lista y pedido-fila) -->
+                <div class="pedido-lista">
+                    ${filas}
                 </div>
             </div>
         `;
@@ -384,7 +337,7 @@
             });
         });
 
-        // Botones de Contar en cada card
+        // Botones de Contar en cada fila
         document.querySelectorAll('[data-contar]').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -394,10 +347,10 @@
             });
         });
 
-        // Clic en la card completa también abre conteo
-        document.querySelectorAll('.audit-card').forEach((card) => {
-            card.addEventListener('click', () => {
-                const pid = parseInt(card.dataset.pid, 10);
+        // Clic en la fila completa también abre conteo
+        document.querySelectorAll('.pedido-fila').forEach((fila) => {
+            fila.addEventListener('click', () => {
+                const pid = parseInt(fila.dataset.pid, 10);
                 const prod = catalogo.find((p) => p.id === pid);
                 if (prod) abrirDrawerConteo(prod);
             });

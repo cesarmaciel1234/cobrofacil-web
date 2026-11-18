@@ -3,6 +3,37 @@
    Estilos específicos para celular y escritorio.
    ============================================================================== */
 
+.auditoria-mobile-container {
+    max-width: 640px;
+    margin: 0 auto;
+}
+
+.auditoria-mobile-container .pedido-lista {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.auditoria-mobile-container .pedido-fila {
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+
+.auditoria-mobile-container .pedido-fila:active {
+    background: #f1f5f9;
+}
+
+.auditoria-mobile-container .pedido-mas {
+    user-select: none;
+    transition: transform 0.1s ease;
+}
+
+.auditoria-mobile-container .pedido-mas:active {
+    transform: scale(0.92);
+}
+
 .auditoria-container {
     padding: 12px 14px 40px;
     display: flex;
