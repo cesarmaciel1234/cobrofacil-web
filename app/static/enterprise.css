@@ -3603,55 +3603,87 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
     text-align: right;
 }
 
-/* Tabla Detalle por Día (3 columnas limpias y 100% responsiva en móvil) */
+/* Tabla Detalle por Día (3 columnas limpias, 100% responsiva y sin desborde en móvil) */
 #rfTablaDetalle {
-    width: 100%;
-    table-layout: fixed;
-    border-collapse: collapse;
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    margin: 0 !important;
 }
 #rfTablaDetalle th,
 #rfTablaDetalle td {
-    padding: 10px 8px !important;
+    padding: 8px 4px !important;
     vertical-align: middle;
+    overflow: hidden;
+    box-sizing: border-box;
 }
 #rfTablaDetalle th:nth-child(1),
 #rfTablaDetalle td:nth-child(1) {
-    width: 32%;
+    width: 27% !important;
     padding-left: 6px !important;
     text-align: left;
 }
 #rfTablaDetalle th:nth-child(2),
 #rfTablaDetalle td:nth-child(2) {
-    width: 46%;
+    width: 45% !important;
     text-align: right;
+    padding-right: 4px !important;
 }
 #rfTablaDetalle th:nth-child(3),
 #rfTablaDetalle td:nth-child(3) {
-    width: 22%;
+    width: 28% !important;
     padding-right: 6px !important;
     text-align: right;
 }
 
+.rf-tabla-card {
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 14px 10px;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    margin-bottom: 16px;
+    overflow: hidden;
+}
+.rf-tabla-card .table-wrap {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    max-width: 100% !important;
+}
+
+.rf-row-dia {
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.rf-row-dia:active,
+.rf-row-dia:hover {
+    background: rgba(37, 99, 235, 0.05) !important;
+}
+
 @media (max-width: 640px) {
     .rf-tabla-card {
-        padding: 12px 8px;
+        padding: 10px 6px !important;
+        margin-left: -4px;
+        margin-right: -4px;
     }
     #rfTablaDetalle th,
     #rfTablaDetalle td {
-        padding: 9px 4px !important;
+        padding: 7px 3px !important;
     }
     #rfTablaDetalle th:nth-child(1),
     #rfTablaDetalle td:nth-child(1) {
-        width: 33%;
+        width: 26% !important;
         padding-left: 4px !important;
     }
     #rfTablaDetalle th:nth-child(2),
     #rfTablaDetalle td:nth-child(2) {
-        width: 45%;
+        width: 46% !important;
+        padding-right: 3px !important;
     }
     #rfTablaDetalle th:nth-child(3),
     #rfTablaDetalle td:nth-child(3) {
-        width: 22%;
+        width: 28% !important;
         padding-right: 4px !important;
     }
 }
@@ -4061,15 +4093,16 @@ body.wa-modal-open {
 
 /* ─── Reporte Financiero: Tabla Días, Comparativas y Proyección ─── */
 .rf-subline {
-    font-size: 10.5px;
+    font-size: 10px;
     font-weight: 600;
     margin-top: 2px;
     color: var(--text-secondary);
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: flex-end;
-    gap: 4px;
-    line-height: 1.2;
+    gap: 3px;
+    line-height: 1.15;
 }
 .rf-subline-lbl {
     color: var(--text-muted);

@@ -24,6 +24,21 @@
         }
     }
 
+    function formatPesosCompact(n) {
+        if (n == null) return '$0';
+        try {
+            const val = Number(n) || 0;
+            const neg = val < 0;
+            const abs = Math.abs(val);
+            const entero = Math.round(abs);
+            const sEntero = entero.toLocaleString('es-AR');
+            const res = `$${sEntero}`;
+            return neg ? `-${res}` : res;
+        } catch (e) {
+            return '$0';
+        }
+    }
+
     function cambiarPantalla(pantalla) {
         pantallaActual = pantalla || 'vitrina';
         const vitrinaBox = $('reporteVitrina');
@@ -184,7 +199,7 @@
                 tablaCuerpo.innerHTML = '<tr><td colspan="3" style="text-align:center; padding:16px; color:var(--text-muted);">Sin datos</td></tr>';
                 if (tablaPie) tablaPie.innerHTML = '';
             } else {
-                tablaCuerpo.innerHTML = serie.map(s => {
+                tablaCuerpo.innerHTML = serie.map((s, idx) => {
                     const v = Number(s.ventas) || 0;
                     const vp = Number(s.ventas_prev) || 0;
                     const t = Number(s.tickets) || 0;
@@ -194,9 +209,9 @@
                     if (v > 0 && vp > 0) {
                         const diff = (((v - vp) / vp) * 100).toFixed(0);
                         const isUp = v >= vp;
-                        subVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(vp)} <span class="${isUp ? 'rf-diff-up' : 'rf-diff-down'}">(${isUp ? '+' : ''}${diff}%)</span></div>`;
+                        subVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesosCompact(vp)} <span class="${isUp ? 'rf-diff-up' : 'rf-diff-down'}">(${isUp ? '+' : ''}${diff}%)</span></div>`;
                     } else if (v === 0 && vp > 0) {
-                        subVentas = `<div class="rf-subline rf-subline-meta"><span class="rf-subline-lbl-meta">Meta:</span> ${formatPesos(vp)}</div>`;
+                        subVentas = `<div class="rf-subline rf-subline-meta"><span class="rf-subline-lbl-meta">Meta:</span> ${formatPesosCompact(vp)}</div>`;
                     }
 
                     let subTickets = '';
@@ -205,24 +220,38 @@
                     }
 
                     return `
-                        <tr>
+                        <tr class="rf-row-dia clickable" data-dia-idx="${idx}" title="Toca para ver tickets de este día">
                             <td>
-                                <div style="font-weight:700; color:var(--text-primary); font-size:13px; line-height:1.2;">
+                                <div style="font-weight:700; color:var(--text-primary); font-size:12.5px; line-height:1.2;">
                                     ${s.label}
-                                    ${s.fecha ? `<small style="color:var(--text-muted); font-weight:500; font-size:11px; display:inline-block; margin-left:2px;">(${s.fecha})</small>` : ''}
+                                    ${s.fecha ? `<small style="color:var(--text-muted); font-weight:500; font-size:10.5px; display:inline-block; margin-left:2px;">(${s.fecha})</small>` : ''}
                                 </div>
                             </td>
                             <td style="text-align:right;">
-                                <div style="font-weight:800; color:var(--accent); font-size:13.5px; line-height:1.2;">${formatPesos(v)}</div>
+                                <div style="font-weight:800; color:var(--accent); font-size:13px; line-height:1.2;">${formatPesos(v)}</div>
                                 ${subVentas}
                             </td>
                             <td style="text-align:right;">
-                                <div style="font-weight:700; color:var(--text-primary); font-size:13.5px; line-height:1.2;">${t} <small style="font-size:10.5px; color:var(--text-muted); font-weight:600;">tkt</small></div>
+                                <div style="font-weight:800; color:var(--text-primary); font-size:13px; line-height:1.2;">${t} <small style="font-size:10px; color:var(--text-muted); font-weight:600;">tkt</small></div>
                                 ${subTickets}
                             </td>
                         </tr>
                     `;
                 }).join('');
+
+                if (!tablaCuerpo.dataset.clickBound) {
+                    tablaCuerpo.dataset.clickBound = 'true';
+                    tablaCuerpo.addEventListener('click', (e) => {
+                        const tr = e.target.closest('tr.rf-row-dia');
+                        if (!tr) return;
+                        const btnTicket = document.querySelector('[data-pwa-view="ticket"]');
+                        if (btnTicket) {
+                            btnTicket.click();
+                        } else if (typeof marcarEntrada === 'function') {
+                            marcarEntrada('ticket');
+                        }
+                    });
+                }
 
                 if (tablaPie) {
                     const sumV = serie.reduce((acc, s) => acc + (Number(s.ventas) || 0), 0);
@@ -237,9 +266,9 @@
                     if (sumVp > 0 && sumV > 0) {
                         const diffTot = (((sumV - sumVp) / sumVp) * 100).toFixed(1);
                         const isUpTot = sumV >= sumVp;
-                        subTotalVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(sumVp)} <span class="${isUpTot ? 'rf-diff-up' : 'rf-diff-down'}">(${isUpTot ? '+' : ''}${diffTot}%)</span></div>`;
+                        subTotalVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesosCompact(sumVp)} <span class="${isUpTot ? 'rf-diff-up' : 'rf-diff-down'}">(${isUpTot ? '+' : ''}${diffTot}%)</span></div>`;
                     } else if (sumVp > 0) {
-                        subTotalVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesos(sumVp)}</div>`;
+                        subTotalVentas = `<div class="rf-subline"><span class="rf-subline-lbl">Ant:</span> ${formatPesosCompact(sumVp)}</div>`;
                     }
 
                     const proy = data.proyeccion;
