@@ -9,7 +9,7 @@ databases:
 
 services:
   - type: web
-    name: crm-frigorifico
+    name: cobrofacil
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt && python scripts/generate_icons.py
