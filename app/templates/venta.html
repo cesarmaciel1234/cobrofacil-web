@@ -534,7 +534,7 @@
                 {% else %}
                 <a class="btn btn-solido" href="/login">🏢 Iniciar sesión en Central</a>
                 {% endif %}
-                <a class="btn btn-delivery" href="#delivery">🛵 Tienda Delivery & Compras</a>
+                <a class="btn btn-delivery" href="https://repartofacil.onrender.com" target="_blank">🛵 Tienda Delivery & Compras</a>
                 <a class="btn btn-ghost" href="{{ instalador }}">💻 Descargar TPV Caja (PC)</a>
             </div>
         </section>
@@ -663,9 +663,12 @@
                 </div>
             </div>
 
-            <div>
-                <button class="btn btn-delivery" onclick="abrirModalDelivery()" style="font-size:16px; min-height:54px; padding:12px 24px;">
-                    🛵 Ver Info de Delivery Público
+            <div style="display: flex; flex-direction: column; gap: 10px;">
+                <a class="btn btn-delivery" href="https://repartofacil.onrender.com" target="_blank" style="font-size:16px; min-height:54px; padding:12px 24px;">
+                    🛵 Ir a RepartoFacil (Tienda Online)
+                </a>
+                <button class="btn btn-ghost" onclick="abrirModalDelivery()" style="font-size:14px; min-height:42px;">
+                    ℹ️ ¿Cómo funciona?
                 </button>
             </div>
         </section>
