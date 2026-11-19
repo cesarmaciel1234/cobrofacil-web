@@ -3,161 +3,719 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Cobro Fácil</title>
-    <meta name="description" content="Cobro Fácil es la caja de la sucursal y el tablero de todas las sucursales.">
+    <title>Cobro Fácil — Central de Sucursales, Cajas y Delivery</title>
+    <meta name="description" content="Cobro Fácil: Central de sucursales, puntos de venta en locales y tienda de delivery compras públicas, todos conectados a una única base de datos en tiempo real.">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-title" content="Cobro Fácil">
     <link rel="icon" type="image/png" href="/static/icons/icon-192.png">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800;900&display=swap">
     <style>
         :root {
             --ink: #f8fafc;
             --muted: #94a3b8;
-            --line: rgba(255, 255, 255, 0.08);
+            --line: rgba(255, 255, 255, 0.09);
             --blue: #4f46e5;
             --blue-2: #2563eb;
+            --cyan: #06b6d4;
+            --emerald: #10b981;
+            --amber: #f59e0b;
+            --bg-card: rgba(15, 23, 42, 0.78);
         }
         * { box-sizing: border-box; }
-        html, body { margin: 0; padding: 0; }
+        html, body { margin: 0; padding: 0; scroll-behavior: smooth; }
         body {
             min-height: 100vh;
             color: var(--ink);
-            font-family: Outfit, "Segoe UI", sans-serif;
+            font-family: Outfit, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             background:
-                radial-gradient(circle at 80% -10%, rgba(79, 70, 229, 0.35), transparent 36%),
-                radial-gradient(circle at 0% 80%, rgba(37, 99, 235, 0.18), transparent 32%),
+                radial-gradient(circle at 85% -10%, rgba(79, 70, 229, 0.40), transparent 42%),
+                radial-gradient(circle at 10% 45%, rgba(6, 182, 212, 0.16), transparent 38%),
+                radial-gradient(circle at 50% 90%, rgba(37, 99, 235, 0.22), transparent 45%),
                 #070b14;
+            overflow-x: hidden;
         }
         a { color: inherit; text-decoration: none; }
+        
+        /* ─── Header Barra ─── */
         .barra {
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            width: min(1080px, calc(100% - 32px));
+            width: min(1120px, calc(100% - 32px));
             margin: 0 auto;
-            padding: 22px 0;
+            padding: 20px 0;
+            border-bottom: 1px solid var(--line);
         }
-        .marca { display: flex; align-items: center; gap: 12px; font-weight: 800; letter-spacing: -0.03em; }
+        .marca { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 20px; letter-spacing: -0.03em; }
         .logo {
             width: 42px; height: 42px; border-radius: 12px;
             display: grid; place-items: center;
             background: linear-gradient(135deg, var(--blue), var(--blue-2));
-            font-size: 15px;
+            box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+            font-size: 16px; font-weight: 900;
         }
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .nav-item {
+            color: var(--muted);
+            font-size: 14.5px;
+            font-weight: 600;
+            transition: color 0.15s;
+        }
+        .nav-item:hover { color: #ffffff; }
         .acciones { display: flex; gap: 10px; align-items: center; }
         .btn {
-            display: inline-flex; align-items: center; justify-content: center;
-            min-height: 48px; padding: 12px 18px; border-radius: 14px;
-            font-weight: 700; line-height: 1.15; text-align: center;
-            border: 1px solid transparent;
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            min-height: 46px; padding: 10px 18px; border-radius: 14px;
+            font-weight: 700; font-size: 15px; line-height: 1.15; text-align: center;
+            border: 1px solid transparent; cursor: pointer; transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            user-select: none;
         }
-        .btn-ghost { border-color: var(--line); background: rgba(255,255,255,0.04); }
+        .btn:active { transform: scale(0.98); }
+        .btn-ghost { border-color: var(--line); background: rgba(255,255,255,0.05); color: var(--ink); }
+        .btn-ghost:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
         .btn-solido {
             background: linear-gradient(135deg, var(--blue), var(--blue-2));
-            box-shadow: 0 10px 24px rgba(79, 70, 229, 0.35);
+            color: #ffffff;
+            box-shadow: 0 10px 24px rgba(79, 70, 229, 0.38);
         }
-        .hero, .franja, .pie { width: min(1080px, calc(100% - 32px)); margin: 0 auto; }
-        .hero { padding: 28px 0 12px; }
+        .btn-solido:hover {
+            box-shadow: 0 14px 28px rgba(79, 70, 229, 0.55);
+            filter: brightness(1.06);
+        }
+        .btn-delivery {
+            background: linear-gradient(135deg, #059669, #10b981);
+            color: #ffffff;
+            box-shadow: 0 10px 22px rgba(16, 185, 129, 0.35);
+        }
+        .btn-delivery:hover {
+            filter: brightness(1.08);
+            box-shadow: 0 12px 26px rgba(16, 185, 129, 0.5);
+        }
+
+        /* ─── Hero Section ─── */
+        .hero {
+            width: min(1120px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 44px 0 20px;
+        }
+        .badge-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(79, 70, 229, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #c7d2fe;
+            margin-bottom: 20px;
+            letter-spacing: 0.02em;
+        }
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 10px #10b981;
+        }
         .hero h1 {
-            margin: 0 0 14px;
-            max-width: 16ch;
-            font-size: clamp(40px, 7vw, 72px);
-            line-height: 0.95;
-            letter-spacing: -0.045em;
+            margin: 0 0 18px;
+            max-width: 17ch;
+            font-size: clamp(38px, 6.2vw, 68px);
+            line-height: 1.02;
+            letter-spacing: -0.04em;
+            font-weight: 900;
         }
-        .hero p { margin: 0 0 28px; max-width: 46ch; color: var(--muted); font-size: 18px; line-height: 1.5; }
-        .hero-acciones { display: flex; flex-wrap: wrap; gap: 12px; }
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(3, minmax(0, 1fr));
+        .hero h1 .highlight-text {
+            background: linear-gradient(135deg, #818cf8, #38bdf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .hero p {
+            margin: 0 0 32px;
+            max-width: 58ch;
+            color: var(--muted);
+            font-size: 18.5px;
+            line-height: 1.55;
+            font-weight: 450;
+        }
+        .hero-acciones {
+            display: flex;
+            flex-wrap: wrap;
             gap: 14px;
-            width: min(1080px, calc(100% - 32px));
-            margin: 18px auto 48px;
+            margin-bottom: 38px;
+        }
+
+        /* ─── Diagrama del Ecosistema Unificado ─── */
+        .ecosistema-card {
+            width: min(1120px, calc(100% - 32px));
+            margin: 10px auto 44px;
+            padding: 30px;
+            border-radius: 24px;
+            background: linear-gradient(180deg, rgba(30, 41, 59, 0.65) 0%, rgba(15, 23, 42, 0.85) 100%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45);
+        }
+        .eco-header {
+            text-align: center;
+            max-width: 620px;
+            margin: 0 auto 30px;
+        }
+        .eco-tag {
+            font-size: 12px;
+            font-weight: 800;
+            color: #38bdf8;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            display: block;
+            margin-bottom: 6px;
+        }
+        .eco-header h2 {
+            margin: 0 0 8px;
+            font-size: clamp(22px, 3.5vw, 30px);
+            letter-spacing: -0.03em;
+        }
+        .eco-header p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        .eco-grid {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            align-items: center;
+            gap: 20px;
+        }
+        .eco-nodes-left, .eco-nodes-right {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .eco-node {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px 16px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            transition: all 0.2s ease;
+        }
+        .eco-node:hover {
+            border-color: rgba(99, 102, 241, 0.4);
+            transform: translateY(-2px);
+        }
+        .eco-node-ico {
+            font-size: 24px;
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: grid;
+            place-items: center;
+            background: rgba(255, 255, 255, 0.05);
+            flex-shrink: 0;
+        }
+        .eco-node-title {
+            font-weight: 800;
+            font-size: 14.5px;
+            color: var(--ink);
+            margin-bottom: 2px;
+        }
+        .eco-node-desc {
+            font-size: 12px;
+            color: var(--muted);
+        }
+        .eco-badge {
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 6px;
+            margin-left: auto;
+            flex-shrink: 0;
+        }
+        .badge-live { background: rgba(16, 185, 129, 0.18); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .badge-sync { background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); }
+        .badge-pub { background: rgba(245, 158, 11, 0.18); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+        /* Centro Base de Datos */
+        .eco-center-hub {
+            text-align: center;
+            padding: 24px 20px;
+            background: radial-gradient(circle, rgba(79, 70, 229, 0.25) 0%, rgba(15, 23, 42, 0.9) 80%);
+            border: 2px solid #6366f1;
+            border-radius: 22px;
+            box-shadow: 0 0 35px rgba(99, 102, 241, 0.25);
+            max-width: 240px;
+            margin: 0 auto;
+        }
+        .eco-db-icon {
+            font-size: 38px;
+            display: block;
+            margin-bottom: 8px;
+            animation: pulse-glow 3s infinite alternate;
+        }
+        @keyframes pulse-glow {
+            from { transform: scale(1); filter: drop-shadow(0 0 8px rgba(99,102,241,0.5)); }
+            to { transform: scale(1.06); filter: drop-shadow(0 0 18px rgba(56,189,248,0.7)); }
+        }
+        .eco-db-title {
+            font-size: 15px;
+            font-weight: 900;
+            color: #ffffff;
+            letter-spacing: -0.01em;
+            margin-bottom: 4px;
+        }
+        .eco-db-sub {
+            font-size: 11.5px;
+            color: #c7d2fe;
+            line-height: 1.35;
+        }
+
+        /* ─── Grilla de los 4 Pilares ─── */
+        .grid-pilares {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 16px;
+            width: min(1120px, calc(100% - 32px));
+            margin: 0 auto 48px;
         }
         .carta {
-            padding: 22px;
+            padding: 24px;
             border: 1px solid var(--line);
             border-radius: 20px;
-            background: rgba(15, 23, 42, 0.72);
+            background: var(--bg-card);
             border-top: 3px solid #6366f1;
+            transition: transform 0.2s, border-color 0.2s;
         }
-        .carta span { display: block; margin-bottom: 8px; color: #a5b4fc; font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
-        .carta h2 { margin: 0 0 8px; font-size: 22px; letter-spacing: -0.03em; }
-        .carta p { margin: 0; color: var(--muted); line-height: 1.45; }
+        .carta:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255, 255, 255, 0.18);
+        }
+        .carta.c-central { border-top-color: #4f46e5; }
+        .carta.c-sucursal { border-top-color: #2563eb; }
+        .carta.c-delivery { border-top-color: #10b981; }
+        .carta.c-movil { border-top-color: #f59e0b; }
+
+        .carta span.tag {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 11.5px;
+            font-weight: 800;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+        .c-central span.tag { color: #a5b4fc; }
+        .c-sucursal span.tag { color: #93c5fd; }
+        .c-delivery span.tag { color: #6ee7b7; }
+        .c-movil span.tag { color: #fde68a; }
+
+        .carta h2 {
+            margin: 0 0 10px;
+            font-size: 21px;
+            letter-spacing: -0.03em;
+            font-weight: 800;
+        }
+        .carta p {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.5;
+            font-size: 14.5px;
+        }
+
+        /* ─── Sección Destacada Delivery ─── */
+        .seccion-delivery {
+            width: min(1120px, calc(100% - 32px));
+            margin: 0 auto 48px;
+            padding: 32px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, rgba(6, 78, 59, 0.45) 0%, rgba(15, 23, 42, 0.95) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 28px;
+            flex-wrap: wrap;
+        }
+        .delivery-info {
+            max-width: 620px;
+        }
+        .delivery-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.4);
+            padding: 4px 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 12px;
+        }
+        .delivery-info h2 {
+            margin: 0 0 10px;
+            font-size: clamp(24px, 4vw, 32px);
+            letter-spacing: -0.03em;
+            font-weight: 900;
+        }
+        .delivery-info p {
+            margin: 0 0 18px;
+            color: #cbd5e1;
+            font-size: 16px;
+            line-height: 1.5;
+        }
+        .delivery-pasos {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+            gap: 12px;
+            margin-top: 14px;
+        }
+        .delivery-paso {
+            background: rgba(0, 0, 0, 0.25);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            padding: 12px;
+            border-radius: 12px;
+        }
+        .delivery-paso-num {
+            font-weight: 900;
+            font-size: 12px;
+            color: #34d399;
+            margin-bottom: 4px;
+        }
+        .delivery-paso-txt {
+            font-size: 13px;
+            color: #94a3b8;
+            line-height: 1.35;
+        }
+
+        /* ─── Franja Instalador Computadora ─── */
         .franja {
-            display: flex; justify-content: space-between; align-items: center; gap: 18px;
-            padding: 22px; margin-bottom: 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 20px;
+            width: min(1120px, calc(100% - 32px));
+            margin: 0 auto 36px;
+            padding: 26px 30px;
             border-radius: 22px;
             background: #0f172a;
             border: 1px solid var(--line);
         }
-        .franja h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.03em; }
-        .franja p { margin: 0; color: var(--muted); }
-        .pie { padding: 8px 0 32px; color: #64748b; font-size: 13px; }
-        @media (max-width: 800px) {
-            .grid { grid-template-columns: 1fr; margin-top: 8px; }
-            .barra { flex-direction: row; align-items: center; padding: 14px 0; }
-            .acciones { width: auto; }
-            .acciones .btn { flex: none; white-space: nowrap; min-height: 42px; padding: 10px 14px; }
-            .hero { padding: 8px 0 4px; }
-            .hero h1 { font-size: clamp(34px, 10.4vw, 52px); max-width: 11ch; }
-            .hero p { font-size: 16px; margin-bottom: 18px; }
-            .hero-acciones, .franja { flex-direction: column; align-items: stretch; }
-            .hero-acciones .btn, .franja .btn { width: 100%; min-height: 54px; }
+        .franja h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.03em; font-weight: 800; }
+        .franja p { margin: 0; color: var(--muted); font-size: 15px; }
+
+        /* ─── Footer ─── */
+        .pie {
+            width: min(1120px, calc(100% - 32px));
+            margin: 0 auto;
+            padding: 16px 0 36px;
+            border-top: 1px solid var(--line);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            color: #64748b;
+            font-size: 13px;
+        }
+
+        /* ─── Modal para Tienda Delivery ─── */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.75);
+            backdrop-filter: blur(8px);
+            z-index: 9999;
+            place-items: center;
+            padding: 16px;
+        }
+        .modal-card {
+            background: #0f172a;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 22px;
+            max-width: 480px;
+            width: 100%;
+            padding: 28px;
+            box-shadow: 0 25px 60px rgba(0,0,0,0.6);
+            position: relative;
+        }
+        .modal-close {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: rgba(255,255,255,0.08);
+            border: none;
+            color: #ffffff;
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            font-size: 16px;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+        }
+
+        /* ─── Mobile Responsiveness ─── */
+        @media (max-width: 860px) {
+            .nav-links { display: none; }
+            .eco-grid {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+            .eco-center-hub {
+                order: -1;
+                width: 100%;
+                max-width: 100%;
+            }
+            .seccion-delivery {
+                padding: 22px;
+            }
+            .franja {
+                flex-direction: column;
+                align-items: stretch;
+                text-align: left;
+                padding: 20px;
+            }
+            .franja .btn { width: 100%; min-height: 52px; }
+        }
+        @media (max-width: 640px) {
+            .hero { padding: 24px 0 10px; }
+            .hero h1 { font-size: clamp(32px, 9.8vw, 44px); max-width: 13ch; }
+            .hero p { font-size: 16px; margin-bottom: 22px; }
+            .hero-acciones { flex-direction: column; align-items: stretch; gap: 10px; }
+            .hero-acciones .btn { width: 100%; min-height: 52px; }
+            .ecosistema-card { padding: 18px 14px; }
+            .delivery-pasos { grid-template-columns: 1fr; }
         }
     </style>
 </head>
 <body>
+    <!-- Barra Superior -->
     <header class="barra">
         <a class="marca" href="/inicio"><span class="logo">CF</span> Cobro Fácil</a>
-        <nav class="acciones">
+        <nav class="nav-links">
+            <a class="nav-item" href="#ecosistema">Ecosistema</a>
+            <a class="nav-item" href="#pilares">Sucursales</a>
+            <a class="nav-item" href="#delivery">Delivery & Compras</a>
+            <a class="nav-item" href="#instalador">Descargar</a>
+        </nav>
+        <div class="acciones">
             {% if adentro %}
-            <a class="btn btn-solido" href="/">Entrar</a>
+            <a class="btn btn-solido" href="/">Entrar a la Central</a>
             {% else %}
             <a class="btn btn-solido" href="/login">Entrar</a>
             {% endif %}
-        </nav>
+        </div>
     </header>
+
     <main>
+        <!-- Hero Principal -->
         <section class="hero">
-            <h1>La caja de la sucursal, a la vista de todas.</h1>
-            <p>Cobro Fácil cobra en la computadora del local y deja el libro listo para ver ventas, caja y cartera desde un solo lugar.</p>
+            <div class="badge-tag">
+                <span class="badge-dot"></span> Central Multilocal · Cajas TPV · Tienda Delivery · Base Unificada
+            </div>
+            <h1>La Central de tus <span class="highlight-text">Sucursales, Cajas</span> y Delivery Online.</h1>
+            <p>Todo el circuito de tu negocio conectado a una sola base de datos en tiempo real: cobrá a máxima velocidad en cada mostrador, habilitá compras públicas con delivery online y administrá ventas, stock y caja desde la Casa Central.</p>
+            
             <div class="hero-acciones">
-                <a class="btn btn-solido" href="{{ instalador }}">Descargar instalador</a>
                 {% if adentro %}
-                <a class="btn btn-ghost" href="/">Ir al sistema</a>
+                <a class="btn btn-solido" href="/">🏢 Entrar a la Central</a>
                 {% else %}
-                <a class="btn btn-ghost" href="/login">Iniciar sesión</a>
+                <a class="btn btn-solido" href="/login">🏢 Iniciar sesión en Central</a>
                 {% endif %}
+                <a class="btn btn-delivery" href="#delivery">🛵 Tienda Delivery & Compras</a>
+                <a class="btn btn-ghost" href="{{ instalador }}">💻 Descargar TPV Caja (PC)</a>
             </div>
         </section>
-        <section class="grid">
-            <article class="carta">
-                <span>Sucursal</span>
-                <h2>El programa de la caja</h2>
-                <p>Se instala en la computadora del local. Ahí se vende, se cobra y se guarda el día.</p>
+
+        <!-- Diagrama del Ecosistema en Vivo -->
+        <section class="ecosistema-card" id="ecosistema">
+            <div class="eco-header">
+                <span class="eco-tag">Arquitectura en Tiempo Real</span>
+                <h2>Todos los Puntos Conectados a la Misma Base de Datos</h2>
+                <p>Una venta en mostrador o un pedido por delivery actualiza la misma base de datos al instante: cero desfasajes de stock y números transparentes.</p>
+            </div>
+
+            <div class="eco-grid">
+                <!-- Columna Izquierda: Puntos de Venta Físicos -->
+                <div class="eco-nodes-left">
+                    <div class="eco-node">
+                        <div class="eco-node-ico">💻</div>
+                        <div>
+                            <div class="eco-node-title">Caja Sucursal 1 (Local)</div>
+                            <div class="eco-node-desc">Punto de venta táctil, balanza y ticket</div>
+                        </div>
+                        <span class="eco-badge badge-live">En línea</span>
+                    </div>
+                    <div class="eco-node">
+                        <div class="eco-node-ico">💻</div>
+                        <div>
+                            <div class="eco-node-title">Caja Sucursal 2 (Local)</div>
+                            <div class="eco-node-desc">Cobro rápido offline / online</div>
+                        </div>
+                        <span class="eco-badge badge-live">En línea</span>
+                    </div>
+                    <div class="eco-node">
+                        <div class="eco-node-ico">🏪</div>
+                        <div>
+                            <div class="eco-node-title">Nuevas Sucursales</div>
+                            <div class="eco-node-desc">Se conectan en 1 minuto con el instalador</div>
+                        </div>
+                        <span class="eco-badge badge-sync">Auto-sync</span>
+                    </div>
+                </div>
+
+                <!-- Centro: Base de Datos Central Cloud -->
+                <div class="eco-center-hub">
+                    <span class="eco-db-icon">🗄️</span>
+                    <div class="eco-db-title">BASE DE DATOS CENTRAL</div>
+                    <div class="eco-db-sub">Servidor en la Nube · Stock Vivo · Ventas y Cuentas Consolidadas</div>
+                </div>
+
+                <!-- Columna Derecha: Canales Digitales y Gestión -->
+                <div class="eco-nodes-right">
+                    <div class="eco-node">
+                        <div class="eco-node-ico">🛵</div>
+                        <div>
+                            <div class="eco-node-title">Tienda Delivery Online</div>
+                            <div class="eco-node-desc">Compras públicas directo de clientes</div>
+                        </div>
+                        <span class="eco-badge badge-pub">Público</span>
+                    </div>
+                    <div class="eco-node">
+                        <div class="eco-node-ico">📱</div>
+                        <div>
+                            <div class="eco-node-title">Terminal Móvil Gerencial</div>
+                            <div class="eco-node-desc">Auditoría, escáner láser y reportes PWA</div>
+                        </div>
+                        <span class="eco-badge badge-sync">Móvil</span>
+                    </div>
+                    <div class="eco-node">
+                        <div class="eco-node-ico">🏢</div>
+                        <div>
+                            <div class="eco-node-title">Casa Central</div>
+                            <div class="eco-node-desc">Tablero financiero, cartera y cajas</div>
+                        </div>
+                        <span class="eco-badge badge-live">Matriz</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Grilla de los 4 Pilares -->
+        <section class="grid-pilares" id="pilares">
+            <article class="carta c-central">
+                <span class="tag">Casa Central</span>
+                <h2>Central de Sucursales</h2>
+                <p>El centro de comando de todas tus sucursales: mirá las ventas en tiempo real, compará rendimiento entre días, proyectá cierres de semana y auditá las cajas sin llamadas telefónicas.</p>
             </article>
-            <article class="carta">
-                <span>Central</span>
-                <h2>Todas las sucursales</h2>
-                <p>Con la sesión se ve el libro de cada local: ventas, caja, cartera y pedidos.</p>
+
+            <article class="carta c-sucursal">
+                <span class="tag">Punto de Venta Local</span>
+                <h2>Cajas en Sucursal</h2>
+                <p>Instalado en la computadora de cada local comercial. Cobro ágil con lector de barras, integración de balanza y tickets. Funciona offline y sincroniza con la nube al instante.</p>
             </article>
-            <article class="carta">
-                <span>Sesión</span>
-                <h2>Queda abierta</h2>
-                <p>Una vez adentro, la sesión sigue hasta que se toca Cerrar sesión.</p>
+
+            <article class="carta c-delivery">
+                <span class="tag">Venta Digital</span>
+                <h2>Tienda Delivery & Compras</h2>
+                <p>Página pública para que tus clientes elijan cortes y productos desde su celular o PC. Los pedidos entran directo a la base de datos central y a la sucursal más cercana para despacho.</p>
+            </article>
+
+            <article class="carta c-movil">
+                <span class="tag">Control en el Celular</span>
+                <h2>Móvil PWA Gerencial</h2>
+                <p>Llevá el control en tu bolsillo: auditoría rápida de stock con escáner de cámara, libro de clientes deudores, métricas financieras y seguimiento de pedidos con sensación de app nativa.</p>
             </article>
         </section>
-        <section class="franja">
+
+        <!-- Sección Especial: Delivery y Compras Públicas -->
+        <section class="seccion-delivery" id="delivery">
+            <div class="delivery-info">
+                <div class="delivery-badge">🛵 Canal Público de Venta Digital</div>
+                <h2>Tienda Delivery y Compras para Clientes</h2>
+                <p>Conectá a tus clientes directamente con tu negocio. Podrán consultar los cortes y productos vigentes, armar su carrito y enviar su pedido de delivery o retiro en mostrador.</p>
+                
+                <div class="delivery-pasos">
+                    <div class="delivery-paso">
+                        <div class="delivery-paso-num">1. PEDIDO PÚBLICO</div>
+                        <div class="delivery-paso-txt">El cliente elige productos desde la web pública en su celular.</div>
+                    </div>
+                    <div class="delivery-paso">
+                        <div class="delivery-paso-num">2. BASE CENTRAL</div>
+                        <div class="delivery-paso-txt">Impacta directo en la base de datos sin duplicar precios ni stock.</div>
+                    </div>
+                    <div class="delivery-paso">
+                        <div class="delivery-paso-num">3. SUCURSAL DESPACHA</div>
+                        <div class="delivery-paso-txt">El local asignado recibe la comanda y realiza la entrega.</div>
+                    </div>
+                </div>
+            </div>
+
             <div>
-                <h2>Instalador para la computadora</h2>
-                <p>Se baja el instalador. Ese instalador trae el sistema desde acá, y el programa se actualiza por acá.</p>
+                <button class="btn btn-delivery" onclick="abrirModalDelivery()" style="font-size:16px; min-height:54px; padding:12px 24px;">
+                    🛵 Ver Info de Delivery Público
+                </button>
             </div>
-            <a class="btn btn-solido" href="{{ instalador }}">Descargar instalador</a>
+        </section>
+
+        <!-- Franja Descarga Instalador -->
+        <section class="franja" id="instalador">
+            <div>
+                <h2>Instalador para la computadora del local</h2>
+                <p>Instalá el punto de venta en las computadoras de cada sucursal. Conexión automática con la central y actualizaciones automáticas sin interrupciones.</p>
+            </div>
+            <a class="btn btn-solido" href="{{ instalador }}">Descargar instalador (.exe)</a>
         </section>
     </main>
-    <footer class="pie">Cobro Fácil</footer>
+
+    <!-- Pie de Página -->
+    <footer class="pie">
+        <div><strong>Cobro Fácil PRO</strong> — Ecosistema de Sucursales, Cajas y Delivery</div>
+        <div>Conectado a la Base de Datos Central</div>
+    </footer>
+
+    <!-- Modal Informativo de Delivery -->
+    <div class="modal-overlay" id="modalDelivery" onclick="if(event.target===this) cerrarModalDelivery()">
+        <div class="modal-card">
+            <button class="modal-close" onclick="cerrarModalDelivery()">✕</button>
+            <div style="font-size: 32px; margin-bottom: 10px;">🛵</div>
+            <h3 style="margin: 0 0 8px; font-size: 22px; color: #ffffff;">Tienda Delivery & Compras Públicas</h3>
+            <p style="color: var(--muted); font-size: 15px; line-height: 1.5; margin-bottom: 18px;">
+                La tienda pública de compras y pedidos por delivery se integrará directamente con la <strong>Base de Datos Central</strong> de Cobro Fácil.
+            </p>
+            <div style="background: rgba(255,255,255,0.04); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin-bottom: 20px;">
+                <div style="font-weight: 700; color: #34d399; font-size: 13px; margin-bottom: 4px;">✓ Stock y Precios Unificados</div>
+                <div style="font-size: 13px; color: #cbd5e1; line-height: 1.4;">
+                    Cuando cambies un precio o registres cortes en la central, la tienda pública de delivery se actualiza de forma automática para todos tus clientes.
+                </div>
+            </div>
+            <button class="btn btn-solido" style="width: 100%;" onclick="cerrarModalDelivery()">
+                Entendido
+            </button>
+        </div>
+    </div>
+
+    <script>
+        function abrirModalDelivery() {
+            var m = document.getElementById('modalDelivery');
+            if (m) m.style.display = 'grid';
+        }
+        function cerrarModalDelivery() {
+            var m = document.getElementById('modalDelivery');
+            if (m) m.style.display = 'none';
+        }
+    </script>
 </body>
 </html>
