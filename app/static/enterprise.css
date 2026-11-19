@@ -3603,6 +3603,59 @@ button.fact { width: 100%; text-align: left; border: 0; cursor: pointer; font: i
     text-align: right;
 }
 
+/* Tabla Detalle por Día (3 columnas limpias y 100% responsiva en móvil) */
+#rfTablaDetalle {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+#rfTablaDetalle th,
+#rfTablaDetalle td {
+    padding: 10px 8px !important;
+    vertical-align: middle;
+}
+#rfTablaDetalle th:nth-child(1),
+#rfTablaDetalle td:nth-child(1) {
+    width: 32%;
+    padding-left: 6px !important;
+    text-align: left;
+}
+#rfTablaDetalle th:nth-child(2),
+#rfTablaDetalle td:nth-child(2) {
+    width: 46%;
+    text-align: right;
+}
+#rfTablaDetalle th:nth-child(3),
+#rfTablaDetalle td:nth-child(3) {
+    width: 22%;
+    padding-right: 6px !important;
+    text-align: right;
+}
+
+@media (max-width: 640px) {
+    .rf-tabla-card {
+        padding: 12px 8px;
+    }
+    #rfTablaDetalle th,
+    #rfTablaDetalle td {
+        padding: 9px 4px !important;
+    }
+    #rfTablaDetalle th:nth-child(1),
+    #rfTablaDetalle td:nth-child(1) {
+        width: 33%;
+        padding-left: 4px !important;
+    }
+    #rfTablaDetalle th:nth-child(2),
+    #rfTablaDetalle td:nth-child(2) {
+        width: 45%;
+    }
+    #rfTablaDetalle th:nth-child(3),
+    #rfTablaDetalle td:nth-child(3) {
+        width: 22%;
+        padding-right: 4px !important;
+    }
+}
+
 /* Adaptación Mobile (<= 768px) */
 @media (max-width: 768px) {
     .reporte-financiero-card {
