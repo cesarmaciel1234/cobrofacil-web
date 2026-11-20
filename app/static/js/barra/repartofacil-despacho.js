@@ -82,13 +82,36 @@
             const data = await resp.json();
             if (data && data.success && Array.isArray(data.pedidos)) {
                 pedidosLista = data.pedidos;
+                try {
+                    localStorage.setItem('cf_rf_pedidos_cache', JSON.stringify(pedidosLista));
+                } catch(e) {}
                 renderizarCards();
                 actualizarBadge();
             } else if (!silencioso) {
+                // Mini-motor fallback: si hay cache local, renderizarlo para que el sistema siga vivo
+                const cache = localStorage.getItem('cf_rf_pedidos_cache');
+                if (cache) {
+                    try {
+                        pedidosLista = JSON.parse(cache);
+                        renderizarCards();
+                        actualizarBadge();
+                        return;
+                    } catch(e) {}
+                }
                 contenedor.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700;">No se pudieron cargar los pedidos. Reintentá en unos segundos.</div>`;
             }
         } catch (err) {
             console.error('[RepartoFacil] Error al cargar pedidos:', err);
+            // Mini-motor fallback resiliente
+            const cache = localStorage.getItem('cf_rf_pedidos_cache');
+            if (cache) {
+                try {
+                    pedidosLista = JSON.parse(cache);
+                    renderizarCards();
+                    actualizarBadge();
+                    return;
+                } catch(e) {}
+            }
             if (!silencioso) {
                 contenedor.innerHTML = `<div style="text-align:center; padding:24px; color:#ef4444; font-weight:700;">Error de conexión con el servidor.</div>`;
             }
@@ -126,14 +149,17 @@
         pedidosLista.forEach((p) => {
             const estadoLower = (p.estado || 'pending').toLowerCase();
             const esNuevoPendiente = estadoLower === 'pending' || estadoLower === 'pending_store';
-            const esRechazado = estadoLower === 'rejected' || estadoLower === 'cancelled';
+            const esTimeout = estadoLower === 'cancelled_timeout';
+            const esRechazado = estadoLower === 'rejected' || estadoLower === 'cancelled' || esTimeout;
             const esConfirmado = estadoLower === 'confirmed' || estadoLower === 'accepted';
             const esEmbalado = estadoLower === 'ready' || estadoLower === 'embalado';
             const esEntregado = estadoLower === 'delivered';
             const repartidorAsignado = p.repartidor_nombre || (p.repartidor_id ? 'Lucas Motomensajero' : null);
 
             let badgeEstadoHtml = '';
-            if (esRechazado) {
+            if (esTimeout) {
+                badgeEstadoHtml = `<span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:10px; font-weight:800; padding:3px 8px; border-radius:8px;">⏰ TIMEOUT (1H SIN RESPUESTA)</span>`;
+            } else if (esRechazado) {
                 badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:10px; font-weight:800; padding:3px 8px; border-radius:8px;">❌ RECHAZADO</span>`;
             } else if (esEntregado) {
                 badgeEstadoHtml = `<span style="background:#e2e8f0; color:#475569; font-size:10px; font-weight:800; padding:3px 8px; border-radius:8px;">✅ ENTREGADO</span>`;
