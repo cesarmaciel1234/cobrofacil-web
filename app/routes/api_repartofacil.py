@@ -12,22 +12,42 @@ from app.routes.api import api_bp
 def get_repartofacil_pedidos():
     """
     Devuelve los pedidos activos y recientes de Reparto Fácil
-    desde la tabla compartida public.repartofacil_pedidos.
+    desde la tabla compartida public.repartofacil_pedidos,
+    filtrados ESTRICTAMENTE por la empresa en sesión para garantizar
+    el aislamiento absoluto de datos entre comercios.
     """
     try:
+        from flask import session
+        empresa_actual = session.get("empresa_id")
+        if not empresa_actual:
+            hdr = request.headers.get("X-Empresa-ID") or request.headers.get("X-Company-ID")
+            if hdr and hdr.isdigit():
+                empresa_actual = int(hdr)
+            else:
+                arg = request.args.get("empresa_id") or request.args.get("company_id")
+                if arg and arg.isdigit():
+                    empresa_actual = int(arg)
+                else:
+                    empresa_actual = 1
+
         with get_db(empresa_id=0) as conn:
             sql = """
                 SELECT 
                     id,
                     ticket_id,
+                    cliente_id,
+                    cliente_usuario_id,
                     cliente_nombre,
                     cliente_telefono,
                     direccion_entrega,
                     tipo_entrega,
                     metodo_pago,
                     estado,
+                    empresa_id,
+                    empresa_slug,
                     repartidor_id,
                     repartidor_nombre,
+                    repartidor_usuario_id,
                     items,
                     subtotal,
                     costo_envio,
@@ -43,10 +63,12 @@ def get_repartofacil_pedidos():
                     created_at,
                     updated_at
                 FROM public.repartofacil_pedidos
+                WHERE (empresa_id = %s)
+                   OR (empresa_id IS NULL AND %s = 1)
                 ORDER BY created_at DESC
                 LIMIT 50
             """
-            rows = conn.execute(sql).fetchall()
+            rows = conn.execute(sql, (empresa_actual, empresa_actual)).fetchall()
             pedidos = []
             for r in rows:
                 d = dict(r)
@@ -60,7 +82,7 @@ def get_repartofacil_pedidos():
                 if pago_metodo.lower() in ("web", "tarjeta", "card", "online", "repartofacil"):
                     d["metodo_pago"] = "Web"
                 pedidos.append(d)
-            return jsonify({"success": True, "pedidos": pedidos})
+            return jsonify({"success": True, "empresa_id": empresa_actual, "pedidos": pedidos})
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "pedidos": []}), 500
 
