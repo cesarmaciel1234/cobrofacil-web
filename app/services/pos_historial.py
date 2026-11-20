@@ -581,7 +581,8 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
     else:
         columnas, filas = filas_de("ventas", sucursal_id)
     if not columnas:
-        return _libro_vacio(sucursal_id)
+        columnas = ["id", "fecha", "total", "usuario", "estado", "metodo_pago", "descuento", "recargo", "caja_id", "pago_efectivo", "pago_otro", "cambio", "cliente_nombre"]
+        filas = []
     idx = {str(col).lower(): i for i, col in enumerate(columnas)}
     texto = str(pedido.get("texto") or "")
     nombres: dict[str, str] = {}
