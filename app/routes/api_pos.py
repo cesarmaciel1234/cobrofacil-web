@@ -685,6 +685,8 @@ def api_pos_inventario_ajuste():
         motivo=motivo,
         sucursal_id=sid,
         empresa_id=emp_id,
+        precio=data.get("precio"),
+        departamento=data.get("departamento"),
     )
     status_code = 200 if resultado.get("ok") else 400
     return jsonify(resultado), status_code

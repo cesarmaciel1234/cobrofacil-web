@@ -147,9 +147,22 @@ def obtener_catalogo_auditoria(sucursal_id: Optional[int] = None, empresa_id: in
                 pass
 
     # 2. Si MariaDB no respondió, caer a pos_base (PostgreSQL)
-    if not productos:
-        from app.services.pos_base import filas_de
+    departamentos_tpv: List[str] = []
+    from app.services.pos_base import filas_de
 
+    for tabla_dep in ("departamentos", "categorias"):
+        try:
+            col_d, filas_d = filas_de(tabla_dep, sucursal_id, empresa_id=empresa_id)
+            if col_d and filas_d:
+                id_nom = col_d.index("nombre") if "nombre" in col_d else 1
+                for fd in filas_d:
+                    nom_d = str(fd[id_nom] or "").strip().upper()
+                    if nom_d and nom_d not in departamentos_tpv:
+                        departamentos_tpv.append(nom_d)
+        except Exception:
+            pass
+
+    if not productos:
         col_p, filas_p = filas_de("productos", sucursal_id, empresa_id=empresa_id)
         if col_p:
             idx = {col: i for i, col in enumerate(col_p)}
@@ -158,12 +171,16 @@ def obtener_catalogo_auditoria(sucursal_id: Optional[int] = None, empresa_id: in
                 nombre = str(fila[idx.get("nombre", 1)] or "").strip()
                 if not nombre:
                     continue
-                codigo = str(fila[idx.get("codigo", 0)] if "codigo" in idx else "")
-                depto = str(fila[idx.get("departamento", 0)] if "departamento" in idx else (fila[idx.get("categoria", 0)] if "categoria" in idx else "GENERAL")).strip().upper()
-                stock = float(fila[idx.get("stock", 0)] if "stock" in idx else 0.0)
-                precio = float(fila[idx.get("precio", 0)] if "precio" in idx else 0.0)
-                costo = float(fila[idx.get("costo", 0)] if "costo" in idx else 0.0)
-                unidad = str(fila[idx.get("unidad", 0)] if "unidad" in idx else "UN").strip().upper()
+                codigo = str(fila[idx.get("codigo", 0)] or "" if "codigo" in idx else "").strip()
+                raw_depto = str(fila[idx["departamento"]] or "").strip() if "departamento" in idx else ""
+                raw_cat = str(fila[idx["categoria"]] or "").strip() if "categoria" in idx else ""
+                depto = (raw_depto or raw_cat or "GENERAL").upper()
+                if depto not in departamentos_tpv:
+                    departamentos_tpv.append(depto)
+                stock = float(fila[idx.get("stock", 0)] or 0.0 if "stock" in idx else 0.0)
+                precio = float(fila[idx.get("precio", 0)] or 0.0 if "precio" in idx else 0.0)
+                costo = float(fila[idx.get("costo", 0)] or 0.0 if "costo" in idx else 0.0)
+                unidad = str(fila[idx.get("unidad", 0)] or "UN" if "unidad" in idx else "UN").strip().upper()
                 pesable = bool(fila[idx.get("es_pesable", 0)] if "es_pesable" in idx else False) or unidad in ("KG", "KILO", "KILOS")
 
                 productos.append({
@@ -171,6 +188,7 @@ def obtener_catalogo_auditoria(sucursal_id: Optional[int] = None, empresa_id: in
                     "codigo": codigo,
                     "nombre": nombre,
                     "departamento": depto or "GENERAL",
+                    "categoria": (raw_cat or depto or "GENERAL").upper(),
                     "stock": round(stock, 3),
                     "precio": round(precio, 2),
                     "costo": round(costo, 2),
@@ -243,10 +261,24 @@ def obtener_catalogo_auditoria(sucursal_id: Optional[int] = None, empresa_id: in
         if prod["stock"] <= 0.0001:
             quiebre_cnt += 1
 
+    conteo_deptos: Dict[str, int] = {}
+    for d in departamentos_tpv:
+        conteo_deptos[d] = 0
+    for prod in productos:
+        d = (prod.get("departamento") or "GENERAL").upper()
+        conteo_deptos[d] = conteo_deptos.get(d, 0) + 1
+
+    lista_departamentos = [
+        {"nombre": d, "cantidad": c}
+        for d, c in sorted(conteo_deptos.items(), key=lambda x: (-x[1], x[0]))
+        if d
+    ]
+
     return {
         "ok": True,
         "fuente": fuente,
         "productos": productos,
+        "departamentos": lista_departamentos,
         "resumen": {
             "total_sku": len(productos),
             "auditados": auditados_cnt,
@@ -372,16 +404,21 @@ def registrar_ajuste_inventario(
     motivo: str = "Recuento físico",
     sucursal_id: Optional[int] = None,
     empresa_id: int = 1,
+    precio: Optional[float] = None,
+    departamento: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
-    Aplica el ajuste SET inmediato de stock en MariaDB y pos_base.
-    Registra el evento en auditorias_inventario con sync_id idempotente.
+    Aplica el ajuste SET inmediato de stock (y opcionalmente precio y departamento)
+    en MariaDB y pos_base. Registra el evento en auditorias_inventario.
     """
     try:
         pid = int(producto_id)
         stock_nuevo = round(float(stock_fisico), 3)
+        precio_nuevo = round(float(precio), 2) if precio is not None and str(precio) != "" else None
     except (TypeError, ValueError) as exc:
         return {"ok": False, "error": f"Valores numéricos inválidos: {exc}"}
+
+    depto_nuevo = str(departamento).strip().upper() if departamento else None
 
     if stock_nuevo < 0:
         return {"ok": False, "error": "El stock físico no puede ser negativo"}
@@ -444,19 +481,18 @@ def registrar_ajuste_inventario(
             asegurar_tabla_local(conn)
 
             # Si MariaDB no estaba, leer nombre y stock anterior de pos_base
-            if not actualizado_mb:
-                row_base = conn.execute(
-                    "SELECT columnas, filas FROM pos_base WHERE empresa_id = ? AND tabla = 'productos' LIMIT 1",
-                    (empresa_id,),
-                ).fetchone()
-                if row_base:
+            partes_pb = conn.execute(
+                "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
+            ).fetchall()
+            if not actualizado_mb and partes_pb:
+                for row_base in partes_pb:
                     cols = row_base["columnas"] if isinstance(row_base["columnas"], list) else json.loads(row_base["columnas"])
                     filas = row_base["filas"] if isinstance(row_base["filas"], list) else json.loads(row_base["filas"])
                     id_idx = cols.index("id") if "id" in cols else 0
                     nom_idx = cols.index("nombre") if "nombre" in cols else 1
                     stk_idx = cols.index("stock") if "stock" in cols else 3
                     for r in filas:
-                        if r[id_idx] == pid:
+                        if str(r[id_idx]) == str(pid):
                             nombre_producto = r[nom_idx]
                             stock_anterior = round(float(r[stk_idx] or 0.0), 3)
                             diferencia = round(stock_nuevo - stock_anterior, 3)
@@ -476,29 +512,34 @@ def registrar_ajuste_inventario(
                 stock_nuevo,
                 diferencia,
                 responsable or "Admin",
-                motivo or "Recuento físico",
+                motivo or "Ajuste de inventario",
             ))
 
-            # Actualizar filas de productos en pos_base
-            row_pb = conn.execute(
-                "SELECT columnas, filas FROM pos_base WHERE empresa_id = ? AND tabla = 'productos'",
-                (empresa_id,),
-            ).fetchone()
-            if row_pb:
+            # Actualizar filas de productos en pos_base (stock, precio, departamento)
+            for row_pb in partes_pb:
                 cols = row_pb["columnas"] if isinstance(row_pb["columnas"], list) else json.loads(row_pb["columnas"])
                 filas = row_pb["filas"] if isinstance(row_pb["filas"], list) else json.loads(row_pb["filas"])
                 id_idx = cols.index("id") if "id" in cols else 0
                 stk_idx = cols.index("stock") if "stock" in cols else 3
+                pre_idx = cols.index("precio") if "precio" in cols else None
+                dep_idx = cols.index("departamento") if "departamento" in cols else None
+                cat_idx = cols.index("categoria") if "categoria" in cols else None
                 modificado = False
                 for r in filas:
-                    if r[id_idx] == pid:
+                    if str(r[id_idx]) == str(pid):
                         r[stk_idx] = stock_nuevo
+                        if precio_nuevo is not None and pre_idx is not None:
+                            r[pre_idx] = precio_nuevo
+                        if depto_nuevo:
+                            if dep_idx is not None:
+                                r[dep_idx] = depto_nuevo
+                            if cat_idx is not None:
+                                r[cat_idx] = depto_nuevo
                         modificado = True
-                        break
                 if modificado:
                     conn.execute(
-                        "UPDATE pos_base SET filas = ?, actualizado_en = CURRENT_TIMESTAMP WHERE empresa_id = ? AND tabla = 'productos'",
-                        (json.dumps(filas), empresa_id),
+                        "UPDATE pos_base SET filas = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                        (json.dumps(filas), row_pb["id"]),
                     )
             try:
                 conn.commit()
