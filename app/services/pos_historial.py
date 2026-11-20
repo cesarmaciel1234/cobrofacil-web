@@ -335,11 +335,13 @@ def ticket_de(venta_id) -> dict:
     if venta is None:
         try:
             from app.database import get_db
+            from app.services.pos_base import _empresa_activa
             import json
+            eid_actual = _empresa_activa()
             with get_db() as conn:
                 r_row = conn.execute(
-                    "SELECT id, ticket_id, cliente_nombre, items, total, created_at, estado FROM repartofacil_pedidos WHERE ticket_id = %s OR id = %s LIMIT 1",
-                    (buscado, buscado)
+                    "SELECT id, ticket_id, cliente_nombre, items, total, created_at, estado FROM public.repartofacil_pedidos WHERE (ticket_id = %s OR id = %s) AND empresa_id = %s LIMIT 1",
+                    (buscado, buscado, eid_actual)
                 ).fetchone()
                 if r_row:
                     rd = dict(r_row)
@@ -644,17 +646,20 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             slot["tickets"] += 1
         elegidas.append(venta)
 
-    # Convivencia e-commerce y venta física: incluir pedidos web con ticket en el historial de ventas
+    # Convivencia e-commerce y venta física: incluir pedidos web con ticket SOLO de la empresa activa
     try:
         from app.database import get_db
+        from app.services.pos_base import _empresa_activa
+        eid_actual = _empresa_activa()
         with get_db() as conn:
             web_rows = conn.execute(
                 """
                 SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
-                FROM repartofacil_pedidos
-                WHERE ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected')
+                FROM public.repartofacil_pedidos
+                WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
                 ORDER BY created_at DESC LIMIT 100
-                """
+                """,
+                (eid_actual,)
             ).fetchall()
             for wr in web_rows:
                 tid = str(wr["ticket_id"] or wr["id"])

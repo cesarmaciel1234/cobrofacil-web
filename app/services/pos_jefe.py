@@ -665,18 +665,21 @@ def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
         columnas = ['id', 'nombre', 'telefono', 'limite_credito', 'deuda_actual', 'fecha_registro', 'dni', 'tipo_cliente', 'direccion', 'uid', 'origen_pc', 'creado_por', 'creado_en', 'actualizado_en', 'plazo_dias', 'estado_cuenta', 'promesa_fecha', 'promesa_nota', 'sucursal_id', 'sucursal_nombre']
         filas = []
 
-    # Convivencia e-commerce y cartera física: integrar clientes de Reparto Fácil web
+    # Convivencia e-commerce y cartera física: integrar clientes de Reparto Fácil web SOLO de la empresa activa
     try:
         from app.database import get_db
+        from app.services.pos_base import _empresa_activa
+        eid_actual = _empresa_activa()
         with get_db() as conn:
             web_rows = conn.execute(
                 """
                 SELECT DISTINCT ON (LOWER(TRIM(cliente_nombre)))
                     cliente_nombre, cliente_telefono, direccion_entrega, created_at
-                FROM repartofacil_pedidos
-                WHERE cliente_nombre IS NOT NULL AND cliente_nombre != ''
+                FROM public.repartofacil_pedidos
+                WHERE empresa_id = %s AND cliente_nombre IS NOT NULL AND cliente_nombre != ''
                 ORDER BY LOWER(TRIM(cliente_nombre)), created_at DESC
-                """
+                """,
+                (eid_actual,)
             ).fetchall()
             
             idx = _indice(columnas)

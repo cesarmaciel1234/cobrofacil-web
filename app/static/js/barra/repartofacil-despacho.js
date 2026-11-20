@@ -18,6 +18,11 @@
         return limpio.slice(0, 2).toUpperCase();
     }
 
+    function getCacheKey() {
+        const eid = (global.sessionUser && global.sessionUser.empresa_id) || localStorage.getItem('sync_empresa') || '0';
+        return 'cf_rf_pedidos_cache_emp_' + eid;
+    }
+
     function $(id) {
         return document.getElementById(id);
     }
@@ -91,13 +96,12 @@
             if (data && data.success && Array.isArray(data.pedidos)) {
                 pedidosLista = data.pedidos;
                 try {
-                    localStorage.setItem('cf_rf_pedidos_cache', JSON.stringify(pedidosLista));
+                    localStorage.setItem(getCacheKey(), JSON.stringify(pedidosLista));
                 } catch(e) {}
                 renderizarCards();
                 actualizarBadge();
             } else if (!silencioso) {
-                // Mini-motor fallback: si hay cache local, renderizarlo para que el sistema siga vivo
-                const cache = localStorage.getItem('cf_rf_pedidos_cache');
+                const cache = localStorage.getItem(getCacheKey());
                 if (cache) {
                     try {
                         pedidosLista = JSON.parse(cache);
@@ -110,8 +114,7 @@
             }
         } catch (err) {
             console.error('[RepartoFacil] Error al cargar pedidos:', err);
-            // Mini-motor fallback resiliente
-            const cache = localStorage.getItem('cf_rf_pedidos_cache');
+            const cache = localStorage.getItem(getCacheKey());
             if (cache) {
                 try {
                     pedidosLista = JSON.parse(cache);

@@ -335,7 +335,21 @@ def crear_producto_catalogo(
                     "SELECT id, sucursal_id, columnas, filas FROM pos_base WHERE tabla = 'productos' ORDER BY id DESC"
                 ).fetchall()
             if not partes:
-                return {"ok": False, "error": "La sucursal todavía no sincronizó un catálogo base"}
+                cols_default = [
+                    "id", "nombre", "precio", "stock", "categoria", "unidad", "costo",
+                    "cant_mayoreo", "precio_mayoreo", "stock_minimo", "stock_maximo",
+                    "codigo", "departamento", "es_pesable"
+                ]
+                conn.execute(
+                    """
+                    INSERT INTO pos_base (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en)
+                    VALUES (?, ?, ?, 'productos', 1, ?, '[]', 0, CURRENT_TIMESTAMP)
+                    """,
+                    (empresa_id, sucursal_id or 1, "Central", json.dumps(cols_default)),
+                )
+                partes = conn.execute(
+                    "SELECT id, sucursal_id, columnas, filas FROM pos_base WHERE tabla = 'productos' ORDER BY id DESC"
+                ).fetchall()
 
             def _cargar(v):
                 return v if isinstance(v, list) else json.loads(v or "[]")
