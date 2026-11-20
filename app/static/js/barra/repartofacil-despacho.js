@@ -189,7 +189,7 @@
                         <div style="text-align:right; flex-shrink:0;">
                             <div style="font-size:10px; font-weight:800; text-transform:uppercase; color:#64748b;">A Cobrar</div>
                             <div style="font-size:16px; font-weight:900; color:#0f172a;">${formatMoney(p.total)}</div>
-                            <div style="font-size:10px; font-weight:700; color:#10b981;">${(p.metodo_pago || 'efectivo').toUpperCase()}</div>
+                            <div style="font-size:10px; font-weight:700; color:#10b981;">WEB</div>
                         </div>
                     </div>
 
@@ -383,7 +383,7 @@
                         </div>
                         <div style="display:flex; justify-content:space-between; color:#64748b;">
                             <span>Pago</span>
-                            <b id="rfTicketPago" style="color:#0f172a; font-weight:700;">Tarjeta</b>
+                            <b id="rfTicketPago" style="color:#0f172a; font-weight:700;">Web</b>
                         </div>
                         <div style="display:flex; justify-content:space-between; color:#64748b;">
                             <span>Cajero</span>
@@ -424,7 +424,7 @@
             if (t && t.encontrado) {
                 $('rfTicketNumero').textContent = `Ticket #${t.ticket_numero || t.id}`;
                 $('rfTicketFecha').textContent = t.fecha || '2026-11-20 09:54:56';
-                $('rfTicketPago').textContent = t.pago || 'Tarjeta';
+                $('rfTicketPago').textContent = 'Web';
                 $('rfTicketCajero').textContent = t.cajero || '—';
                 $('rfTicketCaja').textContent = t.caja || '—';
                 $('rfTicketTotal').textContent = formatMoneyDecimal(t.total);

@@ -2693,7 +2693,8 @@ const $ = id => document.getElementById(id);
             const dia = (t.fecha || '').slice(0, 10);
             const hora = (t.fecha || '').slice(11, 16);
             const cuando = (dia && dia !== hoyLocal()) ? (fechaVisible(dia) + ' ' + hora) : hora;
-            return `<tr class="ticket-fila${cancel ? ' ticket-cancel' : ''}" data-ticket="${textoJefe(t.id)}"><td>${textoJefe(cuando)}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(cancel ? 'Cancelada' : (t.pago || '—'))}</td><td>${plataJefe(t.total)}</td></tr>`;
+            const pagoTxt = etiquetaPago(t.pago);
+            return `<tr class="ticket-fila${cancel ? ' ticket-cancel' : ''}" data-ticket="${textoJefe(t.id)}"><td>${textoJefe(cuando)}</td><td>#${textoJefe(t.id)}</td><td>${textoJefe(cancel ? 'Cancelada' : pagoTxt)}</td><td>${plataJefe(t.total)}</td></tr>`;
         }
 
         function actualizarResumenTickets() {
@@ -2830,6 +2831,7 @@ const $ = id => document.getElementById(id);
         function etiquetaPago(metodo) {
             const texto = String(metodo || '').trim();
             const alto = texto.toUpperCase();
+            if (alto === 'WEB' || alto.includes('WEB') || alto.includes('REPARTOFACIL')) return 'Web';
             if (['FIADO', 'CLIENTES', 'CLIENTE', 'CUENTA CORRIENTE'].includes(alto)) return 'Crédito';
             if (alto.startsWith('MIXTO')) return texto.replace(/\b(clientes|cliente|fiado)\b/ig, 'Crédito');
             return texto || '—';

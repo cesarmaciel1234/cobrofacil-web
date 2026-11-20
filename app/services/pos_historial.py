@@ -333,13 +333,63 @@ def ticket_de(venta_id) -> dict:
     idx = {str(col).lower(): i for i, col in enumerate(columnas)}
     venta = next((fila for fila in filas if _id_texto(_tomar(fila, idx, "id")) == buscado), None)
     if venta is None:
+        try:
+            from app.database import get_db
+            import json
+            with get_db() as conn:
+                r_row = conn.execute(
+                    "SELECT id, ticket_id, cliente_nombre, items, total, created_at, estado FROM repartofacil_pedidos WHERE ticket_id = %s OR id = %s LIMIT 1",
+                    (buscado, buscado)
+                ).fetchone()
+                if r_row:
+                    rd = dict(r_row)
+                    r_items = []
+                    if isinstance(rd.get("items"), str):
+                        try:
+                            r_items = json.loads(rd["items"])
+                        except Exception:
+                            r_items = []
+                    elif isinstance(rd.get("items"), list):
+                        r_items = rd["items"]
+                    items_formateados = [
+                        {
+                            "nombre": it.get("nombre") or it.get("name") or "Corte cárnico",
+                            "cantidad": it.get("cantidad") or it.get("quantity") or 1,
+                            "subtotal": it.get("subtotal") or ((it.get("price") or it.get("precio") or 0) * (it.get("quantity") or it.get("cantidad") or 1))
+                        }
+                        for it in r_items
+                    ]
+                    fecha_str = rd["created_at"].strftime("%Y-%m-%d %H:%M:%S") if rd.get("created_at") else ""
+                    return {
+                        "encontrado": True,
+                        "id": rd.get("ticket_id") or rd.get("id"),
+                        "fecha": fecha_str,
+                        "total": float(rd.get("total") or 0),
+                        "pago": "Web",
+                        "estado": rd.get("estado") or "COMPLETADA",
+                        "usuario": "Reparto Fácil",
+                        "caja": "Web",
+                        "cliente": rd.get("cliente_nombre") or "",
+                        "descuento": 0.0,
+                        "recargo": 0.0,
+                        "items": items_formateados,
+                    }
+        except Exception:
+            pass
         return {"encontrado": False, "id": buscado}
+
+    pago_orig = str(_tomar(venta, idx, "metodo_pago", "medio_pago") or "—")
+    if str(pago_orig).strip().lower() in ("web", "repartofacil", "tarjeta_web", "card_web"):
+        pago_final = "Web"
+    else:
+        pago_final = pago_orig
+
     return {
         "encontrado": True,
         "id": buscado,
         "fecha": str(_tomar(venta, idx, "fecha") or "").split(".")[0],
         "total": _num(_tomar(venta, idx, "total")),
-        "pago": str(_tomar(venta, idx, "metodo_pago", "medio_pago") or "—"),
+        "pago": pago_final,
         "estado": str(_tomar(venta, idx, "estado") or ""),
         "usuario": str(_tomar(venta, idx, "usuario") or ""),
         "caja": _id_texto(_tomar(venta, idx, "caja_id")) or "1",
