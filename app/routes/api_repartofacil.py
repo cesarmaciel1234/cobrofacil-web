@@ -1,4 +1,5 @@
 import json
+import random
 import time
 from datetime import datetime
 from flask import jsonify, request
@@ -18,6 +19,7 @@ def get_repartofacil_pedidos():
         sql = """
             SELECT 
                 id,
+                ticket_id,
                 cliente_nombre,
                 cliente_telefono,
                 direccion_entrega,
@@ -54,6 +56,84 @@ def get_repartofacil_pedidos():
         return jsonify({"success": True, "pedidos": pedidos})
     except Exception as e:
         return jsonify({"success": False, "error": str(e), "pedidos": []}), 500
+
+
+@api_bp.route("/repartofacil/pedidos/<order_id>/aceptar", methods=["POST"])
+def aceptar_repartofacil_pedido(order_id):
+    """
+    Cobro Fácil acepta el pedido del comprador.
+    Genera el número de Ticket (#109XXXX), cambia el estado a 'confirmed'
+    (para que ahora sí aparezca en la bandeja/radar de repartidores)
+    y publica el primer mensaje en el chat tripartito.
+    """
+    try:
+        conn = get_db()
+        ticket_id = str(random.randint(1090000, 1099999))
+        
+        update_sql = "UPDATE repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, updated_at = NOW() WHERE id = %s"
+        conn.execute(update_sql, (ticket_id, order_id))
+        
+        msg_id = f"msg-store-{int(time.time() * 1000)}"
+        hora_str = datetime.now().strftime("%H:%M")
+        texto = f"Frigorífico Maciel aceptó el pedido. Ticket #{ticket_id} emitido. Buscando repartidor en zona..."
+        
+        chat_sql = """
+            INSERT INTO repartofacil_chat_mensajes 
+            (id, order_id, author_role, author_name, content, timestamp_str, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+        """
+        conn.execute(chat_sql, (msg_id, order_id, "store", "Frigorífico Maciel", texto, hora_str))
+        
+        if hasattr(conn, "commit"):
+            conn.commit()
+            
+        return jsonify({
+            "success": True,
+            "order_id": order_id,
+            "ticket_id": ticket_id,
+            "estado": "confirmed",
+            "mensaje": texto
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/repartofacil/pedidos/<order_id>/rechazar", methods=["POST"])
+def rechazar_repartofacil_pedido(order_id):
+    """
+    Cobro Fácil rechaza el pedido (por falta de stock o fuera de horario).
+    Pasa a 'rejected', no sale a repartidores y notifica en el chat.
+    """
+    try:
+        conn = get_db()
+        data = request.get_json(silent=True) or {}
+        motivo = data.get("motivo") or "Falta de stock o fuera de horario comercial"
+        
+        update_sql = "UPDATE repartofacil_pedidos SET estado = 'rejected', updated_at = NOW() WHERE id = %s"
+        conn.execute(update_sql, (order_id,))
+        
+        msg_id = f"msg-store-{int(time.time() * 1000)}"
+        hora_str = datetime.now().strftime("%H:%M")
+        texto = f"Pedido no aceptado por Frigorífico Maciel: {motivo}."
+        
+        chat_sql = """
+            INSERT INTO repartofacil_chat_mensajes 
+            (id, order_id, author_role, author_name, content, timestamp_str, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, NOW())
+        """
+        conn.execute(chat_sql, (msg_id, order_id, "store", "Frigorífico Maciel", texto, hora_str))
+        
+        if hasattr(conn, "commit"):
+            conn.commit()
+            
+        return jsonify({
+            "success": True,
+            "order_id": order_id,
+            "estado": "rejected",
+            "mensaje": texto
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @api_bp.route("/repartofacil/pedidos/<order_id>/embalar", methods=["POST"])
@@ -94,6 +174,74 @@ def embalar_repartofacil_pedido(order_id):
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/repartofacil/ticket/<target_id>", methods=["GET"])
+def get_repartofacil_ticket(target_id):
+    """
+    Devuelve los datos del ticket digital estructurado para que tanto
+    la empresa como el comprador puedan consultarlo con el diseño de Cobro Fácil.
+    """
+    try:
+        conn = get_db()
+        sql = """
+            SELECT 
+                id,
+                ticket_id,
+                cliente_nombre,
+                cliente_telefono,
+                direccion_entrega,
+                metodo_pago,
+                estado,
+                repartidor_nombre,
+                items,
+                subtotal,
+                costo_envio,
+                total,
+                notas,
+                sucursal_origen,
+                created_at
+            FROM repartofacil_pedidos
+            WHERE id = %s OR ticket_id = %s
+            LIMIT 1
+        """
+        row = conn.execute(sql, (target_id, target_id)).fetchone()
+        if not row:
+            return jsonify({"encontrado": False, "error": "Ticket no encontrado"}), 404
+            
+        d = dict(row)
+        items = []
+        if isinstance(d.get("items"), str):
+            try:
+                items = json.loads(d["items"])
+            except Exception:
+                items = []
+        elif isinstance(d.get("items"), list):
+            items = d["items"]
+            
+        fecha_str = d["created_at"].strftime("%Y-%m-%d %H:%M:%S") if d.get("created_at") else ""
+        
+        ticket_data = {
+            "encontrado": True,
+            "id": d.get("ticket_id") or d.get("id"),
+            "order_id": d.get("id"),
+            "ticket_numero": d.get("ticket_id") or d.get("id"),
+            "fecha": fecha_str,
+            "pago": (d.get("metodo_pago") or "Tarjeta").capitalize(),
+            "cajero": "—",
+            "caja": "—",
+            "cliente": d.get("cliente_nombre") or "Cliente",
+            "direccion": d.get("direccion_entrega") or "",
+            "estado": d.get("estado"),
+            "items": items,
+            "subtotal": float(d.get("subtotal") or 0),
+            "costo_envio": float(d.get("costo_envio") or 0),
+            "total": float(d.get("total") or 0),
+            "notas": d.get("notas") or ""
+        }
+        return jsonify(ticket_data)
+    except Exception as e:
+        return jsonify({"encontrado": False, "error": str(e)}), 500
 
 
 @api_bp.route("/repartofacil/chat/<order_id>", methods=["GET"])
