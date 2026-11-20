@@ -158,23 +158,27 @@
             const estadoLower = (p.estado || 'pending').toLowerCase();
             const esNuevoPendiente = estadoLower === 'pending' || estadoLower === 'pending_store';
             const esTimeout = estadoLower === 'cancelled_timeout';
-            const esRechazado = estadoLower === 'rejected' || estadoLower === 'cancelled' || esTimeout;
+            const esCanceladoCliente = estadoLower === 'cancelled' || estadoLower === 'cancelled_by_client';
+            const esRechazadoComercio = estadoLower === 'rejected';
+            const esRechazado = esRechazadoComercio || esCanceladoCliente || esTimeout;
             const esConfirmado = estadoLower === 'confirmed' || estadoLower === 'accepted';
             const esEmbalado = estadoLower === 'ready' || estadoLower === 'embalado';
             const esEntregado = estadoLower === 'delivered';
             const repartidorAsignado = p.repartidor_nombre || (p.repartidor_id ? 'Lucas Motomensajero' : null);
 
             let badgeEstadoHtml = '';
-            if (esTimeout) {
-                badgeEstadoHtml = `<span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">⏰ TIMEOUT</span>`;
-            } else if (esRechazado) {
-                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fecaca; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">❌ RECHAZADO</span>`;
+            if (esCanceladoCliente) {
+                badgeEstadoHtml = `<span style="background:#dc2626; color:#ffffff; border:1px solid #b91c1c; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">✕ CANCELADO POR CLIENTE</span>`;
+            } else if (esRechazadoComercio) {
+                badgeEstadoHtml = `<span style="background:#dc2626; color:#ffffff; border:1px solid #b91c1c; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">✕ RECHAZADO</span>`;
+            } else if (esTimeout) {
+                badgeEstadoHtml = `<span style="background:#dc2626; color:#ffffff; border:1px solid #b91c1c; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">⏰ CANCELADO (1H)</span>`;
             } else if (esEntregado) {
-                badgeEstadoHtml = `<span style="background:#e2e8f0; color:#475569; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">✅ ENTREGADO</span>`;
+                badgeEstadoHtml = `<span style="background:#2563eb; color:#ffffff; border:1px solid #1d4ed8; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">✓ ENTREGADO</span>`;
             } else if (esEmbalado) {
                 badgeEstadoHtml = `<span style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">📦 EMBALADO</span>`;
             } else if (repartidorAsignado) {
-                badgeEstadoHtml = `<span style="background:#dbeafe; color:#1e40af; border:1px solid #bfdbfe; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">🛵 ASIGNADO</span>`;
+                badgeEstadoHtml = `<span style="background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">🛵 EN CAMINO</span>`;
             } else if (esConfirmado) {
                 badgeEstadoHtml = `<span style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">⏳ BUSCANDO CHOFER</span>`;
             } else {
@@ -185,18 +189,73 @@
             const cantItems = itemsArray.reduce((acc, item) => acc + (Number(item.quantity || item.cantidad || 1)), 0);
             const abierto = pedidosExpandidos.has(p.id) || esNuevoPendiente;
             const iniciales = obtenerIniciales(p.cliente_nombre);
-            const dotColor = esRechazado ? '#ef4444' : (esEntregado ? '#94a3b8' : (esNuevoPendiente ? '#f97316' : '#10b981'));
-            const resumenLinea = repartidorAsignado
-                ? `Chofer: ${repartidorAsignado} · ${cantItems} ítems`
-                : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${cantItems} ítems` : `${cantItems} ítems · Pago Web`);
+
+            // Tema cromático por estado:
+            // - Cancelado / Rechazado -> ROJO
+            // - Entregado -> AZUL / CELESTE
+            // - Nuevo / Pendiente -> NARANJA / ÁMBAR
+            // - Embalado / En curso -> VERDE ESMERALDA
+            let cardBg = '#ffffff';
+            let cardBorder = '#4ade80';
+            let avatarBg = '#ecfdf5';
+            let avatarBorder = '#6ee7b7';
+            let avatarColor = '#065f46';
+            let dotColor = '#10b981';
+            let pillBg = '#ecfdf5';
+            let pillColor = '#047857';
+            let pillBorder = '#a7f3d0';
+            let checkIcon = '<span style="color:#10b981; font-weight:800;">✓✓</span>';
+            let totalColor = '#0f172a';
+
+            if (esRechazado) {
+                cardBg = '#fef2f2';
+                cardBorder = '#f87171';
+                avatarBg = '#fee2e2';
+                avatarBorder = '#fca5a5';
+                avatarColor = '#b91c1c';
+                dotColor = '#dc2626';
+                pillBg = '#fee2e2';
+                pillColor = '#b91c1c';
+                pillBorder = '#fca5a5';
+                checkIcon = '<span style="color:#dc2626; font-weight:900;">✕</span>';
+                totalColor = '#b91c1c';
+            } else if (esEntregado) {
+                cardBg = '#f0f7ff';
+                cardBorder = '#93c5fd';
+                avatarBg = '#dbeafe';
+                avatarBorder = '#60a5fa';
+                avatarColor = '#1e40af';
+                dotColor = '#2563eb';
+                pillBg = '#dbeafe';
+                pillColor = '#1d4ed8';
+                pillBorder = '#93c5fd';
+                checkIcon = '<span style="color:#2563eb; font-weight:800;">✓✓</span>';
+                totalColor = '#1e3a8a';
+            } else if (esNuevoPendiente || esConfirmado) {
+                cardBg = esNuevoPendiente ? '#fffbeb' : '#ffffff';
+                cardBorder = '#fb923c';
+                avatarBg = '#ffedd5';
+                avatarBorder = '#fdba74';
+                avatarColor = '#9a3412';
+                dotColor = '#f97316';
+                pillBg = '#ffedd5';
+                pillColor = '#c2410c';
+                pillBorder = '#fed7aa';
+            }
+
+            const resumenLinea = esRechazado
+                ? `<span style="color:#b91c1c; font-weight:700;">${esCanceladoCliente ? 'Cancelado por el cliente' : (esRechazadoComercio ? 'Rechazado por el comercio' : 'Cancelado por tiempo de espera')} · ${cantItems} ítems</span>`
+                : (repartidorAsignado
+                    ? `Chofer: ${repartidorAsignado} · ${cantItems} ítems`
+                    : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${cantItems} ítems` : `${cantItems} ítems · Pago Web`));
 
             html += `
-                <div class="card rf-order-card" data-order-id="${p.id}" style="background:#fff; border-radius:16px; border:1.5px solid ${esEmbalado ? '#86efac' : (esNuevoPendiente ? '#fdba74' : '#e2e8f0')}; box-shadow:0 2px 8px rgba(15,23,42,0.04); padding:10px 12px; position:relative; transition:all 0.18s ease;">
+                <div class="card rf-order-card" data-order-id="${p.id}" style="background:${cardBg}; border-radius:16px; border:1.5px solid ${cardBorder}; box-shadow:0 2px 8px rgba(15,23,42,0.04); padding:10px 12px; position:relative; transition:all 0.18s ease;">
                     
                     <!-- FILA COMPACTA (ESTILO MENSAJERÍA: AL CLICK SE ABRE PARA VER MÁS DETALLES) -->
                     <div onclick="window.RepartoFacilDespacho.toggleDetalle('${p.id}')" style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
                         <!-- Avatar Circular con Iniciales y Punto de Estado -->
-                        <div style="position:relative; width:40px; height:40px; border-radius:999px; background:#f1f5f9; border:1.5px solid #cbd5e1; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px; color:#0f172a; flex-shrink:0;">
+                        <div style="position:relative; width:40px; height:40px; border-radius:999px; background:${avatarBg}; border:1.5px solid ${avatarBorder}; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px; color:${avatarColor}; flex-shrink:0;">
                             <span>${iniciales}</span>
                             <span style="position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border-radius:999px; background:${dotColor}; border:2px solid #fff;"></span>
                         </div>
@@ -205,8 +264,8 @@
                         <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
                                 <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
-                                    <span style="font-weight:800; font-size:13.5px; color:#0f172a; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.cliente_nombre || 'Cliente'}</span>
-                                    <span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-family:monospace; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; white-space:nowrap;">#${p.id}</span>
+                                    <span style="font-weight:800; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#0f172a'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.cliente_nombre || 'Cliente'}</span>
+                                    <span style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; white-space:nowrap;">#${p.id}</span>
                                     ${badgeEstadoHtml}
                                 </div>
                                 <span style="color:#64748b; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;">${formatFecha(p.created_at)}</span>
@@ -216,13 +275,13 @@
                                 <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     📍 ${p.direccion_entrega || 'Entrega a domicilio'}
                                 </div>
-                                <div style="font-size:13px; font-weight:900; color:#0f172a; white-space:nowrap; flex-shrink:0;">
+                                <div style="font-size:13px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
                                     ${formatMoney(p.total)}
                                 </div>
                             </div>
 
                             <div style="font-size:11px; color:#64748b; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;">
-                                <span style="color:#10b981; font-weight:800;">✓✓</span> ${resumenLinea}
+                                ${checkIcon} ${resumenLinea}
                             </div>
                         </div>
 
