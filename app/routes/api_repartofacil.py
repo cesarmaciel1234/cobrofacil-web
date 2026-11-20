@@ -37,6 +37,9 @@ def get_repartofacil_pedidos():
                     distancia_km,
                     notas,
                     sucursal_origen,
+                    custodio_estado,
+                    custodio_advertencia_at,
+                    driver_last_ping,
                     created_at,
                     updated_at
                 FROM repartofacil_pedidos
@@ -170,6 +173,64 @@ def marcar_pedido_embalado(order_id):
             "success": True,
             "order_id": order_id,
             "estado": "ready",
+            "mensaje": texto,
+            "timestamp": hora_str
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/repartofacil/pedidos/<order_id>/custodio/liberar", methods=["POST"])
+def liberar_pedido_custodio(order_id):
+    """
+    Custodio Intermediario activado por Cobro Fácil:
+    Si el repartidor asignado se desconectó, no responde o no se mueve,
+    el sistema lo desvincula, devuelve el pedido a la bandeja disponible
+    y notifica en el chat blindado a todos los participantes.
+    """
+    try:
+        data = request.get_json(silent=True) or {}
+        motivo = data.get("motivo") or "inactividad y falta de respuesta del chofer"
+        msg_id = f"msg-custodio-{int(time.time() * 1000)}"
+        hora_str = datetime.now().strftime("%H:%M")
+
+        with get_db() as conn:
+            # Obtener estado actual
+            row = conn.execute("SELECT estado, repartidor_nombre FROM repartofacil_pedidos WHERE id = %s", (order_id,)).fetchone()
+            if not row:
+                return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
+                
+            estado_previo = row["estado"]
+            chofer_previo = row["repartidor_nombre"] or "el chofer asignado"
+            nuevo_estado = "ready" if estado_previo in ("ready", "Ready") else "confirmed"
+
+            update_sql = """
+                UPDATE repartofacil_pedidos 
+                SET repartidor_id = NULL,
+                    repartidor_nombre = NULL,
+                    estado = %s,
+                    custodio_estado = 'reingresado',
+                    custodio_advertencia_at = NULL,
+                    updated_at = NOW() 
+                WHERE id = %s
+            """
+            conn.execute(update_sql, (nuevo_estado, order_id))
+
+            texto = f"🚨 [Custodio del Sistema]: Frigorífico Maciel reincorporó el pedido a la bandeja disponible debido a {motivo}. El chofer ({chofer_previo}) fue desasociado. Buscando un nuevo repartidor en zona..."
+            chat_sql = """
+                INSERT INTO repartofacil_chat_mensajes 
+                (id, order_id, author_role, author_name, content, timestamp_str, created_at)
+                VALUES (%s, %s, 'system', 'Sistema Reparto Fácil (Custodio)', %s, %s, NOW())
+            """
+            conn.execute(chat_sql, (msg_id, order_id, texto, hora_str))
+
+            if hasattr(conn, "commit"):
+                conn.commit()
+
+        return jsonify({
+            "success": True,
+            "order_id": order_id,
+            "estado": nuevo_estado,
             "mensaje": texto,
             "timestamp": hora_str
         })

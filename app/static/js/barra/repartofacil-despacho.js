@@ -199,7 +199,14 @@
                             <span>🛵</span>
                             <span>${repartidorAsignado ? `Repartidor: <b style="color:#0f172a;">${repartidorAsignado}</b>` : (esConfirmado ? '<span style="color:#d97706;">Buscando chofer en la zona…</span>' : (esNuevoPendiente ? '<span style="color:#ea580c;">Esperando aceptación de la sucursal</span>' : '<span style="color:#94a3b8;">Sin chofer asignado</span>'))}</span>
                         </div>
-                        <span style="color:#64748b; font-weight:600;">${cantItems} cortes cárnicos</span>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            ${repartidorAsignado && !esEntregado && !esRechazado ? `
+                                <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio('${p.id}')" title="Reincorporar a la bandeja pública si el chofer no responde o se desconectó" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:7px; font-size:9.5px; font-weight:800; padding:2px 6px; cursor:pointer;">
+                                    ⚠️ Reasignar
+                                </button>
+                            ` : ''}
+                            <span style="color:#64748b; font-weight:600;">${cantItems} cortes cárnicos</span>
+                        </div>
                     </div>
 
                     <!-- ACCIONES CONDICIONALES SEGÚN ESTADO: -->
@@ -558,6 +565,21 @@
                 }
 
                 box.innerHTML = data.mensajes.map(m => {
+                    const esSistema = m.author_role === 'system';
+                    if (esSistema) {
+                        return `
+                            <div style="align-self:center; width:100%; margin:6px 0;">
+                                <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:10px 12px; font-size:12px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
+                                    <div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:3px; display:flex; align-items:center; justify-content:center; gap:4px;">
+                                        <span>🛡️</span>
+                                        <span>${m.author_name || 'Custodio del Sistema'} · ${m.timestamp_str || ''}</span>
+                                    </div>
+                                    <div style="color:#78350f; font-weight:600;">${m.content}</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
                     const esMio = m.author_role === 'store';
                     const esChofer = m.author_role === 'driver';
                     const emisor = esMio ? 'Frigorífico Maciel (Tú)' : (esChofer ? `Repartidor (${m.author_name || 'Lucas'})` : `Comprador (${m.author_name || 'Cliente'})`);
@@ -625,6 +647,32 @@
         }, 4000);
     }
 
+    // Acción Custodio: Reincorporar pedido a bandeja por desconexión / falta de respuesta del chofer
+    async function liberarPorCustodio(orderId) {
+        if (!confirm(`¿Deseas desvincular al repartidor del pedido #${orderId} y devolverlo a la bandeja pública por desconexión o inactividad?`)) {
+            return;
+        }
+        try {
+            const resp = await fetch(`/api/repartofacil/pedidos/${orderId}/custodio/liberar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ motivo: 'inactividad y falta de respuesta del chofer' })
+            });
+            const data = await resp.json();
+            if (data.success) {
+                mostrarToast(`Pedido #${orderId} devuelto a la bandeja disponible`);
+                cargarPedidos();
+                if (orderChatActivo === orderId) {
+                    cargarMensajesChat(orderId);
+                }
+            } else {
+                alert(data.error || 'No se pudo liberar el pedido');
+            }
+        } catch (e) {
+            console.error('[RepartoFacil] Error al liberar:', e);
+        }
+    }
+
     // API pública del módulo
     global.RepartoFacilDespacho = {
         iniciar,
@@ -634,6 +682,7 @@
         aceptarPedido,
         rechazarPedido,
         marcarEmbalado,
+        liberarPorCustodio,
         verTicket,
         cerrarTicketModal,
         abrirChat,
