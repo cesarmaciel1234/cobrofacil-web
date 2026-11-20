@@ -661,6 +661,56 @@ def _nombres_en_crm() -> dict[str, dict]:
 
 def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
     columnas, filas = filas_de("clientes", sucursal_id)
+    if not columnas:
+        columnas = ['id', 'nombre', 'telefono', 'limite_credito', 'deuda_actual', 'fecha_registro', 'dni', 'tipo_cliente', 'direccion', 'uid', 'origen_pc', 'creado_por', 'creado_en', 'actualizado_en', 'plazo_dias', 'estado_cuenta', 'promesa_fecha', 'promesa_nota', 'sucursal_id', 'sucursal_nombre']
+        filas = []
+
+    # Convivencia e-commerce y cartera física: integrar clientes de Reparto Fácil web
+    try:
+        from app.database import get_db
+        with get_db() as conn:
+            web_rows = conn.execute(
+                """
+                SELECT DISTINCT ON (LOWER(TRIM(cliente_nombre)))
+                    cliente_nombre, cliente_telefono, direccion_entrega, created_at
+                FROM repartofacil_pedidos
+                WHERE cliente_nombre IS NOT NULL AND cliente_nombre != ''
+                ORDER BY LOWER(TRIM(cliente_nombre)), created_at DESC
+                """
+            ).fetchall()
+            
+            idx = _indice(columnas)
+            nom_idx = idx.get("nombre")
+            nombres_existentes = set()
+            if nom_idx is not None:
+                for f in filas:
+                    if nom_idx < len(f) and f[nom_idx]:
+                        nombres_existentes.add(str(f[nom_idx]).strip().casefold())
+            
+            for wr in web_rows:
+                c_nom = str(wr["cliente_nombre"] or "").strip()
+                if not c_nom or c_nom.casefold() in nombres_existentes:
+                    continue
+                nueva = [None] * len(columnas)
+                for cname, cval in [
+                    ("id", f"web-{len(filas) + 1}"),
+                    ("nombre", c_nom),
+                    ("telefono", str(wr["cliente_telefono"] or "")),
+                    ("direccion", str(wr["direccion_entrega"] or "")),
+                    ("tipo_cliente", "Web"),
+                    ("deuda_actual", 0.0),
+                    ("limite_credito", 0.0),
+                    ("estado_cuenta", "activo"),
+                    ("fecha_registro", str(wr["created_at"] or "")[:19]),
+                ]:
+                    pos = idx.get(cname)
+                    if pos is not None and pos < len(nueva):
+                        nueva[pos] = cval
+                filas.append(nueva)
+                nombres_existentes.add(c_nom.casefold())
+    except Exception as e:
+        logger.warning("Error combinando clientes web en cartera: %s", e)
+
     if filas:
         if sucursal_id is None:
             sucs_activas = {int(s["id"]) for s in listar_sucursales() if s.get("id") is not None}
@@ -670,7 +720,7 @@ def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
                 if idx_suc is not None:
                     filas = [
                         f for f in filas
-                        if idx_suc >= len(f) or f[idx_suc] in (None, "") or int(float(f[idx_suc])) in sucs_activas
+                        if idx_suc >= len(f) or f[idx_suc] in (None, "") or int(float(f[idx_suc])) in sucs_activas or str(f[0]).startswith("web-")
                     ]
         return unir_clientes(columnas, filas)
     col_cc, filas_cc = filas_de("cuenta_corriente", sucursal_id)

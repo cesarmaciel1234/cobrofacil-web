@@ -71,24 +71,62 @@ def aceptar_repartofacil_pedido(order_id):
     Cobro Fácil acepta el pedido del comprador.
     Genera el número de Ticket (#109XXXX), cambia el estado a 'confirmed',
     asigna metodo_pago = 'Web' (para que figure como Web en el libro y tickets),
+    registra/vincula al cliente en la Cartera de Clientes (clientes) para historial unificado,
     y publica el primer mensaje en el chat tripartito.
     """
     try:
         ticket_id = str(random.randint(1090000, 1099999))
-        texto = f"Frigorífico Maciel aceptó el pedido. Ticket #{ticket_id} emitido. Buscando repartidor en zona..."
         msg_id = f"msg-store-{int(time.time() * 1000)}"
         hora_str = datetime.now().strftime("%H:%M")
 
         with get_db() as conn:
+            # Traer datos del pedido
+            order_row = conn.execute("SELECT cliente_nombre, cliente_telefono, direccion_entrega, sucursal_origen FROM repartofacil_pedidos WHERE id = %s", (order_id,)).fetchone()
+            nombre_cliente = (order_row["cliente_nombre"] if order_row else None) or "Cliente Web"
+            tel_cliente = (order_row["cliente_telefono"] if order_row else None) or ""
+            dir_cliente = (order_row["direccion_entrega"] if order_row else None) or ""
+            nombre_sucursal = (order_row["sucursal_origen"] if order_row else None) or "Frigorífico Maciel"
+
+            texto = f"{nombre_sucursal} aceptó el pedido. Ticket #{ticket_id} emitido. Buscando repartidor en zona..."
+
+            # 1. Actualizar estado y ticket del pedido con pago Web
             update_sql = "UPDATE repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, metodo_pago = 'Web', updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (ticket_id, order_id))
             
+            # 2. Registrar/vincular cliente en la Cartera de Clientes local y web compartida
+            try:
+                existente = conn.execute(
+                    "SELECT id FROM clientes WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(%s)) OR (telefono IS NOT NULL AND telefono != '' AND telefono = %s) LIMIT 1",
+                    (nombre_cliente, tel_cliente)
+                ).fetchone()
+                if not existente:
+                    conn.execute(
+                        """
+                        INSERT INTO clientes (nombre, telefono, direccion, scoring, tipo_cliente, techo_deuda, saldo_actual, saldo_inicial, created_at)
+                        VALUES (%s, %s, %s, 'A', 'Web', 0, 0, 0, NOW())
+                        """,
+                        (nombre_cliente, tel_cliente, dir_cliente)
+                    )
+                else:
+                    conn.execute(
+                        """
+                        UPDATE clientes 
+                        SET direccion = COALESCE(NULLIF(direccion, ''), %s),
+                            telefono = COALESCE(NULLIF(telefono, ''), %s)
+                        WHERE id = %s
+                        """,
+                        (dir_cliente, tel_cliente, existente["id"])
+                    )
+            except Exception as cli_err:
+                print(f"[Cartera] Aviso no bloqueante al sincronizar cliente web: {cli_err}")
+
+            # 3. Notificar en chat tripartito
             chat_sql = """
                 INSERT INTO repartofacil_chat_mensajes 
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
-            conn.execute(chat_sql, (msg_id, order_id, "store", "Frigorífico Maciel", texto, hora_str))
+            conn.execute(chat_sql, (msg_id, order_id, "store", nombre_sucursal, texto, hora_str))
             
             if hasattr(conn, "commit"):
                 conn.commit()

@@ -642,6 +642,71 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             slot["monto"] += float(aporte or 0)
             slot["tickets"] += 1
         elegidas.append(venta)
+
+    # Convivencia e-commerce y venta física: incluir pedidos web con ticket en el historial de ventas
+    try:
+        from app.database import get_db
+        with get_db() as conn:
+            web_rows = conn.execute(
+                """
+                SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
+                FROM repartofacil_pedidos
+                WHERE ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected')
+                ORDER BY created_at DESC LIMIT 100
+                """
+            ).fetchall()
+            for wr in web_rows:
+                tid = str(wr["ticket_id"] or wr["id"])
+                if any(str(v.get("id")) == tid for v in elegidas):
+                    continue
+                w_items = []
+                if isinstance(wr.get("items"), str):
+                    try:
+                        import json
+                        w_items = json.loads(wr["items"])
+                    except Exception:
+                        pass
+                elif isinstance(wr.get("items"), list):
+                    w_items = wr["items"]
+                desc_items = " ".join([str(it.get("name") or it.get("nombre") or "") for it in w_items])
+
+                w_venta = {
+                    "id": tid,
+                    "fecha": str(wr["created_at"] or "").split(".")[0],
+                    "total": _num(wr["total"]),
+                    "usuario": "Reparto Fácil",
+                    "estado": "Completada" if wr["estado"] in ("delivered", "Delivered") else "En curso",
+                    "metodo_pago": "Web",
+                    "descuento": 0.0,
+                    "recargo": 0.0,
+                    "caja_id": "Web",
+                    "pago_efectivo": 0.0,
+                    "pago_otro": _num(wr["total"]),
+                    "cambio": 0.0,
+                    "cliente_nombre": str(wr["cliente_nombre"] or "Cliente Web"),
+                }
+                cajas.add("Web")
+                mostrar, aporte = evaluar_ticket(
+                    w_venta,
+                    desc_items,
+                    texto=texto,
+                    metodo=str(pedido.get("metodo") or "TODOS"),
+                    caja=str(pedido.get("caja") or ""),
+                    hora_desde=str(pedido.get("hora_desde") or "00:00"),
+                    hora_hasta=str(pedido.get("hora_hasta") or "23:59"),
+                    fecha_ini=ini,
+                    fecha_fin=fin,
+                )
+                if mostrar:
+                    suma += aporte
+                    ok += 1
+                    slot = medios.setdefault("Web", {"medio": "Web", "monto": 0.0, "tickets": 0})
+                    slot["monto"] += float(aporte or 0)
+                    slot["tickets"] += 1
+                    elegidas.append(w_venta)
+    except Exception as e:
+        logger.warning("Error combinando pedidos web en historial: %s", e)
+
     elegidas.sort(key=lambda item: (item["fecha"], item["id"]), reverse=True)
     offset = max(0, int(pedido.get("offset") or 0))
     limite = max(1, int(pedido.get("limite") or _TOPE_LISTA))
