@@ -252,7 +252,7 @@ def get_db(empresa_id=None):
             cur = conn.cursor()
             empresa_num = int(empresa_id or 0)
             if empresa_num in _schemas_listos:
-                esquema = "public" if empresa_num in (0, 1) else f"empresa_{empresa_num}"
+                esquema = "public" if empresa_num in (0, 1) else f"empresa_{empresa_num}, public"
                 cur.execute(f"SET search_path TO {esquema}")
             elif empresa_id == 0 or empresa_id == 1:
                 cur.execute("SET search_path TO public")
@@ -272,7 +272,7 @@ def get_db(empresa_id=None):
                 if not tables_exist:
                     cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
                     conn.commit()
-                    cur.execute(f"SET search_path TO {schema_name}")
+                    cur.execute(f"SET search_path TO {schema_name}, public")
                     # Initialize tables in this new schema
                     with open(Config.SCHEMA_PATH, encoding="utf-8") as f:
                         sql = f.read()
@@ -281,7 +281,7 @@ def get_db(empresa_id=None):
                     conn.commit()
                     _schemas_listos.add(empresa_num)
                 else:
-                    cur.execute(f"SET search_path TO {schema_name}")
+                    cur.execute(f"SET search_path TO {schema_name}, public")
                     try:
                         ensure_tenant_migrations(wrapper)
                         _schemas_listos.add(empresa_num)

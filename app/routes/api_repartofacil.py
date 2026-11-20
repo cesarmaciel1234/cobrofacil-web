@@ -12,10 +12,10 @@ from app.routes.api import api_bp
 def get_repartofacil_pedidos():
     """
     Devuelve los pedidos activos y recientes de Reparto Fácil
-    desde la tabla compartida repartofacil_pedidos.
+    desde la tabla compartida public.repartofacil_pedidos.
     """
     try:
-        with get_db() as conn:
+        with get_db(empresa_id=0) as conn:
             sql = """
                 SELECT 
                     id,
@@ -42,7 +42,7 @@ def get_repartofacil_pedidos():
                     driver_last_ping,
                     created_at,
                     updated_at
-                FROM repartofacil_pedidos
+                FROM public.repartofacil_pedidos
                 ORDER BY created_at DESC
                 LIMIT 50
             """
@@ -81,7 +81,7 @@ def aceptar_repartofacil_pedido(order_id):
 
         with get_db() as conn:
             # Traer datos del pedido
-            order_row = conn.execute("SELECT cliente_nombre, cliente_telefono, direccion_entrega, sucursal_origen FROM repartofacil_pedidos WHERE id = %s", (order_id,)).fetchone()
+            order_row = conn.execute("SELECT cliente_nombre, cliente_telefono, direccion_entrega, sucursal_origen FROM public.repartofacil_pedidos WHERE id = %s", (order_id,)).fetchone()
             nombre_cliente = (order_row["cliente_nombre"] if order_row else None) or "Cliente Web"
             tel_cliente = (order_row["cliente_telefono"] if order_row else None) or ""
             dir_cliente = (order_row["direccion_entrega"] if order_row else None) or ""
@@ -90,7 +90,7 @@ def aceptar_repartofacil_pedido(order_id):
             texto = f"{nombre_sucursal} aceptó el pedido. Ticket #{ticket_id} emitido. Buscando repartidor en zona..."
 
             # 1. Actualizar estado y ticket del pedido con pago Web
-            update_sql = "UPDATE repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, metodo_pago = 'Web', updated_at = NOW() WHERE id = %s"
+            update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, metodo_pago = 'Web', updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (ticket_id, order_id))
             
             # 2. Registrar/vincular cliente en la Cartera de Clientes local y web compartida
@@ -122,7 +122,7 @@ def aceptar_repartofacil_pedido(order_id):
 
             # 3. Notificar en chat tripartito
             chat_sql = """
-                INSERT INTO repartofacil_chat_mensajes 
+                INSERT INTO public.repartofacil_chat_mensajes 
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
@@ -157,11 +157,11 @@ def rechazar_repartofacil_pedido(order_id):
         texto = f"Pedido no aceptado por Frigorífico Maciel: {motivo}."
 
         with get_db() as conn:
-            update_sql = "UPDATE repartofacil_pedidos SET estado = 'rejected', updated_at = NOW() WHERE id = %s"
+            update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'rejected', updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (order_id,))
             
             chat_sql = """
-                INSERT INTO repartofacil_chat_mensajes 
+                INSERT INTO public.repartofacil_chat_mensajes 
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
@@ -194,11 +194,11 @@ def marcar_pedido_embalado(order_id):
         texto = "Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅"
 
         with get_db() as conn:
-            update_sql = "UPDATE repartofacil_pedidos SET estado = 'ready', updated_at = NOW() WHERE id = %s"
+            update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'ready', updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (order_id,))
             
             chat_sql = """
-                INSERT INTO repartofacil_chat_mensajes 
+                INSERT INTO public.repartofacil_chat_mensajes 
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
@@ -234,7 +234,7 @@ def liberar_pedido_custodio(order_id):
 
         with get_db() as conn:
             # Obtener estado actual
-            row = conn.execute("SELECT estado, repartidor_nombre FROM repartofacil_pedidos WHERE id = %s", (order_id,)).fetchone()
+            row = conn.execute("SELECT estado, repartidor_nombre FROM public.repartofacil_pedidos WHERE id = %s", (order_id,)).fetchone()
             if not row:
                 return jsonify({"success": False, "error": "Pedido no encontrado"}), 404
                 
@@ -243,7 +243,7 @@ def liberar_pedido_custodio(order_id):
             nuevo_estado = "ready" if estado_previo in ("ready", "Ready") else "confirmed"
 
             update_sql = """
-                UPDATE repartofacil_pedidos 
+                UPDATE public.repartofacil_pedidos 
                 SET repartidor_id = NULL,
                     repartidor_nombre = NULL,
                     estado = %s,
@@ -256,7 +256,7 @@ def liberar_pedido_custodio(order_id):
 
             texto = f"🚨 [Custodio del Sistema]: Frigorífico Maciel reincorporó el pedido a la bandeja disponible debido a {motivo}. El chofer ({chofer_previo}) fue desasociado. Buscando un nuevo repartidor en zona..."
             chat_sql = """
-                INSERT INTO repartofacil_chat_mensajes 
+                INSERT INTO public.repartofacil_chat_mensajes 
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
                 VALUES (%s, %s, 'system', 'Sistema Reparto Fácil (Custodio)', %s, %s, NOW())
             """
@@ -302,7 +302,7 @@ def get_repartofacil_ticket(target_id):
                     notas,
                     sucursal_origen,
                     created_at
-                FROM repartofacil_pedidos
+                FROM public.repartofacil_pedidos
                 WHERE id = %s OR ticket_id = %s
                 LIMIT 1
             """
@@ -354,7 +354,7 @@ def get_repartofacil_chat(order_id):
         with get_db() as conn:
             sql = """
                 SELECT id, order_id, author_role, author_name, content, timestamp_str, created_at
-                FROM repartofacil_chat_mensajes
+                FROM public.repartofacil_chat_mensajes
                 WHERE order_id = %s
                 ORDER BY created_at ASC
             """
@@ -381,7 +381,7 @@ def send_repartofacil_chat_mensaje(order_id):
         
         with get_db() as conn:
             chat_sql = """
-                INSERT INTO repartofacil_chat_mensajes 
+                INSERT INTO public.repartofacil_chat_mensajes 
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
