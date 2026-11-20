@@ -728,7 +728,7 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
         ],
         "filtrado": round(suma, 2),
         "tickets_ok": ok,
-        "cajas": sorted(cajas),
+        "cajas": sorted(cajas, key=lambda x: str(x)),
         "medios": sorted(
             (
                 {"medio": item["medio"], "monto": round(item["monto"], 2), "tickets": item["tickets"]}
