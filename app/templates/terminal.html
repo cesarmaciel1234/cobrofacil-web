@@ -292,6 +292,25 @@
                     </div>
                 </div>
                 <div id="pedidosAuditoriaWrap" style="display:none;"></div>
+                
+                <!-- 🛵 MÓDULO REPARTO FÁCIL: RECEPCIÓN DE PEDIDOS Y EMBALADO -->
+                <div id="pedidosRepartoFacilWrap" style="display:none; padding:10px 14px 80px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; background:#fff; padding:12px 16px; border-radius:16px; border:1px solid #e2e8f0; box-shadow:0 2px 4px rgba(0,0,0,0.02);">
+                        <div>
+                            <div style="display:flex; align-items:center; gap:8px;">
+                                <span style="font-size:18px;">🛵</span>
+                                <h3 style="margin:0; font-size:15px; font-weight:800; color:#0f172a;">Pedidos Reparto Fácil</h3>
+                                <span id="repartoFacilCountBadge" style="display:none; background:#10b981; color:#fff; font-size:10px; font-weight:900; padding:2px 7px; border-radius:999px;">0</span>
+                            </div>
+                            <small style="color:#64748b; font-size:11px; font-weight:600; display:block; margin-top:2px;">Recepción en vivo de pedidos de clientes y aviso de embalado a repartidores</small>
+                        </div>
+                        <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos()" class="btn" style="padding:6px 12px; font-size:11px; font-weight:800; border-radius:10px; background:#f1f5f9; border:1px solid #cbd5e1; cursor:pointer; color:#334155;">
+                            🔄 Refrescar
+                        </button>
+                    </div>
+
+                    <div id="repartoFacilCardsContenedor" style="display:flex; flex-direction:column; gap:12px;"></div>
+                </div>
             </div>
             <div class="view" id="view-cartera">
                 <div id="carteraLista">
@@ -636,6 +655,7 @@
     <script src="/static/js/barra/reporte-financiero.js?v=7.2"></script>
     <script src="/static/js/barra/cartera-libro.js?v=7.2"></script>
     <script src="/static/js/barra/auditoria-inventario.js?v=7.2"></script>
+    <script src="/static/js/barra/repartofacil-despacho.js?v=7.2"></script>
     <script src="/static/js/espejo.js?v=7.2"></script>
     <script src="/static/js/espejo-engine.js?v=7.2"></script>
     <script src="/static/js/nodo.js?v=7.2"></script>

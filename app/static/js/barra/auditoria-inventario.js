@@ -175,8 +175,19 @@
         pantallaActiva = id || 'faltantes';
         const faltantesWrap = $('pedidosFaltantesWrap');
         const auditoriaWrap = $('pedidosAuditoriaWrap');
+        const repartofacilWrap = $('pedidosRepartoFacilWrap');
 
-        if (pantallaActiva === 'auditoria') {
+        if (pantallaActiva === 'repartofacil') {
+            if (faltantesWrap) faltantesWrap.style.display = 'none';
+            if (auditoriaWrap) auditoriaWrap.style.display = 'none';
+            if (repartofacilWrap) {
+                repartofacilWrap.style.display = 'block';
+                if (global.RepartoFacilDespacho && global.RepartoFacilDespacho.iniciar) {
+                    global.RepartoFacilDespacho.iniciar();
+                }
+            }
+        } else if (pantallaActiva === 'auditoria') {
+            if (repartofacilWrap) repartofacilWrap.style.display = 'none';
             if (faltantesWrap) faltantesWrap.style.display = 'none';
             if (auditoriaWrap) {
                 auditoriaWrap.style.display = 'block';
@@ -189,6 +200,7 @@
             }
             actualizarIconoFiltroHeader();
         } else {
+            if (repartofacilWrap) repartofacilWrap.style.display = 'none';
             if (auditoriaWrap) auditoriaWrap.style.display = 'none';
             if (faltantesWrap) faltantesWrap.style.display = 'block';
             const refresh = $('btnRefresh');

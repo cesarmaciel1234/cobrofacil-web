@@ -4850,11 +4850,23 @@ const $ = id => document.getElementById(id);
             if (name === 'pedidos') {
                 const faltantesWrap = $('pedidosFaltantesWrap');
                 const auditoriaWrap = $('pedidosAuditoriaWrap');
+                const repartofacilWrap = $('pedidosRepartoFacilWrap');
                 const pActiva = (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual) ? window.AuditoriaInventario.pantallaActual() : 'faltantes';
-                if (pActiva === 'auditoria') {
+                if (pActiva === 'repartofacil') {
+                    if (faltantesWrap) faltantesWrap.style.display = 'none';
+                    if (auditoriaWrap) auditoriaWrap.style.display = 'none';
+                    if (repartofacilWrap) {
+                        repartofacilWrap.style.display = 'block';
+                        if (window.RepartoFacilDespacho && window.RepartoFacilDespacho.iniciar) {
+                            window.RepartoFacilDespacho.iniciar();
+                        }
+                    }
+                } else if (pActiva === 'auditoria') {
+                    if (repartofacilWrap) repartofacilWrap.style.display = 'none';
                     if (faltantesWrap) faltantesWrap.style.display = 'none';
                     if (auditoriaWrap) auditoriaWrap.style.display = 'block';
                 } else {
+                    if (repartofacilWrap) repartofacilWrap.style.display = 'none';
                     if (auditoriaWrap) auditoriaWrap.style.display = 'none';
                     if (faltantesWrap) faltantesWrap.style.display = 'block';
                 }
