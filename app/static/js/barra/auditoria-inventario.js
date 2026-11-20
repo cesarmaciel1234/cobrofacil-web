@@ -19,7 +19,7 @@
         quiebre: 0
     };
     let fuenteConexion = 'local';
-    let pantallaActiva = 'faltantes'; // 'faltantes' | 'auditoria'
+    let pantallaActiva = 'repartofacil'; // 'repartofacil' (principal) | 'faltantes' | 'auditoria'
     let filtroEstado = 'todos'; // 'todos' | 'auditados' | 'pendientes' | 'diferencia' | 'quiebre'
     let filtroDepto = '';
     let textoBusqueda = '';
@@ -172,7 +172,7 @@
     // CAMBIO DE PANTALLA (Faltantes vs Auditoría)
     // -------------------------------------------------------------------------
     function cambiarPantalla(id) {
-        pantallaActiva = id || 'faltantes';
+        pantallaActiva = id || 'repartofacil';
         const faltantesWrap = $('pedidosFaltantesWrap');
         const auditoriaWrap = $('pedidosAuditoriaWrap');
         const repartofacilWrap = $('pedidosRepartoFacilWrap');

@@ -349,7 +349,7 @@ const $ = id => document.getElementById(id);
             admin: ['Cartera & Fiado', 'Libro de la sucursal', 'Fiado'],
             'historial-fiado': ['Historial del cliente', 'Movimientos del libro de Cobro Fácil', 'Historial'],
             digitales: ['Cobros Digitales MP', 'Auditoría de Mercado Pago, QR y Point', 'Digital'],
-            pedidos: ['Pedidos al Frigorífico', 'Faltantes de stock y mensaje WhatsApp', 'Pedidos'],
+            pedidos: ['Pedidos Reparto Fácil', 'Recepción de pedidos de clientes y despacho', 'Pedidos'],
             cartera: ['Cartera', 'Clientes del libro', 'Cartera']
         };
 
@@ -4853,7 +4853,7 @@ const $ = id => document.getElementById(id);
                 const faltantesWrap = $('pedidosFaltantesWrap');
                 const auditoriaWrap = $('pedidosAuditoriaWrap');
                 const repartofacilWrap = $('pedidosRepartoFacilWrap');
-                const pActiva = (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual) ? window.AuditoriaInventario.pantallaActual() : 'faltantes';
+                const pActiva = (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual) ? window.AuditoriaInventario.pantallaActual() : 'repartofacil';
                 if (pActiva === 'repartofacil') {
                     if (faltantesWrap) faltantesWrap.style.display = 'none';
                     if (auditoriaWrap) auditoriaWrap.style.display = 'none';
@@ -6514,7 +6514,7 @@ const $ = id => document.getElementById(id);
                         switchView('pedidos');
                     }
                     if (window.AuditoriaInventario && window.AuditoriaInventario.cambiarPantalla) {
-                        window.AuditoriaInventario.cambiarPantalla(id || 'faltantes');
+                        window.AuditoriaInventario.cambiarPantalla(id || 'repartofacil');
                     }
                     return;
                 }
