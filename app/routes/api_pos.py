@@ -690,6 +690,29 @@ def api_pos_inventario_ajuste():
     return jsonify(resultado), status_code
 
 
+@api_bp.route("/pos/inventario/producto", methods=["POST"])
+def api_pos_inventario_crear_producto():
+    """Alta rápida de artículo desde el buscador del Inventario (nombre + código de barras)."""
+    from app.services.pos_inventario import crear_producto_catalogo
+
+    data = request.get_json(silent=True) or {}
+    emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or data.get("empresa_id") or 1
+    emp_id = int(emp_raw) if str(emp_raw).isdigit() else 1
+    sid_raw = data.get("sucursal_id")
+    sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+    resultado = crear_producto_catalogo(
+        nombre=data.get("nombre"),
+        codigo=str(data.get("codigo") or ""),
+        precio=data.get("precio") or 0,
+        stock=data.get("stock") or 0,
+        unidad=data.get("unidad") or "UN",
+        departamento=data.get("departamento") or "GENERAL",
+        sucursal_id=sid,
+        empresa_id=emp_id,
+    )
+    return jsonify(resultado), (200 if resultado.get("ok") else 400)
+
+
 @api_bp.route("/pos/inventario/historial", methods=["GET"])
 def api_pos_inventario_historial():
     """Retorna los últimos registros de auditoría de inventario."""

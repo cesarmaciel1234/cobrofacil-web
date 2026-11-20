@@ -260,6 +260,111 @@ def obtener_catalogo_auditoria(sucursal_id: Optional[int] = None, empresa_id: in
     }
 
 
+def crear_producto_catalogo(
+    nombre: str,
+    codigo: str = "",
+    precio: float = 0.0,
+    stock: float = 0.0,
+    unidad: str = "UN",
+    departamento: str = "GENERAL",
+    sucursal_id: Optional[int] = None,
+    empresa_id: int = 1,
+) -> Dict[str, Any]:
+    """
+    Alta rápida de un artículo en el catálogo (pos_base.productos) del esquema
+    de la empresa en sesión. Valida que el código de barras no esté repetido.
+    """
+    nombre = (nombre or "").strip()
+    codigo = (codigo or "").strip()
+    if not nombre:
+        return {"ok": False, "error": "El nombre es obligatorio"}
+    try:
+        precio = round(float(precio or 0), 2)
+        stock = round(float(stock or 0), 3)
+    except (TypeError, ValueError):
+        return {"ok": False, "error": "Precio o stock inválidos"}
+    unidad = (unidad or "UN").strip().upper()
+    pesable = unidad in ("KG", "KILO", "KILOS")
+    departamento = (departamento or "GENERAL").strip().upper()
+
+    from app.database import get_db
+
+    try:
+        with get_db(empresa_id) as conn:
+            sql = "SELECT id, sucursal_id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
+            params: tuple = ()
+            if sucursal_id is not None:
+                sql += " AND sucursal_id = ?"
+                params = (sucursal_id,)
+            sql += " ORDER BY id DESC"
+            partes = conn.execute(sql, params).fetchall()
+            if not partes and sucursal_id is not None:
+                partes = conn.execute(
+                    "SELECT id, sucursal_id, columnas, filas FROM pos_base WHERE tabla = 'productos' ORDER BY id DESC"
+                ).fetchall()
+            if not partes:
+                return {"ok": False, "error": "La sucursal todavía no sincronizó un catálogo base"}
+
+            def _cargar(v):
+                return v if isinstance(v, list) else json.loads(v or "[]")
+
+            cols = _cargar(partes[0]["columnas"])
+            idx = {c: i for i, c in enumerate(cols)}
+            max_id = 0
+            for parte in partes:
+                for r in _cargar(parte["filas"]):
+                    try:
+                        max_id = max(max_id, int(r[idx.get("id", 0)]))
+                    except (TypeError, ValueError):
+                        pass
+                    if codigo and "codigo" in idx and str(r[idx["codigo"]] or "").strip() == codigo:
+                        return {"ok": False, "error": f"El código {codigo} ya existe ({r[idx.get('nombre', 1)]})"}
+                    if str(r[idx.get("nombre", 1)] or "").strip().lower() == nombre.lower():
+                        return {"ok": False, "error": f"Ya existe un artículo llamado {nombre}"}
+
+            nuevo_id = max_id + 1
+            if not codigo:
+                codigo = str(nuevo_id)
+            valores = {
+                "id": nuevo_id, "nombre": nombre, "precio": precio, "stock": stock,
+                "unidad": "KG" if pesable else unidad, "costo": 0, "codigo": codigo,
+                "departamento": departamento, "categoria": None, "es_pesable": 1 if pesable else 0,
+                "stock_minimo": 0, "stock_maximo": 0,
+            }
+            fila = [valores.get(c) for c in cols]
+
+            destino = partes[0]
+            filas = _cargar(destino["filas"])
+            filas.append(fila)
+            conn.execute(
+                "UPDATE pos_base SET filas = ?, cantidad = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                (json.dumps(filas), len(filas), destino["id"]),
+            )
+            try:
+                conn.commit()
+            except Exception:
+                pass
+    except Exception as exc:
+        logger.error("Error creando producto en catálogo: %s", exc)
+        return {"ok": False, "error": str(exc)}
+
+    try:
+        from app.services.pos_base import _olvidar_tabla
+        _olvidar_tabla("productos")
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "producto": {
+            "id": nuevo_id, "codigo": codigo, "nombre": nombre, "departamento": departamento,
+            "stock": stock, "precio": precio, "costo": 0.0,
+            "unidad": "KG" if pesable else unidad, "es_pesable": pesable,
+            "auditado_hoy": False, "ultimo_conteo": None, "diferencia": None,
+        },
+    }
+
+
 def registrar_ajuste_inventario(
     producto_id: int,
     stock_fisico: float,

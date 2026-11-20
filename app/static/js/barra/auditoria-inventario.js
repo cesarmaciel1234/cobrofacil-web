@@ -111,6 +111,16 @@
         });
     }
 
+    function escHtml(s) {
+        return String(s == null ? '' : s)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    let callbackCodigoEscaneado = null;
+
     // -------------------------------------------------------------------------
     // -------------------------------------------------------------------------
     // CARGA DE DATOS DESDE LA API
@@ -372,7 +382,19 @@
                     ${btnHtml}
                 </div>`;
             }).join('')
-            : `<p class="pedido-vacio" style="padding: 24px; text-align: center; color: #94a3b8;">No hay artículos con ese filtro.</p>`;
+            : (texto
+                ? `<div class="pedido-vacio" style="padding:22px 16px; text-align:center;">
+                        <div style="color:#64748b; font-size:13.5px; margin-bottom:12px;">No hay <b style="color:#0f172a;">“${escHtml(textoBusqueda.trim())}”</b> en el inventario.</div>
+                        <button type="button" id="btnCrearDesdeVacio" style="background:#2563eb; color:#fff; border:none; border-radius:12px; font-size:14px; font-weight:800; padding:11px 18px; cursor:pointer; box-shadow:0 4px 12px rgba(37,99,235,0.3);">
+                            + Crear artículo
+                        </button>
+                   </div>`
+                : `<p class="pedido-vacio" style="padding: 24px; text-align: center; color: #94a3b8;">No hay artículos con ese filtro.</p>`);
+
+        const sinResultados = !!texto && filtrados.length === 0;
+        const inputPrevio = $('auditoriaSearchInput');
+        const teniaFoco = document.activeElement === inputPrevio;
+        const cursorPos = teniaFoco && inputPrevio ? inputPrevio.selectionStart : null;
 
         wrap.innerHTML = `
             <div class="auditoria-mobile-container" style="padding: 10px 12px 60px;">
@@ -380,9 +402,11 @@
                 <div class="auditoria-search-wrap" style="margin-bottom: ${filtroEstado !== 'todos' ? '8px' : '12px'};">
                     <div class="auditoria-input-box">
                         <input type="search" id="auditoriaSearchInput" class="auditoria-search-input" 
-                               placeholder="Buscar corte, código o escanear..." 
-                               value="${textoBusqueda}" autocomplete="off" autocapitalize="off">
-                        ${textoBusqueda ? '<button type="button" id="btnAuditoriaLimpiar" class="btn-clear-search">✕</button>' : ''}
+                               placeholder="Buscar artículo, código o escanear..." 
+                               value="${escHtml(textoBusqueda)}" autocomplete="off" autocapitalize="off">
+                        ${sinResultados
+                            ? '<button type="button" id="btnAuditoriaCrear" class="btn-clear-search" title="Crear artículo" aria-label="Crear artículo" style="color:#fff; background:#2563eb; border-radius:999px; width:28px; height:28px; font-size:20px; font-weight:800; line-height:28px; padding:0;">+</button>'
+                            : (textoBusqueda ? '<button type="button" id="btnAuditoriaLimpiar" class="btn-clear-search">✕</button>' : '')}
                     </div>
                     <button type="button" id="btnAuditoriaEscaner" class="btn-cam-scanner" aria-label="Escanear código con cámara">
                         <svg class="cam-ico" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -416,6 +440,16 @@
 
         // Event Listeners
         vincularEventosAuditoria();
+
+        if (teniaFoco) {
+            const nuevoInput = $('auditoriaSearchInput');
+            if (nuevoInput) {
+                nuevoInput.focus();
+                if (cursorPos !== null) {
+                    try { nuevoInput.setSelectionRange(cursorPos, cursorPos); } catch (_) {}
+                }
+            }
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -427,12 +461,10 @@
         if (inputBuscar) {
             inputBuscar.addEventListener('input', (e) => {
                 textoBusqueda = e.target.value;
-                const btnLimpiar = $('btnAuditoriaLimpiar');
-                if (btnLimpiar) btnLimpiar.style.display = textoBusqueda ? 'block' : 'none';
                 renderAuditoria();
             });
 
-            // Enter directo abre el primer resultado o conteo
+            // Enter directo abre el primer resultado o el alta si no existe
             inputBuscar.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -441,8 +473,27 @@
                     const encontrado = buscarPorCodigoONombre(code);
                     if (encontrado) {
                         abrirDrawerConteo(encontrado);
+                    } else {
+                        abrirModalCrearProducto(code);
                     }
                 }
+            });
+        }
+
+        const btnCrear = $('btnAuditoriaCrear');
+        if (btnCrear) {
+            btnCrear.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                abrirModalCrearProducto(textoBusqueda.trim());
+            });
+        }
+
+        const btnCrearVacio = $('btnCrearDesdeVacio');
+        if (btnCrearVacio) {
+            btnCrearVacio.addEventListener('click', (e) => {
+                e.preventDefault();
+                abrirModalCrearProducto(textoBusqueda.trim());
             });
         }
 
@@ -957,23 +1008,166 @@
         const prompt = $('scannerPrompt');
         if (prompt) prompt.textContent = '✓ Código detectado: ' + codigo;
 
-        // Buscar producto correspondiente
         setTimeout(() => {
             cerrarEscanerCamara();
+            if (typeof callbackCodigoEscaneado === 'function') {
+                const cb = callbackCodigoEscaneado;
+                callbackCodigoEscaneado = null;
+                cb(String(codigo).trim());
+                return;
+            }
             const prod = buscarPorCodigoONombre(codigo);
             if (prod) {
                 abrirDrawerConteo(prod);
             } else {
                 audioBeep(false);
                 vibrar([150, 80, 150]);
-                if (global.CrmBus) {
-                    global.CrmBus.emit('toast', `Código "${codigo}" detectado, pero no figura en inventario.`, true);
-                }
-                // Si no se encuentra, poner el código en el buscador para facilitar carga
                 textoBusqueda = codigo;
                 renderAuditoria();
+                abrirModalCrearProducto(codigo);
             }
         }, 350);
+    }
+
+    // -------------------------------------------------------------------------
+    // ALTA RÁPIDA DE ARTÍCULO CON NOMBRE + CÓDIGO DE BARRAS FUNCIONAL
+    // -------------------------------------------------------------------------
+    function abrirModalCrearProducto(semilla = '') {
+        $('modalCrearProductoInv')?.remove();
+        const texto = String(semilla || '').trim();
+        const esCodigoNumerico = /^\d{4,}$/.test(texto);
+        const nombreInicial = esCodigoNumerico ? '' : texto;
+        const codigoInicial = esCodigoNumerico ? texto : '';
+
+        const fondo = document.createElement('div');
+        fondo.id = 'modalCrearProductoInv';
+        fondo.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9500; display:flex; align-items:flex-end; justify-content:center; padding:0;';
+        fondo.innerHTML = `
+            <div style="background:#fff; width:100%; max-width:460px; border-radius:22px 22px 0 0; padding:20px 18px 26px; box-shadow:0 -10px 30px rgba(15,23,42,0.2); animation:slideUpSheet 0.2s ease-out;">
+                <div style="width:38px; height:4px; background:#cbd5e1; border-radius:99px; margin:0 auto 12px;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <h3 style="margin:0; font-size:17px; font-weight:800; color:#0f172a;">+ Nuevo artículo en Inventario</h3>
+                    <button type="button" id="btnCerrarCrearProd" style="background:#f1f5f9; border:none; width:30px; height:30px; border-radius:99px; font-size:15px; font-weight:800; color:#475569; cursor:pointer;">✕</button>
+                </div>
+
+                <form id="formCrearProductoInv" style="display:flex; flex-direction:column; gap:12px;">
+                    <div>
+                        <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Nombre del artículo *</label>
+                        <input type="text" id="nuevoProdNombre" required placeholder="Ej: Coca Cola 2.25L" value="${escHtml(nombreInicial)}"
+                               style="width:100%; box-sizing:border-box; padding:11px 12px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:14.5px; font-weight:700; color:#0f172a;">
+                    </div>
+
+                    <div>
+                        <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Código de barras / Código</label>
+                        <div style="display:flex; gap:8px;">
+                            <input type="text" id="nuevoProdCodigo" placeholder="Escanear o escribir código..." value="${escHtml(codigoInicial)}"
+                                   style="flex:1; min-width:0; box-sizing:border-box; padding:11px 12px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:14px; font-weight:700; font-family:monospace; color:#0f172a;">
+                            <button type="button" id="btnEscanearParaNuevo" style="background:#2563eb; color:#fff; border:none; border-radius:12px; padding:0 14px; font-size:12.5px; font-weight:800; display:inline-flex; align-items:center; gap:6px; cursor:pointer; white-space:nowrap;">
+                                📷 Escanear
+                            </button>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr 96px; gap:8px;">
+                        <div>
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Precio ($)</label>
+                            <input type="number" id="nuevoProdPrecio" step="0.01" min="0" placeholder="0" value=""
+                                   style="width:100%; box-sizing:border-box; padding:11px 10px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:14px; font-weight:700; color:#0f172a;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Stock inicial</label>
+                            <input type="number" id="nuevoProdStock" step="0.001" placeholder="0" value="0"
+                                   style="width:100%; box-sizing:border-box; padding:11px 10px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:14px; font-weight:700; color:#0f172a;">
+                        </div>
+                        <div>
+                            <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Unidad</label>
+                            <select id="nuevoProdUnidad" style="width:100%; box-sizing:border-box; padding:11px 8px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:13.5px; font-weight:800; color:#0f172a; background:#fff;">
+                                <option value="UN">UN</option>
+                                <option value="KG">KG</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div id="nuevoProdError" style="display:none; color:#dc2626; background:#fef2f2; border:1px solid #fecaca; padding:8px 10px; border-radius:10px; font-size:12.5px; font-weight:700;"></div>
+
+                    <div style="display:flex; gap:8px; margin-top:4px;">
+                        <button type="button" id="btnCancelarCrearProd" style="flex:1; padding:12px; border-radius:12px; border:1px solid #cbd5e1; background:#f8fafc; color:#475569; font-size:13.5px; font-weight:800; cursor:pointer;">Cancelar</button>
+                        <button type="submit" id="btnGuardarCrearProd" style="flex:1.6; padding:12px; border-radius:12px; border:none; background:#10b981; color:#fff; font-size:14px; font-weight:900; cursor:pointer; box-shadow:0 4px 12px rgba(16,185,129,0.3);">✓ Guardar en Catálogo</button>
+                    </div>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(fondo);
+
+        const cerrar = () => {
+            callbackCodigoEscaneado = null;
+            fondo.remove();
+        };
+        fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
+        fondo.querySelector('#btnCerrarCrearProd')?.addEventListener('click', cerrar);
+        fondo.querySelector('#btnCancelarCrearProd')?.addEventListener('click', cerrar);
+
+        const inputNom = fondo.querySelector('#nuevoProdNombre');
+        const inputCod = fondo.querySelector('#nuevoProdCodigo');
+        setTimeout(() => {
+            if (nombreInicial && inputCod) inputCod.focus();
+            else if (inputNom) inputNom.focus();
+        }, 40);
+
+        fondo.querySelector('#btnEscanearParaNuevo')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            callbackCodigoEscaneado = (codDetectado) => {
+                if (inputCod) inputCod.value = codDetectado;
+                if (inputNom && !inputNom.value.trim()) inputNom.focus();
+            };
+            abrirEscanerCamara();
+        });
+
+        fondo.querySelector('#formCrearProductoInv')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const errBox = fondo.querySelector('#nuevoProdError');
+            const btnSave = fondo.querySelector('#btnGuardarCrearProd');
+            const nombre = (inputNom?.value || '').trim();
+            const codigo = (inputCod?.value || '').trim();
+            const precio = parseFloat(fondo.querySelector('#nuevoProdPrecio')?.value || '0') || 0;
+            const stock = parseFloat(fondo.querySelector('#nuevoProdStock')?.value || '0') || 0;
+            const unidad = fondo.querySelector('#nuevoProdUnidad')?.value || 'UN';
+
+            if (!nombre) {
+                if (errBox) { errBox.textContent = 'Ingresá el nombre del artículo.'; errBox.style.display = 'block'; }
+                return;
+            }
+            if (btnSave) { btnSave.disabled = true; btnSave.textContent = 'Guardando…'; }
+            try {
+                const res = await fetch('/api/pos/inventario/producto', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        nombre,
+                        codigo,
+                        precio,
+                        stock,
+                        unidad,
+                        sucursal_id: global.activeSucursalId
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) {
+                    throw new Error(data.error || 'No se pudo crear el artículo');
+                }
+                if (data.producto) {
+                    catalogo.unshift(data.producto);
+                    resumen.total_sku = catalogo.length;
+                    textoBusqueda = data.producto.nombre;
+                }
+                cerrar();
+                renderAuditoria();
+                if (global.CrmBus) global.CrmBus.emit('toast', `✓ "${nombre}" creado con código ${data.producto?.codigo || codigo}`);
+            } catch (err) {
+                if (errBox) { errBox.textContent = err.message; errBox.style.display = 'block'; }
+                if (btnSave) { btnSave.disabled = false; btnSave.textContent = '✓ Guardar en Catálogo'; }
+            }
+        });
     }
 
     // -------------------------------------------------------------------------
