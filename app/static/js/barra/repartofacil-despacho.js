@@ -252,23 +252,23 @@
                     ` : ''}
 
                     <!-- BOTONES ESENCIALES: DETALLE, MENSAJERÍA Y EMBALADO (Adaptables a Mobile) -->
-                    <div style="display:flex; gap:6px; margin-top:8px; width:100%;">
+                    <div style="display:flex; gap:6px; margin-top:8px; width:100%; box-sizing:border-box;">
                         <!-- 1. Botón Detalle (Desplegable) -->
-                        <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle('${p.id}')" style="flex:0.85; min-width:0; background:#f1f5f9; hover:background:#e2e8f0; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:700; padding:8px 3px; display:inline-flex; align-items:center; justify-content:center; gap:3px; cursor:pointer; white-space:nowrap;">
+                        <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle('${p.id}')" style="flex:1; min-width:0; background:#f1f5f9; hover:background:#e2e8f0; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
                             <span>📋</span>
-                            <span style="overflow:hidden; text-overflow:ellipsis;">Ver</span>
+                            <span>Ver</span>
                         </button>
 
                         <!-- 2. Botón Mensajería Privada Tripartita -->
-                        <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat('${p.id}', '${p.cliente_nombre || 'Cliente'}')" style="flex:0.85; min-width:0; background:#e0f2fe; hover:background:#bae6fd; color:#0369a1; border:1px solid #7dd3fc; border-radius:10px; font-size:11px; font-weight:700; padding:8px 3px; display:inline-flex; align-items:center; justify-content:center; gap:3px; cursor:pointer; white-space:nowrap;">
+                        <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat('${p.id}', '${p.cliente_nombre || 'Cliente'}')" style="flex:1; min-width:0; background:#e0f2fe; hover:background:#bae6fd; color:#0369a1; border:1px solid #7dd3fc; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
                             <span>💬</span>
-                            <span style="overflow:hidden; text-overflow:ellipsis;">Chat</span>
+                            <span>Chat</span>
                         </button>
 
                         <!-- 3. Botón Embalado -->
-                        <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado('${p.id}')" ${esRechazado ? 'disabled' : ''} style="flex:1.3; min-width:0; background:${esEmbalado ? '#10b981' : (esRechazado ? '#94a3b8' : '#047857')}; color:#ffffff; border:none; border-radius:10px; font-size:10.5px; letter-spacing:-0.2px; font-weight:800; padding:8px 2px; display:inline-flex; align-items:center; justify-content:center; gap:3px; cursor:pointer; box-shadow:0 2px 6px rgba(16,185,129,0.3); white-space:nowrap;">
+                        <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado('${p.id}')" ${esRechazado ? 'disabled' : ''} style="flex:1.25; min-width:0; background:${esEmbalado ? '#10b981' : (esRechazado ? '#94a3b8' : '#047857')}; color:#ffffff; border:none; border-radius:10px; font-size:11px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(16,185,129,0.3); white-space:nowrap;">
                             <span>${esEmbalado ? '✓' : '📦'}</span>
-                            <span style="overflow:hidden; text-overflow:ellipsis;">${esEmbalado ? 'Embalado' : 'Embalar'}</span>
+                            <span>${esEmbalado ? 'Embalado' : 'Embalar'}</span>
                         </button>
                     </div>
 
