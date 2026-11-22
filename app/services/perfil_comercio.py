@@ -73,8 +73,12 @@ def guardar_perfil(empresa_id, datos):
     if (coords[0] is None) != (coords[1] is None):
         raise ValueError("Ingresá latitud y longitud juntas.")
 
+    confirmada = datos.get("ubicacion_confirmada", False)
+    if not isinstance(confirmada, bool):
+        raise ValueError("La confirmación de ubicación no es válida.")
     anterior = leer_perfil(empresa_id)["perfil"]
-    if textos["direccion"] != anterior["direccion"] and coords == [anterior["latitud"], anterior["longitud"]]:
+    if (textos["direccion"] != anterior["direccion"] and
+            coords == [anterior["latitud"], anterior["longitud"]] and not confirmada):
         coords = [None, None]
     with get_db(empresa_id=0) as conn:
         conn.execute(

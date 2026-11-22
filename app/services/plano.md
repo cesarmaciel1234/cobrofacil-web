@@ -45,7 +45,8 @@ app/services/
 ### Ficha de comercio (`perfil_comercio.py`):
 - Lee y valida la ficha pública por `empresa_id` en la base compartida. Las
   reseñas pertenecen a pedidos entregados y son creadas por la API de la tienda.
-  El horario es informativo y no controla el estado abierto/cerrado.
+  El horario es informativo y no controla el estado abierto/cerrado. Un cambio
+  de dirección exige un punto nuevo o confirmado para conservar coordenadas.
 
 ### Motor de Historial Progresivo (`pos_historial.py`):
 - **Scroll Infinito y Carga Progresiva:** Retorna los primeros 400 tickets visibles ordenados cronológicamente descendentes (`offset`, `limite`, `hay_mas`). Evita el colapso del DOM y el congelamiento del navegador en dispositivos móviles al manipular más de 1.000 o 2.500 tickets por mes.

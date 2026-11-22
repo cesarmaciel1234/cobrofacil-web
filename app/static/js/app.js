@@ -350,7 +350,7 @@ const $ = id => document.getElementById(id);
             'historial-fiado': ['Historial del cliente', 'Movimientos del libro de Cobro Fácil', 'Historial'],
             digitales: ['Cobros Digitales MP', 'Auditoría de Mercado Pago, QR y Point', 'Digital'],
             pedidos: ['Pedidos Reparto Fácil', 'Recepción de pedidos de clientes y despacho', 'Pedidos'],
-            'mi-empresa': ['Mi empresa', 'Ficha pública y reseñas de compradores', 'Mi empresa'],
+            'mi-empresa': ['Perfil', 'Ficha pública y reseñas de compradores', 'Perfil'],
             cartera: ['Cartera', 'Clientes del libro', 'Cartera']
         };
 

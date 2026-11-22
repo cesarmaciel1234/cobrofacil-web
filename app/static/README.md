@@ -17,6 +17,9 @@
 - `manifest.json`: Manifiesto para instalación como aplicación web independiente.
 - `sw.js`: Service worker para gestión de caché y soporte offline.
 - `js/`: Scripts JavaScript de control del frontend.
+- `css/perfil-empresa.css` y `vendor/leaflet.*`: interfaz y mapa del perfil.
+  El mapa carga mosaicos de OpenStreetMap solo al abrirlo; el GPS se solicita
+  únicamente al tocar «Usar mi ubicación» y no se envía la dirección a buscadores.
 
 ---
 

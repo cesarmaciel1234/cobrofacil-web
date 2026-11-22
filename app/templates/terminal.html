@@ -54,6 +54,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/enterprise.css?v=7.7">
     <link rel="stylesheet" href="/static/css/auditoria.css?v=7.7">
+    <link rel="stylesheet" href="/static/vendor/leaflet.css?v=1.9.4">
+    <link rel="stylesheet" href="/static/css/perfil-empresa.css?v=8.1">
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -144,27 +146,56 @@
                 <div class="carga-libro-riel" aria-hidden="true"><div id="cargaLibroBarra"></div></div>
             </div>
             <div class="view" id="view-mi-empresa">
-                <section class="card" style="padding:20px;max-width:720px;margin:0 auto;">
-                    <h2>Mi empresa</h2>
-                    <p>Esta ficha es pública en Reparto Fácil. Solo administradores pueden editarla.</p>
+                <section class="perfil-empresa">
                     <p id="empresaPerfilEstado" role="status" aria-live="polite"></p>
-                    <form id="empresaPerfilForm" style="display:grid;gap:12px;">
+                    <div id="empresaPerfilResumen" hidden>
+                        <div class="perfil-empresa-cabecera">
+                            <span id="empresaPerfilInicial" class="perfil-empresa-avatar" aria-hidden="true"></span>
+                            <div class="perfil-empresa-identidad">
+                                <h2 id="empresaPerfilNombre"></h2>
+                                <span>Ficha pública</span>
+                            </div>
+                            <button type="button" class="perfil-empresa-editar" id="empresaPerfilEditar" hidden>Editar</button>
+                        </div>
+                        <div class="perfil-empresa-tarjeta">
+                            <h3>Datos del comercio</h3>
+                            <div class="perfil-empresa-fila"><span aria-hidden="true">⌂</span><div><small>Dirección</small><p id="empresaPerfilDireccion"></p></div></div>
+                            <div class="perfil-empresa-fila"><span aria-hidden="true">☎</span><div><small>WhatsApp</small><p id="empresaPerfilWhatsapp"></p></div></div>
+                            <div class="perfil-empresa-fila"><span aria-hidden="true">◷</span><div><small>Horario</small><p id="empresaPerfilHorario"></p></div></div>
+                            <div class="perfil-empresa-fila"><span aria-hidden="true">✎</span><div><small>Descripción</small><p id="empresaPerfilDescripcion"></p></div></div>
+                        </div>
+                        <section class="perfil-empresa-tarjeta perfil-empresa-resenas" aria-label="Reseñas">
+                            <h3>Reseñas de compradores</h3>
+                            <p id="empresaPerfilValoracion"></p>
+                            <div id="empresaPerfilResenas"></div>
+                        </section>
+                    </div>
+                    <form id="empresaPerfilForm" class="perfil-empresa-formulario perfil-empresa-tarjeta" hidden>
+                        <h3>Editar ficha pública</h3>
                         <label>Nombre del comercio <input name="nombre" required maxlength="120" class="buscar"></label>
                         <label>Descripción <textarea name="descripcion" maxlength="500" class="buscar"></textarea></label>
                         <label>Dirección <input name="direccion" maxlength="250" class="buscar"></label>
-                        <p>Para mostrar la distancia, ingresá las coordenadas de la dirección. Al cambiarla, revisá ambas.</p>
-                        <label>Latitud <input name="latitud" type="number" step="any" min="-90" max="90" class="buscar"></label>
-                        <label>Longitud <input name="longitud" type="number" step="any" min="-180" max="180" class="buscar"></label>
-                        <label>WhatsApp con código de país, solo números <input name="whatsapp" inputmode="numeric" maxlength="15" class="buscar"></label>
+                        <input name="latitud" type="hidden">
+                        <input name="longitud" type="hidden">
+                        <button type="button" id="empresaPerfilAbrirMapa" class="perfil-empresa-mapa-boton">Elegir ubicación en el mapa</button>
+                        <p id="empresaPerfilUbicacion" class="perfil-empresa-ayuda"></p>
+                        <div id="empresaPerfilMapaPanel" hidden>
+                            <p class="perfil-empresa-ayuda">Tocá el lugar de tu comercio en el mapa.</p>
+                            <div id="empresaPerfilMapa" aria-label="Mapa para elegir la ubicación del comercio"></div>
+                            <div class="perfil-empresa-mapa-acciones">
+                                <button type="button" id="empresaPerfilGps" class="perfil-empresa-mapa-boton">Usar mi ubicación</button>
+                                <button type="button" id="empresaPerfilCerrarMapa" class="perfil-empresa-mapa-boton">Cerrar mapa</button>
+                            </div>
+                            <p id="empresaPerfilMapaEstado" class="perfil-empresa-ayuda" role="status" aria-live="polite"></p>
+                        </div>
+                        <label>WhatsApp con código de país <input name="whatsapp" inputmode="numeric" maxlength="15" class="buscar"></label>
                         <label>Horario informativo <input name="horario" maxlength="250" class="buscar" placeholder="Ej.: Lunes a sábado, 9 a 20 h"></label>
-                        <p>El horario se muestra en la ficha; no cambia automáticamente el estado abierto o cerrado.</p>
-                        <button type="submit" class="btn btn-primary">Guardar ficha</button>
+                        <p class="perfil-empresa-ayuda">El horario no cambia automáticamente el estado abierto o cerrado.</p>
+                        <div class="perfil-empresa-acciones">
+                            <button type="button" id="empresaPerfilCancelar" class="perfil-empresa-mapa-boton">Cancelar</button>
+                            <button type="submit" class="btn btn-primary">Guardar</button>
+                        </div>
                     </form>
-                    <section style="margin-top:24px;" aria-label="Reseñas">
-                        <h3>Reseñas de compradores</h3>
-                        <p id="empresaPerfilValoracion"></p>
-                        <div id="empresaPerfilResenas"></div>
-                    </section>
                 </section>
             </div>
             <div class="view active" id="view-reporte">
@@ -509,13 +540,13 @@
     </div>
 
     <nav class="bottom-pwa-bar" id="bottomPwaBar" aria-label="Navegación Principal Móvil">
+        <button type="button" class="pwa-nav-btn" data-pwa-view="mi-empresa" aria-label="Perfil">
+            <span class="pwa-icon">🏪</span>
+            <span class="pwa-text">Perfil</span>
+        </button>
         <button type="button" class="pwa-nav-btn active" data-pwa-view="reporte" aria-label="Reporte">
             <span class="pwa-icon">👑</span>
             <span class="pwa-text">Reporte</span>
-        </button>
-        <button type="button" class="pwa-nav-btn" data-pwa-view="mi-empresa" aria-label="Mi empresa">
-            <span class="pwa-icon">🏪</span>
-            <span class="pwa-text">Mi empresa</span>
         </button>
         <button type="button" class="pwa-nav-btn" data-pwa-view="contabilidad" aria-label="Caja">
             <span class="pwa-icon">💰</span>
@@ -671,7 +702,8 @@
     <script src="/static/js/barra/ventas.js?v=7.7"></script>
     <script src="/static/js/barra/cobros.js?v=7.7"></script>
     <script src="/static/js/barra/caja.js?v=7.9"></script>
-    <script src="/static/js/barra/mi-empresa.js?v=8.0"></script>
+    <script src="/static/vendor/leaflet.js?v=1.9.4"></script>
+    <script src="/static/js/barra/mi-empresa.js?v=8.1"></script>
     <script src="/static/js/barra/cartera.js?v=7.7"></script>
     <script src="/static/js/barra/pedidos.js?v=7.7"></script>
     <script src="/static/js/barra/armar.js?v=8.0"></script>
@@ -684,6 +716,6 @@
     <script src="/static/js/espejo.js?v=7.7"></script>
     <script src="/static/js/espejo-engine.js?v=7.7"></script>
     <script src="/static/js/nodo.js?v=7.7"></script>
-    <script src="/static/js/app.js?v=8.0"></script>
+    <script src="/static/js/app.js?v=8.1"></script>
 </body>
 </html>

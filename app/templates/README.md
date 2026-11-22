@@ -13,7 +13,7 @@
 
 ## 2. Plantillas Principales
 - `terminal.html`: Plantilla principal del sistema. Aloja la SPA, el contenedor dinámico `#panel-contenido`, la barra de navegación superior y el modal de selección de sucursales.
-  Su barra inferior abre Mi empresa; Caja conserva el historial y desglose de ventas.
+  Su primer botón inferior abre Perfil; Caja conserva el historial y desglose de ventas.
 - `login.html`: Pantalla de inicio de sesión con selección de empresa y credenciales.
 - `cartera_clientes.html`: Vista de libro de cuentas corrientes de clientes.
 - `pos.html`: Consola de punto de venta web alternativa.

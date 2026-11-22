@@ -1,10 +1,13 @@
 /* Cobro Fácil PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v8.0';
+const CACHE_VERSION = 'crm-frigorifico-v8.1';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',
   '/static/enterprise.css',
   '/static/css/auditoria.css',
+  '/static/css/perfil-empresa.css',
+  '/static/vendor/leaflet.css',
+  '/static/vendor/leaflet.js',
   '/static/js/crm-safe.js',
   '/static/js/crm-bus.js',
   '/static/js/crm-format.js',

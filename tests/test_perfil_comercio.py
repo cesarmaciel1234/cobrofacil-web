@@ -5,6 +5,7 @@ import pytest
 from flask import Flask
 
 from app.routes.api import api_bp
+from app.security import register_security
 from app.services import perfil_comercio
 
 
@@ -82,3 +83,27 @@ def test_validacion_y_cambio_de_direccion_invalida_coordenadas(client):
     cambio["whatsapp"] = ""
     cambio["longitud"] = 200
     assert client.put("/api/repartofacil/mi-empresa", json=cambio).status_code == 400
+
+
+def test_direccion_puede_conservar_punto_confirmado_en_mapa(client):
+    sesion(client)
+    assert client.put("/api/repartofacil/mi-empresa", json=perfil()).status_code == 200
+    cambio = perfil()
+    cambio["direccion"] = "Otra calle 42"
+    cambio["ubicacion_confirmada"] = True
+    guardado = client.put("/api/repartofacil/mi-empresa", json=cambio)
+    assert guardado.status_code == 200
+    assert guardado.get_json()["perfil"]["latitud"] == -32.9
+    assert guardado.get_json()["perfil"]["longitud"] == -60.6
+    cambio["ubicacion_confirmada"] = "true"
+    assert client.put("/api/repartofacil/mi-empresa", json=cambio).status_code == 400
+
+
+def test_politica_permite_mapa_y_ubicacion_del_propio_sitio():
+    app = Flask(__name__)
+    app.config["SECRET_KEY"] = "prueba"
+    register_security(app)
+    app.add_url_rule("/", view_func=lambda: "ok")
+    response = app.test_client().get("/")
+    assert "geolocation=(self)" in response.headers["Permissions-Policy"]
+    assert "https://tile.openstreetmap.org" in response.headers["Content-Security-Policy"]

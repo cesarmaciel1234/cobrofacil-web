@@ -18,7 +18,8 @@
 ### `perfil_comercio.py`
 - `leer_perfil(empresa_id)` consulta la ficha pública y reseñas de esa empresa.
 - `guardar_perfil(empresa_id, datos)` valida la ficha y la guarda en la base
-  compartida; una dirección cambiada sin coordenadas nuevas descarta las anteriores.
+  compartida; una dirección cambiada descarta las coordenadas anteriores salvo
+  que se confirme explícitamente el punto en el mapa.
   No utiliza ni expone la configuración privada de informes y correo.
 
 ### `pos_base.py`
