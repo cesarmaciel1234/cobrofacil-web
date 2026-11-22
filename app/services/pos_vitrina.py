@@ -605,6 +605,80 @@ def calcular_reporte_financiero(
     pagos_map: dict[str, float] = {}
     deptos_map: dict[str, float] = {}
 
+    # Integrar pedidos web (Reparto Fácil) en el reporte financiero
+    try:
+        from app.database import get_db
+        from app.services.pos_base import _empresa_activa
+        eid_actual = _empresa_activa()
+        with get_db() as conn:
+            web_rows = conn.execute(
+                """
+                SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
+                FROM public.repartofacil_pedidos
+                WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
+                AND created_at >= %s AND created_at <= %s
+                ORDER BY created_at DESC
+                """,
+                (eid_actual, desde_iso, hasta_iso)
+            ).fetchall()
+            for wr in web_rows:
+                fecha_str = str(wr["created_at"] or "").replace("T", " ")
+                if not (desde_iso <= fecha_str <= hasta_iso):
+                    continue
+
+                tid = str(wr["ticket_id"] or wr["id"])
+                tot = float(wr["total"] or 0.0)
+                pago = "Web"  # Pedidos web siempre son pago Web
+
+                total_ventas += tot
+                total_tickets += 1
+                pagos_map[pago] = pagos_map.get(pago, 0.0) + tot
+
+                # Calcular costo y departamento para items web
+                w_items = []
+                if isinstance(wr.get("items"), str):
+                    try:
+                        import json
+                        w_items = json.loads(wr["items"])
+                    except Exception:
+                        pass
+                elif isinstance(wr.get("items"), list):
+                    w_items = wr["items"]
+
+                v_costo = 0.0
+                for item in w_items:
+                    pid = str(item.get("id") or item.get("product_id") or "")
+                    c_u = mapa_costos.get(pid, 0.0)
+                    st = float(item.get("price") or item.get("precio") or 0.0) * float(item.get("quantity") or item.get("cantidad") or 1)
+                    depto = mapa_deptos.get(pid, "CARNE")
+                    deptos_map[depto] = deptos_map.get(depto, 0.0) + st
+                    if c_u > 0.009:
+                        hay_costo_cargado = True
+                        v_costo += float(item.get("quantity") or item.get("cantidad") or 1) * c_u
+                        venta_con_costo += st
+
+                total_costo += v_costo
+
+                # Agregar al slot correspondiente
+                k = ""
+                if p_norm in ("hoy", "dia", "diario"):
+                    k = fecha_str[11:13] if len(fecha_str) >= 13 else "12"
+                elif p_norm in ("año", "anio", "año actual"):
+                    k = fecha_str[5:7] if len(fecha_str) >= 7 else "01"
+                else:
+                    k = fecha_str[:10]
+
+                target_slot = slot_map.get(k)
+                if target_slot:
+                    target_slot["ventas"] += tot
+                    target_slot["tickets"] += 1
+                    if hay_costo_cargado:
+                        target_slot["ganancia"] += (tot - v_costo)
+                    else:
+                        target_slot["ganancia"] += tot
+    except Exception as e:
+        logger.warning("Error integrando pedidos web en vitrina: %s", e)
+
     for fila in filas_v:
         fecha_str = str(_valor(fila, idx_v, "fecha") or "").replace("T", " ")
         if not (desde_iso <= fecha_str <= hasta_iso):

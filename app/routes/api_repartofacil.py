@@ -6,6 +6,7 @@ from flask import current_app, jsonify, request
 
 from app.database import get_db
 from app.routes.api import api_bp
+from app.services.pos_base import filas_de
 from flask import session
 
 
@@ -34,6 +35,210 @@ def _pedido_repartofacil_bloqueado(conn, order_id, empresa_id, estados):
     return pedido, None
 
 
+def _validar_stock_pedido(items, empresa_id=None, sucursal_id=None):
+    """
+    Valida el stock disponible para los items de un pedido.
+    Retorna un dict con:
+    - valido: bool
+    - items_sin_stock: lista de items faltantes con stock requerido vs disponible
+    - items_con_stock: lista de items que tienen stock suficiente
+    """
+    if not items or not isinstance(items, list):
+        return {"valido": True, "items_sin_stock": [], "items_con_stock": items or []}
+
+    eid = empresa_id if empresa_id is not None else (session.get("empresa_id") or 1)
+
+    # Obtener catálogo de productos con stock
+    col_p, filas_p = filas_de("productos", sucursal_id, empresa_id=eid)
+    if not col_p:
+        col_p, filas_p = filas_de("articulos", sucursal_id, empresa_id=eid)
+
+    if not col_p or not filas_p:
+        # Si no hay catálogo, no podemos validar, permitimos
+        return {"valido": True, "items_sin_stock": [], "items_con_stock": items}
+
+    idx = {col: i for i, col in enumerate(col_p)}
+    mapa_stock = {}
+
+    for fila in filas_p:
+        pid = str(fila[idx.get("id", 0)] or "")
+        stock = float(fila[idx.get("stock", 0)] or 0.0) if "stock" in idx else 0.0
+        nombre = str(fila[idx.get("nombre", 1)] or "") if "nombre" in idx else ""
+        codigo = str(fila[idx.get("codigo", 0)] or "") if "codigo" in idx else ""
+        mapa_stock[pid] = {"stock": stock, "nombre": nombre, "codigo": codigo}
+
+    items_sin_stock = []
+    items_con_stock = []
+
+    for item in items:
+        item_id = str(item.get("id") or item.get("product_id") or "")
+        cantidad = float(item.get("quantity") or item.get("cantidad") or 1)
+
+        # Buscar por ID, nombre o código
+        prod = mapa_stock.get(item_id)
+        if not prod:
+            # Intentar buscar por nombre
+            item_nombre = str(item.get("name") or item.get("nombre") or "").lower()
+            for pid, p_data in mapa_stock.items():
+                if p_data["nombre"].lower() == item_nombre or p_data["codigo"] == item_id:
+                    prod = p_data
+                    break
+
+        if prod:
+            stock_disponible = prod["stock"]
+            if stock_disponible < cantidad:
+                items_sin_stock.append({
+                    **item,
+                    "stock_disponible": stock_disponible,
+                    "stock_requerido": cantidad,
+                    "producto_nombre": prod["nombre"]
+                })
+            else:
+                items_con_stock.append(item)
+        else:
+            # Producto no encontrado en catálogo - tratamos como válido (puede ser nuevo)
+            items_con_stock.append(item)
+
+    return {
+        "valido": len(items_sin_stock) == 0,
+        "items_sin_stock": items_sin_stock,
+        "items_con_stock": items_con_stock
+    }
+
+
+def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
+    """
+    Deduce el stock de los items del pedido del inventario.
+    Prioriza MariaDB 192.168.0.8, si no está disponible usa pos_base.
+    """
+    if not items or not isinstance(items, list):
+        return
+
+    eid = empresa_id if empresa_id is not None else (session.get("empresa_id") or 1)
+
+    # Primero intentar MariaDB (192.168.0.8)
+    try:
+        import os
+        import pymysql
+        import socket
+
+        MARIADB_HOST = os.environ.get("POS_MARIADB_HOST", "192.168.0.8")
+        MARIADB_PORT = int(os.environ.get("POS_MARIADB_PORT", "3306"))
+        MARIADB_USER = os.environ.get("POS_MARIADB_USER", "root")
+        MARIADB_PASS = os.environ.get("POS_MARIADB_PASS", "1234")
+        MARIADB_DB = os.environ.get("POS_MARIADB_DB", "punpro_db")
+
+        # Verificar si estamos en cloud (Render no tiene IPs privadas)
+        if not (os.environ.get("RENDER") or os.environ.get("DYNO")):
+            # Quick socket check
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.3)
+                res = sock.connect_ex((MARIADB_HOST, MARIADB_PORT))
+                sock.close()
+                if res == 0:
+                    # Conectar a MariaDB
+                    conn_mb = pymysql.connect(
+                        host=MARIADB_HOST,
+                        port=MARIADB_PORT,
+                        user=MARIADB_USER,
+                        password=MARIADB_PASS,
+                        database=MARIADB_DB,
+                        connect_timeout=0.5,
+                        charset="utf8mb4",
+                        autocommit=True,
+                    )
+                    with conn_mb.cursor() as cur:
+                        # Obtener mapa de productos por nombre/código
+                        cur.execute("SELECT id, nombre, codigo, stock FROM productos")
+                        productos_mb = {f"{r[1]}_{r[2]}": {"id": r[0], "stock": r[3]} for r in cur.fetchall()}
+
+                        for item in items:
+                            item_nombre = str(item.get("name") or item.get("nombre") or "")
+                            item_codigo = str(item.get("codigo") or "")
+                            cantidad = float(item.get("quantity") or item.get("cantidad") or 1)
+
+                            key = f"{item_nombre}_{item_codigo}"
+                            prod = productos_mb.get(key)
+                            if prod:
+                                nuevo_stock = max(0, prod["stock"] - cantidad)
+                                cur.execute("UPDATE productos SET stock = %s WHERE id = %s", (nuevo_stock, prod["id"]))
+
+                    conn_mb.close()
+                    return
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # Si MariaDB no está disponible, usar pos_base
+    try:
+        from app.services.pos_base import _olvidar_tabla
+
+        col_p, filas_p = filas_de("productos", sucursal_id, empresa_id=eid)
+        if not col_p:
+            col_p, filas_p = filas_de("articulos", sucursal_id, empresa_id=eid)
+
+        if not col_p or not filas_p:
+            return
+
+        idx = {col: i for i, col in enumerate(col_p)}
+        mapa_productos = {}
+
+        for fila in filas_p:
+            pid = str(fila[idx.get("id", 0)] or "")
+            nombre = str(fila[idx.get("nombre", 1)] or "").lower() if "nombre" in idx else ""
+            codigo = str(fila[idx.get("codigo", 0)] or "") if "codigo" in idx else ""
+            stock = float(fila[idx.get("stock", 0)] or 0.0) if "stock" in idx else 0.0
+            mapa_productos[f"{nombre}_{codigo}"] = {"pos_base_id": pid, "stock": stock}
+
+        # Actualizar filas en pos_base
+        partes = []
+        with get_db(eid) as conn:
+            partes = conn.execute(
+                "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
+            ).fetchall()
+
+        if not partes:
+            return
+
+        for parte in partes:
+            cols = parte["columnas"] if isinstance(parte["columnas"], list) else json.loads(parte["columnas"])
+            filas = parte["filas"] if isinstance(parte["filas"], list) else json.loads(parte["filas"])
+            idx_p = {col: i for i, col in enumerate(cols)}
+
+            actualizada = False
+            for fila in filas:
+                nombre = str(fila[idx_p.get("nombre", 1)] or "").lower() if "nombre" in idx_p else ""
+                codigo = str(fila[idx_p.get("codigo", 0)] or "") if "codigo" in idx_p else ""
+                key = f"{nombre}_{codigo}"
+
+                for item in items:
+                    item_nombre = str(item.get("name") or item.get("nombre") or "").lower()
+                    item_codigo = str(item.get("codigo") or "")
+                    item_key = f"{item_nombre}_{item_codigo}"
+
+                    if key == item_key and "stock" in idx_p:
+                        cantidad = float(item.get("quantity") or item.get("cantidad") or 1)
+                        stock_actual = float(fila[idx_p["stock"]] or 0.0)
+                        fila[idx_p["stock"]] = max(0.0, stock_actual - cantidad)
+                        actualizada = True
+                        break
+
+            if actualizada:
+                with get_db(eid) as conn:
+                    conn.execute(
+                        "UPDATE pos_base SET filas = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                        (json.dumps(filas), parte["id"])
+                    )
+                    if hasattr(conn, "commit"):
+                        conn.commit()
+
+        _olvidar_tabla("productos")
+    except Exception as e:
+        print(f"[Stock] Error al deducir stock de pos_base: {e}")
+
+
 @api_bp.route("/repartofacil/pedidos", methods=["GET"])
 def get_repartofacil_pedidos():
     """
@@ -41,6 +246,7 @@ def get_repartofacil_pedidos():
     desde la tabla compartida public.repartofacil_pedidos,
     filtrados ESTRICTAMENTE por la empresa en sesión para garantizar
     el aislamiento absoluto de datos entre comercios.
+    Incluye validación de stock para cada pedido.
     """
     empresa_actual, error = _sesion_empresa_repartofacil()
     if error:
@@ -97,6 +303,12 @@ def get_repartofacil_pedidos():
                 if pago_metodo.lower() in ("web", "tarjeta", "card", "online", "repartofacil"):
                     d["metodo_pago"] = "Web"
 
+                # Validar stock para este pedido
+                validacion = _validar_stock_pedido(d.get("items"), empresa_actual)
+                d["stock_valido"] = validacion["valido"]
+                d["items_sin_stock"] = validacion["items_sin_stock"]
+                d["items_con_stock"] = validacion["items_con_stock"]
+
                 pedidos.append(d)
             return jsonify({"success": True, "empresa_id": empresa_actual, "pedidos": pedidos})
     except Exception as e:
@@ -110,12 +322,20 @@ def aceptar_repartofacil_pedido(order_id):
     Genera el número de Ticket (#109XXXX), cambia el estado a 'confirmed',
     asigna metodo_pago = 'Web' (para que figure como Web en el libro y tickets),
     registra/vincula al cliente en la Cartera de Clientes (clientes) para historial unificado,
+    valida el stock y deduce automáticamente del inventario,
     y publica el primer mensaje en el chat tripartito.
+
+    Payload opcional:
+    - items_aceptados: lista de items a aceptar (para aceptación parcial)
+    - forzar_sin_stock: bool para aceptar aunque falte stock
     """
     empresa_id, error = _sesion_empresa_repartofacil(escritura=True)
     if error:
         return error
     try:
+        data = request.get_json(silent=True) or {}
+        items_aceptados = data.get("items_aceptados")
+        forzar_sin_stock = data.get("forzar_sin_stock", False)
         ticket_id = str(random.randint(1090000, 1099999))
         msg_id = f"msg-store-{uuid.uuid4()}"
         hora_str = datetime.now().strftime("%H:%M")
@@ -132,7 +352,35 @@ def aceptar_repartofacil_pedido(order_id):
             tel_cliente = (order_row["cliente_telefono"] if order_row else None) or ""
             dir_cliente = (order_row["direccion_entrega"] if order_row else None) or ""
             nombre_sucursal = (order_row["sucursal_origen"] if order_row else None) or "Frigorífico Maciel"
+            items_pedido = order_row["items"]
+            if isinstance(items_pedido, str):
+                try:
+                    items_pedido = json.loads(items_pedido)
+                except Exception:
+                    items_pedido = []
+
+            # Determinar items a procesar (todos o parcial)
+            items_a_procesar = items_aceptados if items_aceptados else items_pedido
+
+            # Validar stock
+            validacion = _validar_stock_pedido(items_a_procesar, empresa_id)
+
+            if not validacion["valido"] and not forzar_sin_stock:
+                return jsonify({
+                    "success": False,
+                    "error": "Stock insuficiente",
+                    "items_sin_stock": validacion["items_sin_stock"],
+                    "items_con_stock": validacion["items_con_stock"],
+                    "puede_aceptar_parcial": len(validacion["items_con_stock"]) > 0
+                }), 400
+
+            # Deducción de stock (si hay items con stock)
+            if validacion["items_con_stock"]:
+                _deducir_stock_items(validacion["items_con_stock"], empresa_id)
+
             texto = f"{nombre_sucursal} aceptó el pedido. Ticket #{ticket_id} emitido. Buscando repartidor en zona..."
+            if items_aceptados:
+                texto += f" (Aceptación parcial: {len(items_aceptados)} de {len(items_pedido)} items)"
 
             # 1. Actualizar estado y ticket del pedido con pago Web
             update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, metodo_pago = 'Web', updated_at = NOW() WHERE id = %s"
@@ -182,7 +430,9 @@ def aceptar_repartofacil_pedido(order_id):
             "ticket_id": ticket_id,
             "estado": "confirmed",
             "pago": "Web",
-            "mensaje": texto
+            "mensaje": texto,
+            "stock_deducido": True,
+            "items_sin_stock": validacion.get("items_sin_stock", [])
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500

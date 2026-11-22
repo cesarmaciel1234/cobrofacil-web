@@ -10,6 +10,66 @@
     let chatPollingTimer = null;
     let orderChatActivo = null;
     const pedidosExpandidos = new Set();
+    let ultimoCountActivos = 0;
+    let audioContext = null;
+    let ultimoOrderIdNotificado = new Set();
+
+    // Sonido de notificación urgente para nuevos pedidos
+    function reproducirSonidoUrgente() {
+        try {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+
+            // Tono ascendente tipo "ding-dong" para nuevo pedido
+            oscillator.frequency.setValueAtTime(880, audioContext.currentTime); // A5
+            oscillator.frequency.setValueAtTime(1108, audioContext.currentTime + 0.1); // C#6
+            oscillator.frequency.setValueAtTime(1318, audioContext.currentTime + 0.2); // E6
+
+            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.4);
+
+            oscillator.start(audioContext.currentTime);
+            oscillator.stop(audioContext.currentTime + 0.4);
+        } catch (e) {
+            console.error('[RepartoFacil] Error al reproducir sonido:', e);
+        }
+    }
+
+    // Vibración para notificación táctil
+    function vibrarUrgente() {
+        if (navigator.vibrate) {
+            try {
+                // Patrón: vibración larga, pausa corta, vibración corta
+                navigator.vibrate([300, 100, 150]);
+            } catch (e) {
+                console.error('[RepartoFacil] Error al vibrar:', e);
+            }
+        }
+    }
+
+    // Notificación completa de nuevo pedido
+    function notificarNuevoPedido(orderId) {
+        if (ultimoOrderIdNotificado.has(orderId)) {
+            return; // Ya notificado
+        }
+        ultimoOrderIdNotificado.add(orderId);
+
+        reproducirSonidoUrgente();
+        vibrarUrgente();
+
+        // Limpiar notificaciones viejas (máximo 100 en memoria)
+        if (ultimoOrderIdNotificado.size > 100) {
+            const primero = ultimoOrderIdNotificado.values().next().value;
+            ultimoOrderIdNotificado.delete(primero);
+        }
+    }
 
     function obtenerIniciales(nombre) {
         const limpio = String(nombre || 'Cliente').trim();
@@ -96,10 +156,24 @@
             if (resp.status === 401 || resp.status === 403) {
                 pedidosLista = [];
                 actualizarBadge();
-                contenedor.textContent = data.error || 'Inici\u00e1 sesi\u00f3n para consultar los pedidos.';
+                contenedor.textContent = data.error || 'Iniciá sesión para consultar los pedidos.';
                 return;
             }
             if (data && data.success && Array.isArray(data.pedidos)) {
+                // Detectar nuevos pedidos (pendientes/confirmados que no estaban antes)
+                const nuevosIds = new Set(pedidosLista.map(p => p.id));
+                const nuevosPedidos = data.pedidos.filter(p =>
+                    !nuevosIds.has(p.id) &&
+                    (p.estado === 'pending' || p.estado === 'pending_store')
+                );
+
+                // Notificar nuevos pedidos
+                nuevosPedidos.forEach(p => {
+                    if (!silencioso) {
+                        notificarNuevoPedido(p.id);
+                    }
+                });
+
                 pedidosLista = data.pedidos;
                 try {
                     localStorage.setItem(getCacheKey(), JSON.stringify(pedidosLista));
@@ -173,6 +247,8 @@
             const esConfirmado = estadoLower === 'confirmed' || estadoLower === 'accepted';
             const esEmbalado = estadoLower === 'ready' || estadoLower === 'embalado';
             const esEntregado = estadoLower === 'delivered';
+            const puedeEmbalar = esConfirmado || esEmbalado || estadoLower === 'assigned';
+            const puedeReasignar = Boolean(p.repartidor_id) && (estadoLower === 'assigned' || esEmbalado);
             const repartidorAsignado = p.repartidor_nombre || (p.repartidor_id ? 'Lucas Motomensajero' : null);
 
             let badgeEstadoHtml = '';
@@ -198,6 +274,11 @@
             const cantItems = itemsArray.reduce((acc, item) => acc + (Number(item.quantity || item.cantidad || 1)), 0);
             const abierto = pedidosExpandidos.has(p.id) || esNuevoPendiente;
             const iniciales = obtenerIniciales(p.cliente_nombre);
+
+            // Validación de stock desde el backend
+            const tieneStockValido = p.stock_valido !== false;
+            const itemsSinStock = Array.isArray(p.items_sin_stock) ? p.items_sin_stock : [];
+            const alertaStock = !tieneStockValido && itemsSinStock.length > 0;
 
             // Tema cromático por estado:
             // - Cancelado / Rechazado -> ROJO
@@ -242,30 +323,32 @@
                 totalColor = '#1e3a8a';
             } else if (esNuevoPendiente || esConfirmado) {
                 cardBg = esNuevoPendiente ? '#fffbeb' : '#ffffff';
-                cardBorder = '#fb923c';
-                avatarBg = '#ffedd5';
-                avatarBorder = '#fdba74';
-                avatarColor = '#9a3412';
-                dotColor = '#f97316';
-                pillBg = '#ffedd5';
-                pillColor = '#c2410c';
-                pillBorder = '#fed7aa';
+                cardBorder = alertaStock ? '#f87171' : '#fb923c';
+                avatarBg = alertaStock ? '#fee2e2' : '#ffedd5';
+                avatarBorder = alertaStock ? '#fca5a5' : '#fdba74';
+                avatarColor = alertaStock ? '#b91c1c' : '#9a3412';
+                dotColor = alertaStock ? '#dc2626' : '#f97316';
+                pillBg = alertaStock ? '#fee2e2' : '#ffedd5';
+                pillColor = alertaStock ? '#b91c1c' : '#c2410c';
+                pillBorder = alertaStock ? '#fca5a5' : '#fed7aa';
             }
 
             const resumenLinea = esRechazado
                 ? `<span style="color:#b91c1c; font-weight:700;">${esCanceladoCliente ? 'Cancelado por el cliente' : (esRechazadoComercio ? 'Rechazado por el comercio' : 'Cancelado por tiempo de espera')} · ${cantItems} ítems</span>`
-                : (repartidorAsignado
-                    ? `Chofer: ${repartidorAsignado} · ${cantItems} ítems`
-                    : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${cantItems} ítems` : `${cantItems} ítems · Pago Web`));
+                : (alertaStock
+                    ? `⚠️ Faltan ${itemsSinStock.length} productos · ${cantItems} ítems`
+                    : (repartidorAsignado
+                        ? `Chofer: ${escaparTextoChat(repartidorAsignado)} · ${cantItems} ítems`
+                        : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${cantItems} ítems` : `${cantItems} ítems · Pago Web`)));
 
             html += `
-                <div class="card rf-order-card" data-order-id="${p.id}" style="background:${cardBg}; border-radius:16px; border:1.5px solid ${cardBorder}; box-shadow:0 2px 8px rgba(15,23,42,0.04); padding:10px 12px; position:relative; transition:all 0.18s ease;">
+                <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" style="background:${cardBg}; border-radius:16px; border:1.5px solid ${cardBorder}; box-shadow:0 2px 8px rgba(15,23,42,0.04); padding:10px 12px; position:relative; transition:all 0.18s ease;">
                     
                     <!-- FILA COMPACTA (ESTILO MENSAJERÍA: AL CLICK SE ABRE PARA VER MÁS DETALLES) -->
-                    <div onclick="window.RepartoFacilDespacho.toggleDetalle('${p.id}')" style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
+                    <div onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
                         <!-- Avatar Circular con Iniciales y Punto de Estado -->
                         <div style="position:relative; width:40px; height:40px; border-radius:999px; background:${avatarBg}; border:1.5px solid ${avatarBorder}; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px; color:${avatarColor}; flex-shrink:0;">
-                            <span>${iniciales}</span>
+                            <span>${escaparTextoChat(iniciales)}</span>
                             <span style="position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border-radius:999px; background:${dotColor}; border:2px solid #fff;"></span>
                         </div>
 
@@ -273,8 +356,8 @@
                         <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
                                 <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
-                                    <span style="font-weight:800; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#0f172a'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${p.cliente_nombre || 'Cliente'}</span>
-                                    <span style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; white-space:nowrap;">#${p.id}</span>
+                                    <span style="font-weight:800; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#0f172a'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escaparTextoChat(p.cliente_nombre || 'Cliente')}</span>
+                                    <span style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; white-space:nowrap;">#${escaparTextoChat(p.id)}</span>
                                     ${badgeEstadoHtml}
                                 </div>
                                 <span style="color:#64748b; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;">${formatFecha(p.created_at)}</span>
@@ -282,7 +365,7 @@
 
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
                                 <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    📍 ${p.direccion_entrega || 'Entrega a domicilio'}
+                                    📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')}
                                 </div>
                                 <div style="font-size:13px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
                                     ${formatMoney(p.total)}
@@ -295,29 +378,29 @@
                         </div>
 
                         <!-- Flecha indicadora de desplegable -->
-                        <div id="chevron-pedido-${p.id}" style="color:#94a3b8; font-size:16px; font-weight:800; flex-shrink:0; transition:transform 0.2s ease; transform:${abierto ? 'rotate(90deg)' : 'rotate(0deg)'};">
+                        <div id="chevron-pedido-${escaparTextoChat(p.id)}" style="color:#94a3b8; font-size:16px; font-weight:800; flex-shrink:0; transition:transform 0.2s ease; transform:${abierto ? 'rotate(90deg)' : 'rotate(0deg)'};">
                             ›
                         </div>
                     </div>
 
                     <!-- PANEL EXPANDIBLE AL CLICK: DETALLES, TICKET Y ACCIONES -->
-                    <div id="detalle-pedido-${p.id}" style="display:${abierto ? 'block' : 'none'}; margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
+                    <div id="detalle-pedido-${escaparTextoChat(p.id)}" style="display:${abierto ? 'block' : 'none'}; margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
                         
                         <!-- Barra de Ticket, Teléfono y Reasignación -->
                         <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
                             <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
                                 ${p.ticket_id ? `
-                                    <button type="button" onclick="window.RepartoFacilDespacho.verTicket('${p.ticket_id}')" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; font-size:10.5px; font-weight:800; padding:3px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap;">
-                                        🧾 Ticket #${p.ticket_id} ↗
+                                    <button type="button" onclick="window.RepartoFacilDespacho.verTicket(${argumentoPedido(p.ticket_id)})" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; font-size:10.5px; font-weight:800; padding:3px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap;">
+                                        🧾 Ticket #${escaparTextoChat(p.ticket_id)} ↗
                                     </button>
                                 ` : ''}
                                 ${p.cliente_telefono ? `
-                                    <span style="font-size:11px; color:#64748b; font-weight:600;">📞 ${p.cliente_telefono}</span>
-                                    <a href="https://wa.me/${p.cliente_telefono.replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${p.id}" target="_blank" style="font-size:11px; color:#10b981; font-weight:800; text-decoration:none;">(WhatsApp)</a>
+                                    <span style="font-size:11px; color:#64748b; font-weight:600;">📞 ${escaparTextoChat(p.cliente_telefono)}</span>
+                                    <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="font-size:11px; color:#10b981; font-weight:800; text-decoration:none;">(WhatsApp)</a>
                                 ` : ''}
                             </div>
-                            ${repartidorAsignado && !esEntregado && !esRechazado ? `
-                                <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio('${p.id}')" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:7px; font-size:10px; font-weight:800; padding:2px 6px; cursor:pointer;">
+                            ${puedeReasignar ? `
+                                <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio(${argumentoPedido(p.id)})" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:7px; font-size:10px; font-weight:800; padding:2px 6px; cursor:pointer;">
                                     ⚠️ Reasignar chofer
                                 </button>
                             ` : ''}
@@ -325,20 +408,35 @@
 
                         <!-- Lista de Cortes e Ítems del Pedido -->
                         <div style="background:#f8fafc; border-radius:10px; padding:8px 10px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px;">
-                            ${itemsArray.map(item => `
+                            ${alertaStock ? `
+                                <div style="background:#fee2e2; color:#b91c1c; padding:6px 8px; border-radius:7px; font-size:11px; font-weight:700; margin-bottom:4px; border:1px solid #fca5a5;">
+                                    ⚠️ Faltan productos en stock:
+                                    ${itemsSinStock.map(i => `
+                                        <div style="margin-top:2px; font-weight:600;">• ${escaparTextoChat(i.producto_nombre || i.name || i.nombre)}: stock ${escaparTextoChat(i.stock_disponible)} de ${escaparTextoChat(i.stock_requerido)}</div>
+                                    `).join('')}
+                                </div>
+                            ` : ''}
+                            ${itemsArray.map(item => {
+                                const itemSinStock = itemsSinStock.find(s =>
+                                    (s.name || s.nombre) === (item.name || item.nombre) ||
+                                    s.id === item.id
+                                );
+                                const styleSinStock = itemSinStock ? 'color:#b91c1c; text-decoration:line-through; opacity:0.6;' : 'color:#0f172a;';
+                                return `
                                 <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#1e293b;">
                                     <div>
-                                        <b style="color:#0f172a;">${item.name || item.nombre || 'Artículo'}</b>
-                                        <span style="color:#64748b; font-size:11px; margin-left:4px;">x ${item.quantity || item.cantidad || 1} ${item.unit || item.unidad || 'un'}</span>
+                                        <b style="${styleSinStock}">${escaparTextoChat(item.name || item.nombre || 'Artículo')}</b>
+                                        ${itemSinStock ? `<span style="color:#b91c1c; font-size:10px; margin-left:4px;">(falta stock)</span>` : ''}
+                                        <span style="color:#64748b; font-size:11px; margin-left:4px;">x ${escaparTextoChat(item.quantity || item.cantidad || 1)} ${escaparTextoChat(item.unit || item.unidad || 'un')}</span>
                                     </div>
                                     <div style="font-weight:700; font-family:monospace;">
                                         ${formatMoney((item.price || item.precio || 0) * (item.quantity || item.cantidad || 1))}
                                     </div>
                                 </div>
-                            `).join('')}
+                            `}).join('')}
                             ${p.notas ? `
                                 <div style="margin-top:4px; font-size:11px; color:#b45309; background:#fffbeb; padding:5px 8px; border-radius:7px; border:1px solid #fde68a;">
-                                    <b>Nota:</b> "${p.notas}"
+                                    <b>Nota:</b> "${escaparTextoChat(p.notas)}"
                                 </div>
                             ` : ''}
                         </div>
@@ -348,10 +446,10 @@
                             <div style="background:#fff7ed; border:1px solid #ffedd5; border-radius:12px; padding:9px; margin-bottom:8px;">
                                 <div style="font-size:10.5px; font-weight:800; color:#9a3412; margin-bottom:6px; text-transform:uppercase;">¿Aceptar pedido para despacho?</div>
                                 <div style="display:flex; gap:8px;">
-                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.rechazarPedido('${p.id}')" style="flex:1; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:11px; font-weight:800; padding:8px 6px !important; cursor:pointer;">
+                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})" style="flex:1; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:11px; font-weight:800; padding:8px 6px !important; cursor:pointer;">
                                         ✕ Rechazar
                                     </button>
-                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.aceptarPedido('${p.id}')" style="flex:1.5; background:#10b981; color:#ffffff; border:none; border-radius:10px; font-size:11.5px; font-weight:900; padding:8px 8px !important; cursor:pointer; box-shadow:0 3px 8px rgba(16,185,129,0.35);">
+                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})" style="flex:1.5; background:#10b981; color:#ffffff; border:none; border-radius:10px; font-size:11.5px; font-weight:900; padding:8px 8px !important; cursor:pointer; box-shadow:0 3px 8px rgba(16,185,129,0.35);">
                                         ✓ Aceptar y Publicar
                                     </button>
                                 </div>
@@ -360,17 +458,17 @@
 
                         <!-- BOTONES DE ACCIÓN: CERRAR DETALLE, CHAT Y EMBALADO -->
                         <div style="display:flex; gap:6px; width:100%; box-sizing:border-box;">
-                            <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle('${p.id}')" style="flex:1; min-width:0; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
+                            <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="flex:1; min-width:0; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
                                 <span>📋</span>
                                 <span>Ocultar</span>
                             </button>
 
-                            <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat('${p.id}', '${p.cliente_nombre || 'Cliente'}')" style="flex:1; min-width:0; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
+                            <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" style="flex:1; min-width:0; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
                                 <span>💬</span>
                                 <span>Chat</span>
                             </button>
 
-                            <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado('${p.id}')" ${esRechazado ? 'disabled' : ''} style="flex:1.25; min-width:0; background:${esEmbalado ? '#10b981' : (esRechazado ? '#94a3b8' : '#047857')}; color:#ffffff; border:none; border-radius:10px; font-size:11px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(16,185,129,0.3); white-space:nowrap;">
+                            <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)})" ${puedeEmbalar ? '' : 'disabled'} style="flex:1.25; min-width:0; background:${esEmbalado ? '#10b981' : (puedeEmbalar ? '#047857' : '#94a3b8')}; color:#ffffff; border:none; border-radius:10px; font-size:11px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(16,185,129,0.3); white-space:nowrap;">
                                 <span>${esEmbalado ? '✓' : '📦'}</span>
                                 <span>${esEmbalado ? 'Embalado' : 'Embalar'}</span>
                             </button>
@@ -402,17 +500,21 @@
     }
 
     // Acción: ACEPTAR PEDIDO (Cobro Fácil emite Ticket y publica a repartidores)
-    async function aceptarPedido(orderId) {
+    async function aceptarPedido(orderId, forzarSinStock = false) {
         try {
-            mostrarToast(`⏳ Aceptando pedido #${orderId} y emitiendo Ticket…`);
-            const resp = await fetch(`/api/repartofacil/pedidos/${orderId}/aceptar`, {
+            mostrarToast(`⏳ Aceptando pedido #${escaparTextoChat(orderId)} y emitiendo Ticket…`);
+            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/aceptar`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ forzar_sin_stock: forzarSinStock })
             });
             const data = await resp.json();
             if (data && data.success) {
-                mostrarToast(`✅ Pedido #${orderId} aceptado con Ticket #${data.ticket_id}. Publicado a repartidores en zona.`);
+                mostrarToast(`✅ Pedido #${escaparTextoChat(orderId)} aceptado con Ticket #${escaparTextoChat(data.ticket_id)}. Publicado a repartidores en zona.`);
                 cargarPedidos(true);
+            } else if (data.error === 'Stock insuficiente') {
+                // Mostrar modal mejorado de aceptación parcial
+                mostrarModalAceptacionParcial(orderId, data.items_sin_stock, data.items_con_stock);
             } else {
                 alert('No se pudo aceptar el pedido: ' + (data.error || 'Error'));
             }
@@ -422,31 +524,142 @@
         }
     }
 
+    // Modal de aceptación parcial con selección de items
+    function mostrarModalAceptacionParcial(orderId, itemsSinStock, itemsConStock) {
+        let modal = $('rfAceptacionParcialModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'rfAceptacionParcialModal';
+            modal.style.cssText = `
+                position:fixed; inset:0; z-index:999999; background:rgba(15,23,42,0.7);
+                display:flex; align-items:center; justify-content:center;
+                backdrop-filter:blur(4px);
+            `;
+            document.body.appendChild(modal);
+        }
+
+        const itemsHtml = itemsSinStock.map(i => `
+            <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 12px; background:#fef2f2; border-radius:8px; margin-bottom:6px; border:1px solid #fca5a5;">
+                <div>
+                    <div style="font-weight:700; color:#b91c1c; font-size:12px;">${i.producto_nombre || i.name || i.nombre}</div>
+                    <div style="font-size:11px; color:#991b1b;">Stock: ${i.stock_disponible} de ${i.stock_requerido} requeridos</div>
+                </div>
+                <label style="display:flex; align-items:center; gap:6px; cursor:pointer;">
+                    <input type="checkbox" class="rf-item-checkbox" data-item-id="${i.id || i.product_id}" data-nombre="${i.producto_nombre || i.name || i.nombre}" style="width:18px; height:18px; accent-color:#10b981;">
+                    <span style="font-size:11px; font-weight:600; color:#059669;">Acepto igual</span>
+                </label>
+            </div>
+        `).join('');
+
+        modal.innerHTML = `
+            <div style="background:#fff; width:100%; max-width:420px; border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); padding:24px; max-height:85vh; overflow-y:auto; margin:16px;">
+                <h2 style="margin:0 0 16px; font-size:18px; font-weight:800; color:#0f172a;">⚠️ Stock insuficiente</h2>
+                <p style="margin:0 0 16px; font-size:13px; color:#64748b; line-height:1.5;">
+                    Los siguientes productos no tienen stock suficiente. Podés aceptar solo los que sí tienen stock, o marcar algunos para aceptarlos igual.
+                </p>
+
+                <div style="margin-bottom:20px;">
+                    <div style="font-size:11px; font-weight:700; color:#b91c1c; margin-bottom:8px; text-transform:uppercase;">Productos sin stock (${itemsSinStock.length}):</div>
+                    ${itemsHtml}
+                </div>
+
+                <div style="background:#ecfdf5; padding:12px; border-radius:10px; margin-bottom:20px; border:1px solid #a7f3d0;">
+                    <div style="font-size:11px; font-weight:700; color:#047857; margin-bottom:4px;">📦 Productos con stock:</div>
+                    <div style="font-size:12px; color:#065f46;">${itemsConStock.length} items disponibles para aceptar</div>
+                </div>
+
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <button type="button" id="btnAceptarParcial" style="width:100%; background:#10b981; color:#fff; border:none; border-radius:12px; padding:12px; font-size:14px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(16,185,129,0.3);">
+                        ✓ Aceptar solo productos con stock
+                    </button>
+                    <button type="button" id="btnAceptarSeleccionados" style="width:100%; background:#f59e0b; color:#fff; border:none; border-radius:12px; padding:12px; font-size:14px; font-weight:800; cursor:pointer; box-shadow:0 4px 12px rgba(245,158,11,0.3);">
+                        ✓ Aceptar selección (incluye marcados)
+                    </button>
+                    <button type="button" id="btnCancelar" style="width:100%; background:#f1f5f9; color:#64748b; border:none; border-radius:12px; padding:10px; font-size:13px; font-weight:700; cursor:pointer;">
+                        Cancelar
+                    </button>
+                </div>
+            </div>
+        `;
+
+        modal.style.display = 'flex';
+
+        // Event listeners
+        modal.querySelector('#btnCancelar').onclick = () => {
+            modal.style.display = 'none';
+        };
+
+        modal.querySelector('#btnAceptarParcial').onclick = async () => {
+            modal.style.display = 'none';
+            await aceptarPedidoConItems(orderId, itemsConStock);
+        };
+
+        modal.querySelector('#btnAceptarSeleccionados').onclick = async () => {
+            const checkboxes = modal.querySelectorAll('.rf-item-checkbox:checked');
+            const itemsMarcados = Array.from(checkboxes).map(cb => {
+                const itemOriginal = itemsSinStock.find(i =>
+                    (i.id || i.product_id) === cb.dataset.itemId ||
+                    (i.producto_nombre || i.name || i.nombre) === cb.dataset.nombre
+                );
+                return itemOriginal;
+            }).filter(Boolean);
+
+            const itemsFinales = [...itemsConStock, ...itemsMarcados];
+            modal.style.display = 'none';
+            await aceptarPedidoConItems(orderId, itemsFinales);
+        };
+    }
+
+    async function aceptarPedidoConItems(orderId, items) {
+        try {
+            mostrarToast(`⏳ Aceptando pedido #${escaparTextoChat(orderId)} con ${items.length} items…`);
+            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/aceptar`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items_aceptados: items })
+            });
+            const data = await resp.json();
+            if (data && data.success) {
+                mostrarToast(`✅ Pedido #${escaparTextoChat(orderId)} aceptado con Ticket #${escaparTextoChat(data.ticket_id)}.`);
+                cargarPedidos(true);
+            } else {
+                alert('No se pudo aceptar: ' + (data.error || 'Error'));
+            }
+        } catch (e) {
+            console.error('[RepartoFacil] Error al aceptar con items:', e);
+            alert('Error de conexión.');
+        }
+    }
+
     // Acción: RECHAZAR PEDIDO
     async function rechazarPedido(orderId) {
         const conf = confirm(`¿Rechazar el pedido #${orderId}? Se notificará al comprador.`);
         if (!conf) return;
 
         try {
-            const resp = await fetch(`/api/repartofacil/pedidos/${orderId}/rechazar`, {
+            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/rechazar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ motivo: 'Falta de stock en sucursal' })
             });
             const data = await resp.json();
             if (data && data.success) {
-                mostrarToast(`Pedido #${orderId} rechazado.`);
+                mostrarToast(`Pedido #${escaparTextoChat(orderId)} rechazado.`);
                 cargarPedidos(true);
+            } else {
+                alert('No se pudo rechazar el pedido: ' + (data.error || 'Error'));
             }
         } catch (e) {
             console.error('[RepartoFacil] Error al rechazar pedido:', e);
+            alert('Error de conexión al rechazar pedido.');
         }
     }
 
     // Acción de marcar EMBALADO
     async function marcarEmbalado(orderId) {
         const order = pedidosLista.find(p => p.id === orderId);
-        const card = document.querySelector(`.rf-order-card[data-order-id="${orderId}"]`);
+        const card = Array.from(document.querySelectorAll('.rf-order-card'))
+            .find(element => element.dataset.orderId === String(orderId));
         const btn = card ? card.querySelector('.btn-embalar-pedido') : null;
 
         if (btn) {
@@ -455,14 +668,14 @@
         }
 
         try {
-            const resp = await fetch(`/api/repartofacil/pedidos/${orderId}/embalar`, {
+            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/embalar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await resp.json();
 
             if (data && data.success) {
-                mostrarToast(`✅ Pedido #${orderId} embalado. Mensaje enviado al repartidor: "Pedido listo y embalado" 📦`);
+                mostrarToast(`✅ Pedido #${escaparTextoChat(orderId)} embalado. Mensaje enviado al repartidor: "Pedido listo y embalado" 📦`);
 
                 if (order) {
                     order.estado = 'ready';
@@ -539,10 +752,13 @@
         }
 
         try {
-            const resp = await fetch(`/api/repartofacil/ticket/${targetId}`);
+            const resp = await fetch(`/api/repartofacil/ticket/${encodeURIComponent(targetId)}`);
             const t = await resp.json();
+            if (!resp.ok || !t.encontrado) {
+                throw new Error(t.error || 'No se pudo cargar el ticket.');
+            }
 
-            if (t && t.encontrado) {
+            {
                 $('rfTicketNumero').textContent = `Ticket #${t.ticket_numero || t.id}`;
                 $('rfTicketFecha').textContent = t.fecha || '2026-11-20 09:54:56';
                 $('rfTicketPago').textContent = 'Web';
@@ -557,7 +773,7 @@
                     const sub = (i.price || i.precio || 0) * cant;
                     return `
                         <div style="display:flex; justify-content:space-between; font-size:13.5px; color:#0f172a;">
-                            <span>${nombre} · ${cant}</span>
+                            <span>${escaparTextoChat(nombre)} · ${escaparTextoChat(cant)}</span>
                             <b style="font-weight:700;">${formatMoneyDecimal(sub)}</b>
                         </div>
                     `;
@@ -565,6 +781,8 @@
             }
         } catch (e) {
             console.error('[RepartoFacil] Error al cargar ticket:', e);
+            cerrarTicketModal();
+            alert(e.message || 'No se pudo cargar el ticket.');
         }
     }
 
@@ -666,6 +884,10 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function argumentoPedido(valor) {
+        return escaparTextoChat(JSON.stringify(String(valor)));
     }
 
     async function cargarMensajesChat(orderId) {
@@ -790,14 +1012,14 @@
             return;
         }
         try {
-            const resp = await fetch(`/api/repartofacil/pedidos/${orderId}/custodio/liberar`, {
+            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/custodio/liberar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ motivo: 'inactividad y falta de respuesta del chofer' })
             });
             const data = await resp.json();
             if (data.success) {
-                mostrarToast(`Pedido #${orderId} devuelto a la bandeja disponible`);
+                mostrarToast(`Pedido #${escaparTextoChat(orderId)} devuelto a la bandeja disponible`);
                 cargarPedidos();
                 if (orderChatActivo === orderId) {
                     cargarMensajesChat(orderId);
@@ -807,6 +1029,7 @@
             }
         } catch (e) {
             console.error('[RepartoFacil] Error al liberar:', e);
+            alert('Error de conexión al liberar el pedido.');
         }
     }
 
