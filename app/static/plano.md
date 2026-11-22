@@ -18,6 +18,7 @@
 - **Selector de Sucursales:** Menú desplegable y modal flotante que permite alternar entre `Todas`, `Maciel` (ID 1) y `alfaro 1964` (ID 2), actualizando instantáneamente la barra superior (`MACIEL · ALFARO 1964`) y los montos filtrados.
 - **Pedidos y chat:** La bandeja de despacho muestra errores de sesión y envío, conserva el texto no enviado y escapa los mensajes antes de renderizarlos.
 - **Caja y Perfil:** Caja ofrece historial y desglose de ventas desde su menú lateral. El primer botón abre el perfil público, sus reseñas y la edición con selección de ubicación en el mapa.
+- **Inventario:** el resumen destaca quiebres, productos sin contar hoy y diferencias de auditoría. Los indicadores describen el catálogo recibido, no reservas ni umbrales de stock bajo; la lista muestra el stock del sistema. Se advierte que la selección de sucursal no filtra esta vista ni sus conteos.
 
 ---
 

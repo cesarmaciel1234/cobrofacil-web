@@ -20,6 +20,7 @@
         quiebre: 0
     };
     let fuenteConexion = 'local';
+    let errorCatalogo = '';
     let pantallaActiva = 'repartofacil'; // 'repartofacil' (principal) | 'faltantes' | 'auditoria'
     let filtroEstado = 'todos'; // 'todos' | 'auditados' | 'pendientes' | 'diferencia' | 'quiebre'
     let filtroDepto = '';
@@ -185,6 +186,7 @@
                 auditoriasHoy = data.auditorias_hoy || [];
                 resumen = data.resumen || resumen;
                 fuenteConexion = data.fuente || 'local';
+                errorCatalogo = '';
                 renderAuditoria();
             } else {
                 throw new Error(data.error || 'Respuesta no exitosa');
@@ -192,12 +194,15 @@
         } catch (err) {
             console.error('Error cargando catálogo de auditoría:', err);
             if (global.CrmBus) global.CrmBus.emit('toast', 'No se pudo cargar el inventario: ' + err.message, true);
-            if (!catalogo || catalogo.length === 0) {
+            if (catalogo && catalogo.length > 0) {
+                errorCatalogo = 'No se pudo actualizar. Se muestran los últimos datos cargados.';
+                renderAuditoria();
+            } else {
                 wrap.innerHTML = `
                     <div class="auditoria-mobile-container" style="padding: 48px 16px; text-align: center;">
                         <div style="font-size:36px; margin-bottom:10px;">📦</div>
                         <p style="font-weight:700; color:#ef4444; margin:0 0 6px; font-size:16px;">No se pudo conectar al inventario</p>
-                        <p style="font-size:13px; color:#64748b; margin-bottom:18px;">${err.message || 'Error de red o servidor no disponible'}</p>
+                        <p style="font-size:13px; color:#64748b; margin-bottom:18px;">${escHtml(err.message || 'Error de red o servidor no disponible')}</p>
                         <button type="button" class="btn btn-primary" id="btnReintentarAuditoria" style="padding:10px 24px; border-radius:10px; font-weight:700; cursor:pointer;">Reintentar</button>
                     </div>
                 `;
@@ -260,9 +265,8 @@
     // FILTRO POR DEPARTAMENTO DEL TPV VÍA BOTÓN DEL HEADER (EMBUDO)
     // -------------------------------------------------------------------------
     function etiquetaFiltro() {
-        if (filtroDepto) return `${iconoDepto(filtroDepto)} ${filtroDepto}`;
-        if (filtroEstado === 'quiebre') return '⚡ Sin stock / Quiebre';
-        return 'Todos';
+        const estados = { quiebre: 'Sin stock', pendientes: 'Sin contar hoy', auditados: 'Contados hoy', diferencia: 'Con diferencia' };
+        return [filtroDepto ? `${iconoDepto(filtroDepto)} ${filtroDepto}` : '', estados[filtroEstado] || ''].filter(Boolean).join(' · ') || 'Todos';
     }
 
     function actualizarIconoFiltroHeader() {
@@ -278,7 +282,7 @@
 
         const deptos = obtenerDepartamentosLista();
         const totalArt = catalogo.length;
-        const quiebreCant = catalogo.filter((p) => (p.stock || 0) <= 0.0001).length;
+        const quiebreCant = catalogo.filter((p) => p.stock <= 0.0001).length;
 
         const sheet = document.createElement('div');
         sheet.id = 'auditoriaFiltroSheet';
@@ -365,37 +369,34 @@
         const wrap = $('pedidosAuditoriaWrap');
         if (!wrap) return;
 
-        // Filtrar productos
         const texto = textoBusqueda.trim().toLowerCase();
+        const coincideTexto = (p) => !texto || [p.nombre, p.codigo, p.id, p.departamento]
+            .some((valor) => String(valor == null ? '' : valor).toLowerCase().includes(texto));
+        const indicadores = [
+            { filtro: 'todos', etiqueta: 'Artículos', cantidad: catalogo.length, color: '#2563eb' },
+            { filtro: 'quiebre', etiqueta: 'Sin stock', cantidad: catalogo.filter((p) => p.stock <= 0.0001).length, color: '#dc2626' },
+            { filtro: 'pendientes', etiqueta: 'Sin contar hoy', cantidad: catalogo.filter((p) => !p.auditado_hoy).length, color: '#b45309' },
+            { filtro: 'diferencia', etiqueta: 'Con diferencia', cantidad: catalogo.filter((p) => p.auditado_hoy && Math.abs(p.diferencia || 0) > 0.001).length, color: '#7c3aed' }
+        ];
         const filtrados = catalogo.filter((p) => {
-            // Filtro de estado
             if (filtroEstado === 'auditados' && !p.auditado_hoy) return false;
             if (filtroEstado === 'pendientes' && p.auditado_hoy) return false;
-            if (filtroEstado === 'diferencia' && (!p.auditado_hoy || Math.abs(p.diferencia || 0) < 0.001)) return false;
+            if (filtroEstado === 'diferencia' && (!p.auditado_hoy || Math.abs(p.diferencia || 0) <= 0.001)) return false;
             if (filtroEstado === 'quiebre' && p.stock > 0.0001) return false;
 
-            // Filtro de depto
-            if (filtroDepto && String(p.departamento || '').toUpperCase() !== filtroDepto.toUpperCase()) return false;
-
-            // Filtro de texto
-            if (texto) {
-                const matchNombre = (p.nombre || '').toLowerCase().includes(texto);
-                const matchCodigo = String(p.codigo || '').toLowerCase().includes(texto);
-                const matchId = String(p.id || '').includes(texto);
-                const matchDepto = (p.departamento || '').toLowerCase().includes(texto);
-                if (!matchNombre && !matchCodigo && !matchId && !matchDepto) return false;
-            }
-            return true;
+            if (filtroDepto && String(p.departamento || p.categoria || 'GENERAL').trim().toUpperCase() !== filtroDepto) return false;
+            return coincideTexto(p);
         });
 
         const deptosBarra = obtenerDepartamentosLista();
+        const puedeCrear = !!texto && !catalogo.some(coincideTexto);
 
         const filas = filtrados.length
             ? filtrados.map((p) => {
                 const esPesable = p.es_pesable || p.unidad === 'KG';
                 const unidadTxt = esPesable ? 'kg' : 'un';
                 const decimales = esPesable ? 3 : 0;
-                const stockVal = p.auditado_hoy && p.ultimo_conteo !== null ? p.ultimo_conteo : p.stock;
+                const stockVal = p.stock;
                 const stockFmt = formatearNumero(stockVal, decimales);
                 const precioFmt = formatearPlata(p.precio || 0);
                 const deptoNom = (p.departamento || 'GENERAL').toUpperCase();
@@ -409,6 +410,8 @@
                         <span style="font-size:12px; color:#475569;">
                             Stock: <b class="pedido-stock" style="color:${stockColor};">${stockFmt} ${unidadTxt}</b>
                         </span>
+                        ${p.stock <= 0.0001 ? '<span style="font-size:11px; font-weight:800; color:#b91c1c;">Sin stock</span>' : ''}
+                        ${p.auditado_hoy ? '<span style="font-size:11px; font-weight:700; color:#047857;">Contado hoy</span>' : ''}
                         ${p.codigo ? `<span style="font-size:10.5px; color:#94a3b8; font-family:monospace;">#${escHtml(p.codigo)}</span>` : ''}
                     </span>
                 `;
@@ -428,16 +431,19 @@
                     ${btnHtml}
                 </div>`;
             }).join('')
-            : (texto
+            : (puedeCrear
                 ? `<div class="pedido-vacio" style="padding:22px 16px; text-align:center;">
                         <div style="color:#64748b; font-size:13.5px; margin-bottom:12px;">No hay <b style="color:#0f172a;">“${escHtml(textoBusqueda.trim())}”</b> en el inventario.</div>
                         <button type="button" id="btnCrearDesdeVacio" style="background:#2563eb; color:#fff; border:none; border-radius:12px; font-size:14px; font-weight:800; padding:11px 18px; cursor:pointer; box-shadow:0 4px 12px rgba(37,99,235,0.3);">
                             + Crear artículo
                         </button>
                    </div>`
-                : `<p class="pedido-vacio" style="padding: 24px; text-align: center; color: #94a3b8;">No hay artículos en este departamento.</p>`);
+                : `<div class="pedido-vacio" style="padding:24px; text-align:center; color:#64748b;">
+                    <p>No hay artículos con estos filtros.</p>
+                    ${(texto || filtroDepto || filtroEstado !== 'todos') ? '<button type="button" id="btnRestablecerFiltros" style="border:0; background:none; color:#2563eb; font-weight:800; cursor:pointer;">Limpiar filtros y búsqueda</button>' : ''}
+                   </div>`);
 
-        const sinResultados = !!texto && filtrados.length === 0;
+        const sinResultados = puedeCrear;
         const inputPrevio = $('auditoriaSearchInput');
         const teniaFoco = document.activeElement === inputPrevio;
         const cursorPos = teniaFoco && inputPrevio ? inputPrevio.selectionStart : null;
@@ -463,14 +469,25 @@
                     </button>
                 </div>
 
+                <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:14px 0 8px;">
+                    <div><strong style="font-size:16px; color:#0f172a;">Inventario</strong><div style="font-size:11px; color:#64748b;">${fuenteConexion === 'mariadb_maestra' ? 'Lectura del TPV local' : 'Datos replicados; pueden tener demora'} · Sin stock: cero o negativo</div><div style="font-size:11px; color:#9a3412;">La selección de sucursal no filtra esta vista ni sus conteos.</div></div>
+                </div>
+                ${errorCatalogo ? `<div role="alert" style="padding:9px 11px; margin-bottom:8px; border-radius:10px; background:#fff7ed; color:#9a3412; font-size:12px; font-weight:700;">${escHtml(errorCatalogo)} <button type="button" id="btnReintentarActualizacionInventario" style="border:0; background:none; color:#9a3412; text-decoration:underline; font-weight:800; cursor:pointer;">Reintentar</button></div>` : ''}
+                <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px;" aria-label="Resumen de inventario">
+                    ${indicadores.map((item) => `<button type="button" class="audit-kpi-card" data-filtro="${item.filtro}" aria-pressed="${filtroEstado === item.filtro}" style="text-align:left; border:1px solid ${filtroEstado === item.filtro ? item.color : '#e2e8f0'}; background:${filtroEstado === item.filtro ? '#f8fafc' : '#fff'}; border-radius:12px; padding:9px 11px; cursor:pointer;">
+                        <span style="display:block; font-size:11px; color:#64748b; font-weight:700;">${item.etiqueta}</span>
+                        <strong style="display:block; font-size:20px; color:${item.color};">${item.cantidad}</strong>
+                    </button>`).join('')}
+                </div>
+
                 <!-- Barra de Departamentos del TPV -->
                 <div style="display:flex; align-items:center; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:8px; scrollbar-width:none;">
-                    <button type="button" class="depto-chip" data-depto="" style="flex-shrink:0; padding:6px 12px; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; border:1px solid ${!filtroDepto && filtroEstado === 'todos' ? '#2563eb' : '#cbd5e1'}; background:${!filtroDepto && filtroEstado === 'todos' ? '#2563eb' : '#fff'}; color:${!filtroDepto && filtroEstado === 'todos' ? '#fff' : '#334155'};">
-                        🔥 Todos (${catalogo.length})
+                    <button type="button" class="depto-chip" data-depto="" aria-pressed="${!filtroDepto}" style="flex-shrink:0; padding:6px 12px; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; border:1px solid ${!filtroDepto ? '#2563eb' : '#cbd5e1'}; background:${!filtroDepto ? '#2563eb' : '#fff'}; color:${!filtroDepto ? '#fff' : '#334155'};">
+                        Todos los departamentos (${catalogo.length})
                     </button>
                     ${deptosBarra.map((d) => {
                         const act = filtroDepto === d.nombre;
-                        return `<button type="button" class="depto-chip" data-depto="${escHtml(d.nombre)}" style="flex-shrink:0; padding:6px 12px; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; border:1px solid ${act ? '#2563eb' : '#cbd5e1'}; background:${act ? '#2563eb' : '#fff'}; color:${act ? '#fff' : '#334155'};">
+                        return `<button type="button" class="depto-chip" data-depto="${escHtml(d.nombre)}" aria-pressed="${act}" style="flex-shrink:0; padding:6px 12px; border-radius:999px; font-size:11.5px; font-weight:800; cursor:pointer; border:1px solid ${act ? '#2563eb' : '#cbd5e1'}; background:${act ? '#2563eb' : '#fff'}; color:${act ? '#fff' : '#334155'};">
                             ${iconoDepto(d.nombre)} ${escHtml(d.nombre)} (${d.cantidad})
                         </button>`;
                     }).join('')}
@@ -479,7 +496,7 @@
                 ${(filtroDepto || filtroEstado !== 'todos') ? `
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; padding:0 2px;">
                     <span style="font-size:12.5px; font-weight:700; color:#2563eb; background:#eff6ff; padding:3px 10px; border-radius:999px; border:1px solid #bfdbfe; display:inline-flex; align-items:center; gap:6px;">
-                        <span>Departamento: ${etiquetaFiltro()} (${filtrados.length})</span>
+                        <span>${escHtml(etiquetaFiltro())} (${filtrados.length})</span>
                         <button type="button" id="btnQuitarFiltroAuditoria" style="background:none; border:none; color:#2563eb; font-size:13px; font-weight:800; cursor:pointer; padding:0 2px; line-height:1;" aria-label="Quitar filtro">✕</button>
                     </span>
                     <button type="button" id="btnAbrirFiltroDesdeBarra" style="background:none; border:none; color:#64748b; font-size:12px; font-weight:700; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
@@ -488,7 +505,7 @@
                     </button>
                 </div>` : ''}
 
-                <!-- Lista Simple e Idéntica a Pedidos (pedido-lista y pedido-fila) -->
+                <div style="font-size:12px; color:#64748b; margin:4px 2px 8px;">${filtrados.length} ${filtrados.length === 1 ? 'artículo' : 'artículos'} ${texto || filtroDepto || filtroEstado !== 'todos' ? 'en los filtros' : 'en total'}</div>
                 <div class="pedido-lista">
                     ${filas}
                 </div>
@@ -515,6 +532,10 @@
     // EVENTOS DE LA PANTALLA DE AUDITORÍA
     // -------------------------------------------------------------------------
     function vincularEventosAuditoria() {
+        const wrap = $('pedidosAuditoriaWrap');
+        const btnReintentar = $('btnReintentarActualizacionInventario');
+        if (btnReintentar) btnReintentar.addEventListener('click', () => cargarCatalogoAuditoria(true));
+
         // Buscador
         const inputBuscar = $('auditoriaSearchInput');
         if (inputBuscar) {
@@ -587,10 +608,9 @@
         }
 
         // Chips de departamento
-        document.querySelectorAll('.depto-chip').forEach((btn) => {
+        wrap.querySelectorAll('.depto-chip').forEach((btn) => {
             btn.addEventListener('click', () => {
                 filtroDepto = btn.dataset.depto || '';
-                filtroEstado = 'todos';
                 actualizarIconoFiltroHeader();
                 renderAuditoria();
             });
@@ -605,7 +625,7 @@
         }
 
         // KPIs clicables
-        document.querySelectorAll('.audit-kpi-card').forEach((card) => {
+        wrap.querySelectorAll('.audit-kpi-card').forEach((card) => {
             card.addEventListener('click', () => {
                 filtroEstado = card.dataset.filtro || 'todos';
                 renderAuditoria();
@@ -613,23 +633,15 @@
         });
 
         // Chips de estado
-        document.querySelectorAll('.chip-btn').forEach((btn) => {
+        wrap.querySelectorAll('.chip-btn').forEach((btn) => {
             btn.addEventListener('click', () => {
                 filtroEstado = btn.dataset.f || 'todos';
                 renderAuditoria();
             });
         });
 
-        // Chips de departamento
-        document.querySelectorAll('.depto-chip').forEach((btn) => {
-            btn.addEventListener('click', () => {
-                filtroDepto = btn.dataset.depto || '';
-                renderAuditoria();
-            });
-        });
-
         // Botones de Contar en cada fila
-        document.querySelectorAll('[data-contar]').forEach((btn) => {
+        wrap.querySelectorAll('[data-contar]').forEach((btn) => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const pid = parseInt(btn.dataset.contar, 10);
@@ -639,7 +651,7 @@
         });
 
         // Clic en la fila completa también abre conteo
-        document.querySelectorAll('.pedido-fila').forEach((fila) => {
+        wrap.querySelectorAll('.pedido-fila').forEach((fila) => {
             fila.addEventListener('click', () => {
                 const pid = parseInt(fila.dataset.pid, 10);
                 const prod = catalogo.find((p) => p.id === pid);
@@ -1262,10 +1274,7 @@
         const esPesable = prod.es_pesable || prod.unidad === 'KG';
         const unidadTxt = esPesable ? 'KG' : 'UN';
 
-        // Buffer inicial: si ya fue auditado hoy, usar el último conteo; sino el stock del sistema
-        bufferConteo = prod.auditado_hoy && prod.ultimo_conteo !== null
-            ? String(prod.ultimo_conteo)
-            : (prod.stock > 0 ? String(prod.stock) : '0');
+        bufferConteo = prod.stock > 0 ? String(prod.stock) : '0';
 
         const drawer = $('drawerConteoTactil');
         if (!drawer) return;
