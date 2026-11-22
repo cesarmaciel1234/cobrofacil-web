@@ -39,6 +39,11 @@
 - Las rutas de lista, ticket, chat, aceptación, rechazo, embalaje y liberación manual exigen sesión real y empresa del pedido; `visor` solo puede leer. El historial sigue disponible al comercio después de la entrega.
 - Las acciones bloquean el pedido en PostgreSQL y comprueban su estado: no reabren entregas o cancelaciones, ni liberan pedidos retirados. Pedidos antiguos sin `empresa_id` quedan inaccesibles hasta atribuir su empresa de forma segura. Las pruebas aisladas cubren aceptación concurrente y cambio de empresa durante el envío.
 
+### Ficha pública (`api_perfil_comercio.py`):
+- `GET /api/repartofacil/mi-empresa` exige sesión y devuelve solo datos públicos
+  de la empresa y sus reseñas. `PUT` requiere administrador y comprueba que la
+  empresa esperada coincide con la sesión antes de guardar.
+
 ---
 
 ## 3. Fondo (Procesamiento Interno)

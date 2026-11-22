@@ -2,7 +2,8 @@
 (function () {
     window.BarraPiramide = window.BarraModulos || [];
 
-    const vista = new URLSearchParams(location.search).get('view') || 'reporte';
+    const pedida = new URLSearchParams(location.search).get('view') || 'reporte';
+    const vista = pedida === 'ticket' ? 'contabilidad' : pedida;
     const pwa = document.getElementById('bottomPwaBar');
     if (pwa) {
         pwa.querySelectorAll('.pwa-nav-btn').forEach((btn) => {

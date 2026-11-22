@@ -17,7 +17,7 @@
 - **Ficha y Edición de Cliente Estilo WhatsApp:** En la ficha individual de cliente, el botón superior `#btnRefresh` cambia automáticamente de filtro a lápiz de edición (`.es-editar-cliente`). Al tocar el lápiz, el avatar o la cabecera superior se abre la hoja modal con datos de contacto (nombre, DNI, teléfono, dirección, límite) y accesos directos de llamada/WhatsApp. El botón de ticket en movimientos se destaca en azul claro (`#eff6ff`) con flecha `↗` para abrir cortes.
 - **Selector de Sucursales:** Menú desplegable y modal flotante que permite alternar entre `Todas`, `Maciel` (ID 1) y `alfaro 1964` (ID 2), actualizando instantáneamente la barra superior (`MACIEL · ALFARO 1964`) y los montos filtrados.
 - **Pedidos y chat:** La bandeja de despacho muestra errores de sesión y envío, conserva el texto no enviado y escapa los mensajes antes de renderizarlos.
-- **Caja:** El menú lateral incorpora el historial de ventas y el desglose de artículos, conservando el acceso actual de Ventas durante la transición.
+- **Caja y Mi empresa:** Caja ofrece historial y desglose de ventas desde su menú lateral. La barra inferior abre Mi empresa para editar la ficha pública y consultar reseñas reales.
 
 ---
 

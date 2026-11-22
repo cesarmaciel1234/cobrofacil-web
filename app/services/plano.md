@@ -42,6 +42,11 @@ app/services/
 - **Unificación por DNI:** Un cliente con el mismo DNI en dos sucursales se consolida en una sola persona sumando sus deudas reales.
 - **Unificación por Nombre:** Si no hay DNI, clientes con nombres exactamente idénticos en distintas sucursales se unifican sin duplicar la deuda copiada.
 
+### Ficha de comercio (`perfil_comercio.py`):
+- Lee y valida la ficha pública por `empresa_id` en la base compartida. Las
+  reseñas pertenecen a pedidos entregados y son creadas por la API de la tienda.
+  El horario es informativo y no controla el estado abierto/cerrado.
+
 ### Motor de Historial Progresivo (`pos_historial.py`):
 - **Scroll Infinito y Carga Progresiva:** Retorna los primeros 400 tickets visibles ordenados cronológicamente descendentes (`offset`, `limite`, `hay_mas`). Evita el colapso del DOM y el congelamiento del navegador en dispositivos móviles al manipular más de 1.000 o 2.500 tickets por mes.
 

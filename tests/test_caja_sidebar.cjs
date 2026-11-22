@@ -56,3 +56,40 @@ test('Caja ofrece Ventas y conserva la selección al abrir el desglose', () => {
     buttons()[0].listeners.click({ stopPropagation() {} });
     assert.deepEqual(events.pop(), ['pantallaModulo', 'contabilidad', 'arqueo']);
 });
+
+test('Caja vuelve al arqueo al tocar su botón desde el historial de ventas', async () => {
+    let activeView = 'view-ticket';
+    const active = new Set(['contabilidad']);
+    const events = [];
+    const buttons = ['reporte', 'mi-empresa', 'contabilidad'].map(name => ({
+        dataset: { pwaView: name },
+        classList: {
+            contains: (value) => value === 'active' && active.has(name),
+            toggle: (_value, on) => on ? active.add(name) : active.delete(name),
+        },
+    }));
+    const views = ['view-ticket', 'view-contabilidad'].map(id => ({
+        id, classList: {
+            contains: (value) => value === 'active' && activeView === id,
+            toggle: (_value, on) => { if (on) activeView = id; },
+        },
+    }));
+    let click;
+    const bar = {
+        querySelector: () => buttons.find((button) => active.has(button.dataset.pwaView)),
+        querySelectorAll: () => buttons,
+        contains: () => true,
+        addEventListener: (_name, callback) => { click = callback; },
+    };
+    const document = {
+        getElementById: (id) => id === 'bottomPwaBar' ? bar : views.find(view => view.id === id),
+        querySelectorAll: () => views,
+    };
+    const window = { CrmBus: { get: () => true, emit: (...args) => events.push(args) } };
+    const file = path.join(__dirname, '..', 'app', 'static', 'js', 'barra', 'toque.js');
+    vm.runInNewContext(fs.readFileSync(file, 'utf8'), { window, document, navigator: {}, setTimeout });
+    click({ target: { closest: () => buttons[2] } });
+    await new Promise(resolve => setTimeout(resolve, 5));
+    assert.equal(activeView, 'view-contabilidad');
+    assert.deepEqual(events, [['switchView', 'contabilidad']]);
+});

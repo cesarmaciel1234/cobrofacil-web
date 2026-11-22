@@ -350,6 +350,7 @@ const $ = id => document.getElementById(id);
             'historial-fiado': ['Historial del cliente', 'Movimientos del libro de Cobro Fácil', 'Historial'],
             digitales: ['Cobros Digitales MP', 'Auditoría de Mercado Pago, QR y Point', 'Digital'],
             pedidos: ['Pedidos Reparto Fácil', 'Recepción de pedidos de clientes y despacho', 'Pedidos'],
+            'mi-empresa': ['Mi empresa', 'Ficha pública y reseñas de compradores', 'Mi empresa'],
             cartera: ['Cartera', 'Clientes del libro', 'Cartera']
         };
 
@@ -4732,7 +4733,7 @@ const $ = id => document.getElementById(id);
             pintarBarraJefe(panel, dato);
         }
 
-        const vistasRaiz = new Set(['reporte', 'ticket', 'digitales', 'contabilidad', 'pedidos', 'cartera']);
+        const vistasRaiz = new Set(['reporte', 'ticket', 'digitales', 'contabilidad', 'pedidos', 'cartera', 'mi-empresa']);
         let moduloActual = 'reporte';
 
         function marcarEntrada(name) {
@@ -4785,6 +4786,7 @@ const $ = id => document.getElementById(id);
             setTimeout(() => {
                 if (token !== datosVista) return;
                 if (name === 'cartera' && window.CarteraLibro) void window.CarteraLibro.entrar(activeSucursalId);
+                if (name === 'mi-empresa' && window.MiEmpresa) void window.MiEmpresa.entrar(sessionUser);
                 if (['reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket'].includes(name)) cargarJefe(name);
                 if (name === 'home') renderHomeTable();
                 if (name === 'remitos') renderRemitosFull();
@@ -4823,7 +4825,7 @@ const $ = id => document.getElementById(id);
             document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === name));
             document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
             document.querySelectorAll('.pwa-nav-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.pwaView === name);
+                btn.classList.toggle('active', btn.dataset.pwaView === (name === 'ticket' ? 'contabilidad' : name));
             });
             
             const jefeVistas = ['dashboard', 'reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket'];
@@ -4949,6 +4951,10 @@ const $ = id => document.getElementById(id);
         
         $('btnRefresh').addEventListener('click', () => {
             const btn = $('btnRefresh');
+            if (document.getElementById('view-mi-empresa')?.classList.contains('active') && window.MiEmpresa) {
+                void window.MiEmpresa.entrar(sessionUser);
+                return;
+            }
             if (btn.classList.contains('es-editar-cliente')) {
                 if (window.CarteraLibro && window.CarteraLibro.abrirPerfil) {
                     window.CarteraLibro.abrirPerfil();

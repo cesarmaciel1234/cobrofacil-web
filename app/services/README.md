@@ -15,6 +15,12 @@
 
 ## 2. Archivos y Funciones Clave
 
+### `perfil_comercio.py`
+- `leer_perfil(empresa_id)` consulta la ficha pública y reseñas de esa empresa.
+- `guardar_perfil(empresa_id, datos)` valida la ficha y la guarda en la base
+  compartida; una dirección cambiada sin coordenadas nuevas descarta las anteriores.
+  No utiliza ni expone la configuración privada de informes y correo.
+
 ### `pos_base.py`
 - `filas_de(tabla, sucursal_id=None, desde=None, hasta=None)`: Lee el libro. Con fechas, baja solo esos días. Sin fechas, una bajada alcanza para Todas y para cada sucursal. A los 5 segundos pregunta el sello; si no cambió, no vuelve a traer las filas.
 - `preparar_vista(...)`: El reporte del día entra en una lectura (ese día y los catálogos). Si hoy no tiene ventas, queda el día más nuevo. Un trozo que llegó sin sello de día igual cuenta: se mira la fecha de cada venta. Ese recorte no reemplaza el libro entero: Ventas lee el mismo rango. Si Todas ya está en memoria, una sucursal sale de ahí y no vuelve vacía.

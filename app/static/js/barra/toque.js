@@ -46,6 +46,11 @@
             try { navigator.vibrate(12); } catch (_) {}
         }
         if (nombre === vistaActual()) {
+            if (nombre === 'contabilidad' && document.getElementById('view-ticket')?.classList.contains('active')) {
+                pintar(nombre);
+                cargar(nombre);
+                return;
+            }
             if (nombre === 'reporte' && window.CrmBus && window.CrmBus.get('switchView')) {
                 window.CrmBus.emit('switchView', 'reporte');
             }
