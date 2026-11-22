@@ -37,6 +37,10 @@
 - `crear_operacion()`: Parsea el payload con `utils.parse_operacion_payload()` e inserta en `operaciones_financieras`.
 - `eliminar_operacion()`: Requiere clave de confirmación y elimina la operación.
 
+### `api_repartofacil.py`
+- Lista, ticket, chat y acciones consultan tablas compartidas de PostgreSQL. `_sesion_empresa_repartofacil()` exige sesión y rol válidos; se filtra por empresa de sesión. El chat bloquea el pedido durante el envío y las acciones lo bloquean antes de validar su estado. Devuelve 401 sin sesión, 403 por permisos, 404 para pedidos inexistentes o ajenos, y 409 cuando no corresponde la transición.
+- Aceptar/rechazar solo opera sobre pendientes, embalar no reabre pedidos finalizados y custodio solo libera un repartidor asignado antes del retiro. Los pedidos con empresa desconocida requieren atribución segura previa. Las pruebas aisladas verifican sesiones, aceptación concurrente y cambios de empresa del chat.
+
 ---
 
 ## 3. Flujo Interno de Ejecución

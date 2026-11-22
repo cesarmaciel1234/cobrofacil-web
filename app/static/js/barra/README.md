@@ -24,10 +24,11 @@ Controla la barra inferior fija de cinco botones de la PWA móvil y desktop de *
 | **`toque.js`** | Listener central de eventos de clic/toque en `#bottomPwaBar`. Detecta la vista pedida, aplica `.active` y emite `switchView`. Si se vuelve a tocar la vista activa (ej. `Reporte`), resetea a la subvista principal (*Alertas del día*). |
 | **`ventas.js`** | Paginación y visualización del historial de tickets. Se coordina con `pos_historial.py` y `cargarSiguientePaginaTickets()` para carga progresiva de a 400 tickets. |
 | **`cobros.js`** | Submódulo de historial de cobros transaccionales y conciliación de caja. |
-| **`caja.js`** | Arqueo de medios de pago del día (Efectivo, QR MercadoPago, Fiado, Tarjeta) con porcentajes sobre el total recaudado. |
+| **`caja.js`** | Arqueo, pago digital y accesos laterales al historial de ventas y desglose de artículos. Por ahora Ventas conserva también su botón propio. |
 | **`cartera.js`** | Módulo de Cartera y definición de herramientas en el Sidebar/Drawer (`Tarjetas de clientes`, `Historial de cargos`, `Historial de cobros`, `Auditoría de cartera`), además de chips de filtro (`Todos`, `Con deuda`, `Riesgo`, `Al día`, `Express`, `30+`, `60+`, `90+`). |
 | **`cartera-libro.js`** | Controlador integral de la Cartera de Clientes. Gestiona la vista de tarjetas ejecutivas y fichas individuales, la Planilla de Cargos (ventas a crédito, cargos manuales, filtros de período y estado vivo/borrado/cancelado), la Planilla de Cobros (recibos COB-, medios de pago, id digital y quién cobró) y la Auditoría de Cartera (libro de eventos, control de integridad y cuadre de saldos). Al abrir la ficha de un cliente, conmuta el botón superior derecho (`#btnRefresh`) de filtro (`.es-filtro`) a lápiz de edición (`.es-editar-cliente`), permitiendo abrir la vista modal de edición de datos (nombre, DNI, teléfono, dirección) estilo WhatsApp al tocar el lápiz, el avatar o la cabecera. Todos los clientes muestran botón WhatsApp (activo si tiene número o directo para cargarlo). En el detalle de movimientos de la ficha, el botón de ticket se visualiza destacado con fondo azul (`#eff6ff`) e indicador `#ID ↗` abriendo el desglose de cortes del ticket. |
 | **`pedidos.js`** | Gestión de reposición de mercadería, cálculo de kilos sugeridos por producto con stock negativo y filtrado por proveedor. |
+| **`repartofacil-despacho.js`** | Bandeja de pedidos y conversación por pedido. Consulta y envía usando la sesión del comercio, muestra errores y conserva el texto si falla el envío; escapa los mensajes antes de renderizarlos. |
 
 ---
 

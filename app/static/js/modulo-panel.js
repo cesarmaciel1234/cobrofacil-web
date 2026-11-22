@@ -221,11 +221,11 @@
         if (activo === modulo) pintar();
     }
 
-    function usar(modulo) {
+    function usar(modulo, pantallaInicial) {
         soltar();
-        activo = modulo || 'reporte';
+        activo = modulo === 'ticket' ? 'contabilidad' : (modulo || 'reporte');
         elegida = '';
-        pantalla = '';
+        pantalla = pantallaInicial || '';
         pintar();
     }
 

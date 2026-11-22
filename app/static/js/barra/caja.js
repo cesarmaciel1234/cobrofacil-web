@@ -8,6 +8,8 @@ window.BarraModulos.push({
     pantalla: 'Arqueo por medio de pago',
     herramientas: [
         { id: 'arqueo', titulo: 'Arqueo por medio de pago', tipo: 'pantalla' },
-        { id: 'digital', titulo: 'Pago digital', tipo: 'pantalla' }
+        { id: 'digital', titulo: 'Pago digital', tipo: 'pantalla' },
+        { id: 'historial', titulo: 'Historial de ventas', tipo: 'pantalla' },
+        { id: 'desglose', titulo: 'Desglose de artículos', tipo: 'pantalla' }
     ]
 });

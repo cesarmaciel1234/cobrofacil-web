@@ -93,6 +93,12 @@
         try {
             const resp = await fetch('/api/repartofacil/pedidos');
             const data = await resp.json();
+            if (resp.status === 401 || resp.status === 403) {
+                pedidosLista = [];
+                actualizarBadge();
+                contenedor.textContent = data.error || 'Inici\u00e1 sesi\u00f3n para consultar los pedidos.';
+                return;
+            }
             if (data && data.success && Array.isArray(data.pedidos)) {
                 pedidosLista = data.pedidos;
                 try {
@@ -654,15 +660,27 @@
         if (modal) modal.style.display = 'none';
     }
 
+    function escaparTextoChat(valor) {
+        return String(valor == null ? '' : valor)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
     async function cargarMensajesChat(orderId) {
         const box = $('rfChatMessages');
         if (!box) return;
 
         try {
-            const resp = await fetch(`/api/repartofacil/chat/${orderId}`);
+            const resp = await fetch(`/api/repartofacil/chat/${encodeURIComponent(orderId)}`);
             const data = await resp.json();
+            if (orderChatActivo !== orderId) return;
+            if (!resp.ok || !data.success || !Array.isArray(data.mensajes)) {
+                throw new Error(data.error || 'No se pudo cargar la conversación.');
+            }
 
-            if (data && data.success && Array.isArray(data.mensajes)) {
+            {
                 if (data.mensajes.length === 0) {
                     box.innerHTML = `
                         <div style="text-align:center; padding:24px; color:#64748b; font-size:12px;">
@@ -680,9 +698,9 @@
                                 <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:10px 12px; font-size:12px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                                     <div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:3px; display:flex; align-items:center; justify-content:center; gap:4px;">
                                         <span>🛡️</span>
-                                        <span>${m.author_name || 'Custodio del Sistema'} · ${m.timestamp_str || ''}</span>
+                                        <span>${escaparTextoChat(m.author_name || 'Custodio del Sistema')} · ${escaparTextoChat(m.timestamp_str || '')}</span>
                                     </div>
-                                    <div style="color:#78350f; font-weight:600;">${m.content}</div>
+                                    <div style="color:#78350f; font-weight:600;">${escaparTextoChat(m.content)}</div>
                                 </div>
                             </div>
                         `;
@@ -690,13 +708,13 @@
 
                     const esMio = m.author_role === 'store';
                     const esChofer = m.author_role === 'driver';
-                    const emisor = esMio ? 'Frigorífico Maciel (Tú)' : (esChofer ? `Repartidor (${m.author_name || 'Lucas'})` : `Comprador (${m.author_name || 'Cliente'})`);
+                    const emisor = esMio ? 'Comercio (Tú)' : (esChofer ? `Repartidor (${m.author_name || 'Repartidor'})` : `Comprador (${m.author_name || 'Cliente'})`);
 
                     return `
                         <div style="align-self:${esMio ? 'flex-end' : 'flex-start'}; max-width:82%; display:flex; flex-direction:column; align-items:${esMio ? 'flex-end' : 'flex-start'};">
-                            <span style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:2px; padding:0 4px;">${emisor} · ${m.timestamp_str || ''}</span>
+                            <span style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:2px; padding:0 4px;">${escaparTextoChat(emisor)} · ${escaparTextoChat(m.timestamp_str || '')}</span>
                             <div style="background:${esMio ? '#10b981' : (esChofer ? '#0f172a' : '#ffffff')}; color:${esMio || esChofer ? '#ffffff' : '#0f172a'}; padding:8px 12px; border-radius:14px; font-size:12.5px; border:1px solid ${esMio ? '#059669' : (esChofer ? '#1e293b' : '#cbd5e1')}; box-shadow:0 1px 3px rgba(0,0,0,0.05); word-break:break-word;">
-                                ${m.content}
+                                ${escaparTextoChat(m.content)}
                             </div>
                         </div>
                     `;
@@ -706,6 +724,9 @@
             }
         } catch (e) {
             console.error('[RepartoFacil] Error al cargar chat:', e);
+            if (orderChatActivo === orderId) {
+                box.textContent = e.message || 'No se pudo cargar la conversación.';
+            }
         }
     }
 
@@ -716,17 +737,25 @@
         const texto = input.value.trim();
         if (!texto) return;
 
-        input.value = '';
+        const orderId = orderChatActivo;
 
         try {
-            await fetch(`/api/repartofacil/chat/${orderChatActivo}/mensaje`, {
+            const resp = await fetch(`/api/repartofacil/chat/${encodeURIComponent(orderId)}/mensaje`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ content: texto })
             });
-            cargarMensajesChat(orderChatActivo);
+            const data = await resp.json();
+            if (!resp.ok || !data.success) {
+                throw new Error(data.error || 'No se pudo enviar el mensaje.');
+            }
+            if (orderChatActivo === orderId) {
+                if (input.value.trim() === texto) input.value = '';
+                cargarMensajesChat(orderId);
+            }
         } catch (e) {
             console.error('[RepartoFacil] Error al enviar chat:', e);
+            mostrarToast(escaparTextoChat(e.message || 'No se pudo enviar el mensaje.'));
         }
     }
 

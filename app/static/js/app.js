@@ -4801,7 +4801,7 @@ const $ = id => document.getElementById(id);
                 if (name === 'finanzas-aging') renderFinanzasAging();
                 if (name === 'finanzas-margenes') renderFinanzasMargenes();
                 if (name === 'dashboard') void actualizarInformeEstado();
-                if (window.ModuloPanel) ModuloPanel.usar(name);
+                if (window.ModuloPanel) ModuloPanel.usar(name, name === 'ticket' ? ventasPantalla : (name === 'contabilidad' ? cajaPantalla : ''));
             }, 0);
         }
 
@@ -6519,6 +6519,15 @@ const $ = id => document.getElementById(id);
                     return;
                 }
                 if (vista !== 'contabilidad') return;
+                if (id === 'historial' || id === 'desglose') {
+                    switchView('ticket');
+                    ventasPantalla = id;
+                    return;
+                }
+                const abierta = document.querySelector('.view.active');
+                if (!abierta || abierta.id !== 'view-contabilidad') {
+                    switchView('contabilidad');
+                }
                 cajaPantalla = id || 'arqueo';
                 if (cajaPantalla === 'digital') {
                     periodoDigital = 'Semana';
