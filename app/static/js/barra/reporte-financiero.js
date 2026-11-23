@@ -409,21 +409,21 @@
         let pointsHtml = '';
         ptsVentas.forEach((p, idx) => {
             pointsHtml += `
-                <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="#3b82f6" stroke="#fff" stroke-width="2" class="chart-point" data-idx="${idx}"/>
+                <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="#FFE600" stroke="#2D3277" stroke-width="2" class="chart-point" data-idx="${idx}"/>
             `;
         });
 
         svg.innerHTML = `
             <defs>
                 <linearGradient id="ventasGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.35"/>
-                    <stop offset="100%" stop-color="#3b82f6" stop-opacity="0.0"/>
+                    <stop offset="0%" stop-color="#FFE600" stop-opacity="0.45"/>
+                    <stop offset="100%" stop-color="#FFE600" stop-opacity="0.0"/>
                 </linearGradient>
             </defs>
             ${gridLines}
             <path d="${areaVentas}" fill="url(#ventasGrad)"/>
-            ${comparar ? `<path d="${pathPrev}" fill="none" stroke="#a855f7" stroke-width="2.5" stroke-dasharray="4 4"/>` : ''}
-            <path d="${pathVentas}" fill="none" stroke="#3b82f6" stroke-width="3" stroke-linecap="round"/>
+            ${comparar ? `<path d="${pathPrev}" fill="none" stroke="#2D3277" stroke-width="2.5" stroke-dasharray="4 4"/>` : ''}
+            <path d="${pathVentas}" fill="none" stroke="#eab308" stroke-width="3" stroke-linecap="round"/>
             <path d="${pathGanancias}" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"/>
             ${xLabels}
             ${pointsHtml}
