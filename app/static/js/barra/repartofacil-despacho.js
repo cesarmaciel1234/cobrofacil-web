@@ -117,6 +117,22 @@
         return s.length > 7 ? s.slice(0, 7) : s;
     }
 
+    function obtenerPruebaDeVida(driverLastPing) {
+        if (!driverLastPing) {
+            return { estado: 'esperando', label: 'Conectando señal GPS...', color: '#64748b', bg: '#f1f5f9' };
+        }
+        const diffSec = Math.max(0, Math.floor((Date.now() - new Date(driverLastPing).getTime()) / 1000));
+        if (diffSec < 60) {
+            return { estado: 'activo', label: `🟢 Prueba de vida: En línea (GPS hace ${diffSec}s)`, color: '#065f46', bg: '#ecfdf5' };
+        } else if (diffSec < 300) {
+            const min = Math.floor(diffSec / 60);
+            return { estado: 'reciente', label: `🟡 Chofer en tránsito (Señal hace ${min}m)`, color: '#92400e', bg: '#fffbeb' };
+        } else {
+            const min = Math.floor(diffSec / 60);
+            return { estado: 'alerta', label: `🔴 Sin señal hace ${min}m (Alerta Custodio)`, color: '#991b1b', bg: '#fef2f2' };
+        }
+    }
+
     // Iniciar el módulo cuando se entra a la pantalla
     function iniciar() {
         const wrap = $('pedidosRepartoFacilWrap');
@@ -312,21 +328,34 @@
                 }
             }
 
-            // Indicador de ETA visual dentro del ticket
+            // Indicador de ETA visual y Prueba de Vida dentro del ticket
             let indicadorEtaHtml = '';
             if (repartidorAsignado && !esEntregado && !esRechazado) {
+                const pruebaDeVida = obtenerPruebaDeVida(p.driver_last_ping);
                 if (minutosRestantesChofer > 0) {
                     indicadorEtaHtml = `
-                        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; align-items:center; justify-content:space-between;">
-                            <span style="font-weight:700;">🛵 ${escaparTextoChat(repartidorAsignado)} en camino</span>
-                            <span style="font-weight:900; background:#d1fae5; padding:1px 6px; border-radius:6px;">Llega en ~${minutosRestantesChofer} min</span>
+                        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; flex-direction:column; gap:4px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between;">
+                                <span style="font-weight:700;">🛵 ${escaparTextoChat(repartidorAsignado)} en camino</span>
+                                <span style="font-weight:900; background:#d1fae5; padding:1px 6px; border-radius:6px;">Llega en ~${minutosRestantesChofer} min</span>
+                            </div>
+                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:700; border-top:1px dashed #a7f3d0; padding-top:3px; display:flex; justify-content:space-between;">
+                                <span>${pruebaDeVida.label}</span>
+                                <span style="opacity:0.8;">Custodio Blindado</span>
+                            </div>
                         </div>
                     `;
                 } else {
                     indicadorEtaHtml = `
-                        <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#92400e; display:flex; align-items:center; justify-content:space-between;">
-                            <span style="font-weight:800;">⏱️ Chofer esperando (+${minutosDemoraChofer}m)</span>
-                            <span style="font-weight:900; background:#fef3c7; color:#b45309; padding:1px 6px; border-radius:6px;">Demora: +$${recargoEsperaChofer} al chofer</span>
+                        <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#92400e; display:flex; flex-direction:column; gap:4px;">
+                            <div style="display:flex; align-items:center; justify-content:space-between;">
+                                <span style="font-weight:800;">⏱️ Chofer esperando (+${minutosDemoraChofer}m)</span>
+                                <span style="font-weight:900; background:#fef3c7; color:#b45309; padding:1px 6px; border-radius:6px;">Demora: +$${recargoEsperaChofer} al chofer</span>
+                            </div>
+                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:700; border-top:1px dashed #fde68a; padding-top:3px; display:flex; justify-content:space-between;">
+                                <span>${pruebaDeVida.label}</span>
+                                <span style="opacity:0.8;">Custodio Activo</span>
+                            </div>
                         </div>
                     `;
                 }
@@ -514,8 +543,8 @@
                                 </div>
                             ` : ''}
 
-                            <!-- LISTA DE PEDIDOS / CORTES ADENTRO DEL TICKET -->
-                            <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px;">
+                            <!-- LISTA DE PEDIDOS / CORTES ADENTRO DEL TICKET (CON SCROLL CONTROLADO PARA TICKETS LARGOS) -->
+                            <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px; max-height:170px; overflow-y:auto; padding-right:4px;">
                                 ${itemsArray.map(item => {
                                     const itemSinStock = itemsSinStock.find(s =>
                                         (s.name || s.nombre) === (item.name || item.nombre) ||
@@ -540,6 +569,11 @@
                                     `;
                                 }).join('')}
                             </div>
+                            ${itemsArray.length > 3 ? `
+                                <div style="font-size:9.5px; color:#94a3b8; text-align:center; padding-bottom:5px; font-weight:600;">
+                                    ↕ Deslizá para ver los ${itemsArray.length} cortes
+                                </div>
+                            ` : ''}
 
                             ${p.notas ? `
                                 <div style="font-size:11px; color:#b45309; background:#fffbeb; padding:5px 8px; border-radius:7px; border:1px solid #fde68a; margin-bottom:7px;">
@@ -861,8 +895,8 @@
                         </div>
                     </div>
 
-                    <!-- Lista de Cortes e Ítems -->
-                    <div id="rfTicketItems" style="border-top:1px solid #f1f5f9; border-bottom:1px solid #f1f5f9; padding:12px 0; margin-bottom:16px; display:flex; flex-direction:column; gap:8px;">
+                    <!-- Lista de Cortes e Ítems con Scroll Controlado si el Ticket es muy largo -->
+                    <div id="rfTicketItems" style="border-top:1px solid #f1f5f9; border-bottom:1px solid #f1f5f9; padding:12px 0; margin-bottom:16px; display:flex; flex-direction:column; gap:8px; max-height:240px; overflow-y:auto; padding-right:4px;">
                         <!-- Items inyectados -->
                     </div>
 
@@ -1064,9 +1098,13 @@
                     const esChofer = m.author_role === 'driver';
                     const emisor = esMio ? 'Comercio (Tú)' : (esChofer ? `Repartidor (${m.author_name || 'Repartidor'})` : `Comprador (${m.author_name || 'Cliente'})`);
 
+                    const checksHtml = m.is_read
+                        ? '<span style="color:#38bdf8; font-weight:800; font-size:10.5px; margin-left:3px;" title="Leído por destinatario ✓✓">✓✓</span>'
+                        : '<span style="color:#94a3b8; font-size:10.5px; margin-left:3px;" title="Enviado al chat ✓">✓</span>';
+
                     return `
                         <div style="align-self:${esMio ? 'flex-end' : 'flex-start'}; max-width:82%; display:flex; flex-direction:column; align-items:${esMio ? 'flex-end' : 'flex-start'};">
-                            <span style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:2px; padding:0 4px;">${escaparTextoChat(emisor)} · ${escaparTextoChat(m.timestamp_str || '')}</span>
+                            <span style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:2px; padding:0 4px;">${escaparTextoChat(emisor)} · ${escaparTextoChat(m.timestamp_str || '')} ${esMio ? checksHtml : ''}</span>
                             <div style="background:${esMio ? '#10b981' : (esChofer ? '#0f172a' : '#ffffff')}; color:${esMio || esChofer ? '#ffffff' : '#0f172a'}; padding:8px 12px; border-radius:14px; font-size:12.5px; border:1px solid ${esMio ? '#059669' : (esChofer ? '#1e293b' : '#cbd5e1')}; box-shadow:0 1px 3px rgba(0,0,0,0.05); word-break:break-word;">
                                 ${escaparTextoChat(m.content)}
                             </div>

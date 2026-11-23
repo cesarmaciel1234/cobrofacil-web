@@ -694,14 +694,34 @@ def get_repartofacil_chat(order_id):
         return error
     try:
         with get_db(empresa_id=0) as conn:
+            # Registrar lectura por parte del comercio
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO public.repartofacil_chat_lecturas (usuario_id, mensaje_id)
+                    SELECT %s, m.id FROM public.repartofacil_chat_mensajes m
+                    WHERE m.order_id = %s AND LOWER(COALESCE(m.author_role, '')) <> 'store'
+                    ON CONFLICT (usuario_id, mensaje_id) DO NOTHING
+                    """,
+                    (f"store-{empresa_id}", order_id)
+                )
+                if hasattr(conn, "commit"):
+                    conn.commit()
+            except Exception:
+                pass
+
             sql = """
-                SELECT m.id, m.order_id, m.author_role, m.author_name, m.content, m.timestamp_str, m.created_at
+                SELECT m.id, m.order_id, m.author_role, m.author_name, m.content, m.timestamp_str, m.created_at,
+                       EXISTS (
+                           SELECT 1 FROM public.repartofacil_chat_lecturas l
+                           WHERE l.mensaje_id = m.id AND l.usuario_id <> %s
+                       ) AS is_read
                 FROM public.repartofacil_pedidos p
                 LEFT JOIN public.repartofacil_chat_mensajes m ON m.order_id = p.id
                 WHERE p.id = %s AND p.empresa_id = %s
                 ORDER BY m.created_at ASC, m.id ASC
             """
-            rows = conn.execute(sql, (order_id, empresa_id)).fetchall()
+            rows = conn.execute(sql, (f"store-{empresa_id}", order_id, empresa_id)).fetchall()
             if not rows:
                 return jsonify({"success": False, "error": "Conversación no disponible."}), 404
             mensajes = [dict(r) for r in rows if r["id"] is not None]
