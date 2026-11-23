@@ -170,8 +170,8 @@
         if (!silencioso && pedidosLista.length === 0) {
             contenedor.innerHTML = `
                 <div style="text-align:center; padding:32px 16px; color:#64748b;">
-                    <div class="loader-ring" style="margin:0 auto 12px; width:28px; height:28px; border:3px solid #cbd5e1; border-top-color:#10b981; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
-                    <div style="font-weight:700; font-size:13px;">Conectando con Reparto Fácil Cloud…</div>
+                    <div class="loader-ring" style="margin:0 auto 12px; width:28px; height:28px; border:3px solid #fef08a; border-top-color:#FFE600; border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+                    <div style="font-weight:900; font-size:13px; color:#2D3277;">Conectando con Reparto Fácil Cloud…</div>
                 </div>
             `;
         }
@@ -279,21 +279,21 @@
 
             let badgeEstadoHtml = '';
             if (esCanceladoCliente) {
-                badgeEstadoHtml = `<span style="background:#dc2626; color:#ffffff; border:1px solid #b91c1c; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">✕ CANCELADO POR CLIENTE</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✕ CANCELADO</span>`;
             } else if (esRechazadoComercio) {
-                badgeEstadoHtml = `<span style="background:#dc2626; color:#ffffff; border:1px solid #b91c1c; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">✕ RECHAZADO</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✕ RECHAZADO</span>`;
             } else if (esTimeout) {
-                badgeEstadoHtml = `<span style="background:#dc2626; color:#ffffff; border:1px solid #b91c1c; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">⏰ CANCELADO (1H)</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">⏰ CANCELADO (1H)</span>`;
             } else if (esEntregado) {
-                badgeEstadoHtml = `<span style="background:#2563eb; color:#ffffff; border:1px solid #1d4ed8; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:7px; white-space:nowrap;">✓ ENTREGADO</span>`;
+                badgeEstadoHtml = `<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✓ ENTREGADO</span>`;
             } else if (esEmbalado) {
-                badgeEstadoHtml = `<span style="background:#dcfce7; color:#166534; border:1px solid #bbf7d0; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">📦 EMBALADO</span>`;
+                badgeEstadoHtml = `<span style="background:#fef9c3; color:#713f12; border:1px solid #facc15; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">📦 EMBALADO</span>`;
             } else if (repartidorAsignado) {
-                badgeEstadoHtml = `<span style="background:#d1fae5; color:#065f46; border:1px solid #6ee7b7; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">🛵 EN CAMINO</span>`;
+                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 1px 4px rgba(234,179,8,0.25);">🛵 EN CAMINO</span>`;
             } else if (esConfirmado) {
-                badgeEstadoHtml = `<span style="background:#fef3c7; color:#b45309; border:1px solid #fde68a; font-size:9.5px; font-weight:800; padding:2.5px 6px; border-radius:7px; white-space:nowrap;">⏳ BUSCANDO CHOFER</span>`;
+                badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">⏳ BUSCANDO CHOFER</span>`;
             } else {
-                badgeEstadoHtml = `<span style="background:#ffedd5; color:#c2410c; border:1px solid #fed7aa; font-size:9.5px; font-weight:900; padding:2.5px 6px; border-radius:7px; white-space:nowrap; animation:pulse 2s infinite;">🔔 NUEVO</span>`;
+                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 0 10px rgba(255,230,0,0.6); animation:pulse 2s infinite;">🔔 NUEVO</span>`;
             }
 
             const itemsArray = Array.isArray(p.items) ? p.items : [];
@@ -328,18 +328,18 @@
                 }
             }
 
-            // Indicador de ETA visual y Prueba de Vida dentro del ticket
+            // Indicador de ETA visual y Prueba de Vida dentro del ticket (Estilo Blanco y Amarillo)
             let indicadorEtaHtml = '';
             if (repartidorAsignado && !esEntregado && !esRechazado) {
                 const pruebaDeVida = obtenerPruebaDeVida(p.driver_last_ping);
                 if (minutosRestantesChofer > 0) {
                     indicadorEtaHtml = `
-                        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; flex-direction:column; gap:4px;">
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#2D3277; display:flex; flex-direction:column; gap:4px; box-shadow:0 1px 3px rgba(234,179,8,0.08);">
                             <div style="display:flex; align-items:center; justify-content:space-between;">
-                                <span style="font-weight:700;">🛵 ${escaparTextoChat(repartidorAsignado)} en camino</span>
-                                <span style="font-weight:900; background:#d1fae5; padding:1px 6px; border-radius:6px;">Llega en ~${minutosRestantesChofer} min</span>
+                                <span style="font-weight:900;">🛵 ${escaparTextoChat(repartidorAsignado)} en camino</span>
+                                <span style="font-weight:900; background:#FFE600; color:#2D3277; padding:1.5px 7px; border-radius:6px; border:1px solid #eab308;">Llega en ~${minutosRestantesChofer} min</span>
                             </div>
-                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:700; border-top:1px dashed #a7f3d0; padding-top:3px; display:flex; justify-content:space-between;">
+                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:800; border-top:1px dashed #fde047; padding-top:3px; display:flex; justify-content:space-between;">
                                 <span>${pruebaDeVida.label}</span>
                                 <span style="opacity:0.8;">Custodio Blindado</span>
                             </div>
@@ -347,12 +347,12 @@
                     `;
                 } else {
                     indicadorEtaHtml = `
-                        <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#92400e; display:flex; flex-direction:column; gap:4px;">
+                        <div style="background:#fffbeb; border:1.5px solid #facc15; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#92400e; display:flex; flex-direction:column; gap:4px; box-shadow:0 1px 3px rgba(234,179,8,0.08);">
                             <div style="display:flex; align-items:center; justify-content:space-between;">
-                                <span style="font-weight:800;">⏱️ Chofer esperando (+${minutosDemoraChofer}m)</span>
-                                <span style="font-weight:900; background:#fef3c7; color:#b45309; padding:1px 6px; border-radius:6px;">Demora: +$${recargoEsperaChofer} al chofer</span>
+                                <span style="font-weight:900;">⏱️ Chofer esperando (+${minutosDemoraChofer}m)</span>
+                                <span style="font-weight:900; background:#fef3c7; color:#b45309; padding:1.5px 7px; border-radius:6px; border:1px solid #fde68a;">Demora: +$${recargoEsperaChofer} al chofer</span>
                             </div>
-                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:700; border-top:1px dashed #fde68a; padding-top:3px; display:flex; justify-content:space-between;">
+                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:800; border-top:1px dashed #fde68a; padding-top:3px; display:flex; justify-content:space-between;">
                                 <span>${pruebaDeVida.label}</span>
                                 <span style="opacity:0.8;">Custodio Activo</span>
                             </div>
@@ -361,52 +361,60 @@
                 }
             } else if (esNuevoPendiente || esConfirmado) {
                 indicadorEtaHtml = `
-                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:5px 8px; margin-bottom:8px; font-size:10.5px; color:#1e40af; display:flex; align-items:center; justify-content:space-between;">
-                        <span style="font-weight:700;">⏱️ Tiempo estimado chofer al local:</span>
-                        <span style="font-weight:900;">~${etaBaseMinutos} min (~${distanciaKm.toFixed(1)} km)</span>
+                    <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:10px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#2D3277; display:flex; align-items:center; justify-content:space-between;">
+                        <span style="font-weight:800;">⏱️ Tiempo estimado chofer al local:</span>
+                        <span style="font-weight:900; background:#FFE600; color:#2D3277; padding:1px 6px; border-radius:6px; border:1px solid #eab308;">~${etaBaseMinutos} min (~${distanciaKm.toFixed(1)} km)</span>
                     </div>
                 `;
             }
 
-            // Estado dinámico del botón de Embalar
+            // Estado dinámico del botón de Embalar (Blanco con Amarillo y Navy)
             let textoBotonEmbalar = 'Embalar';
             let iconoBotonEmbalar = '📦';
-            let bgBotonEmbalar = puedeEmbalar ? '#047857' : '#94a3b8';
+            let bgBotonEmbalar = puedeEmbalar ? '#FFE600' : '#f1f5f9';
+            let colorBotonEmbalar = puedeEmbalar ? '#2D3277' : '#94a3b8';
+            let borderBotonEmbalar = puedeEmbalar ? '1.5px solid #eab308' : '1px solid #cbd5e1';
 
             if (esEmbalado) {
                 textoBotonEmbalar = 'Embalado';
                 iconoBotonEmbalar = '✓';
-                bgBotonEmbalar = '#10b981';
+                bgBotonEmbalar = '#fef08a';
+                colorBotonEmbalar = '#713f12';
+                borderBotonEmbalar = '1.5px solid #facc15';
             } else if (repartidorAsignado) {
                 if (minutosRestantesChofer > 0) {
                     textoBotonEmbalar = `Embalar (~${minutosRestantesChofer}m)`;
                     iconoBotonEmbalar = '📦';
-                    bgBotonEmbalar = '#047857';
+                    bgBotonEmbalar = '#FFE600';
+                    colorBotonEmbalar = '#2D3277';
+                    borderBotonEmbalar = '1.5px solid #eab308';
                 } else {
                     textoBotonEmbalar = `Embalar (+⏱️$${recargoEsperaChofer})`;
                     iconoBotonEmbalar = '⚠️';
-                    bgBotonEmbalar = '#b45309';
+                    bgBotonEmbalar = '#f59e0b';
+                    colorBotonEmbalar = '#ffffff';
+                    borderBotonEmbalar = '1.5px solid #d97706';
                 }
             }
 
-            // Tema cromático por estado:
+            // Tema cromático Reparto Fácil Oficial: Blanco con Amarillo (#FFE600) y Navy (#2D3277)
             let cardBg = '#ffffff';
-            let cardBorder = '#4ade80';
-            let avatarBg = '#ecfdf5';
-            let avatarBorder = '#6ee7b7';
-            let avatarColor = '#065f46';
+            let cardBorder = '#fde047';
+            let avatarBg = '#FFE600';
+            let avatarBorder = '#eab308';
+            let avatarColor = '#2D3277';
             let dotColor = '#10b981';
-            let pillBg = '#ecfdf5';
-            let pillColor = '#047857';
-            let pillBorder = '#a7f3d0';
-            let checkIcon = '<span style="color:#10b981; font-weight:800;">✓✓</span>';
-            let totalColor = '#0f172a';
+            let pillBg = '#fefce8';
+            let pillColor = '#854d0e';
+            let pillBorder = '#fde047';
+            let checkIcon = '<span style="color:#eab308; font-weight:800;">✓✓</span>';
+            let totalColor = '#2D3277';
 
             if (esRechazado) {
-                cardBg = '#fef2f2';
-                cardBorder = '#f87171';
+                cardBg = '#fffafa';
+                cardBorder = '#fca5a5';
                 avatarBg = '#fee2e2';
-                avatarBorder = '#fca5a5';
+                avatarBorder = '#f87171';
                 avatarColor = '#b91c1c';
                 dotColor = '#dc2626';
                 pillBg = '#fee2e2';
@@ -415,27 +423,49 @@
                 checkIcon = '<span style="color:#dc2626; font-weight:900;">✕</span>';
                 totalColor = '#b91c1c';
             } else if (esEntregado) {
-                cardBg = '#f0f7ff';
-                cardBorder = '#93c5fd';
-                avatarBg = '#dbeafe';
-                avatarBorder = '#60a5fa';
-                avatarColor = '#1e40af';
-                dotColor = '#2563eb';
-                pillBg = '#dbeafe';
-                pillColor = '#1d4ed8';
-                pillBorder = '#93c5fd';
-                checkIcon = '<span style="color:#2563eb; font-weight:800;">✓✓</span>';
-                totalColor = '#1e3a8a';
+                cardBg = '#ffffff';
+                cardBorder = '#e2e8f0';
+                avatarBg = '#f1f5f9';
+                avatarBorder = '#cbd5e1';
+                avatarColor = '#475569';
+                dotColor = '#64748b';
+                pillBg = '#f8fafc';
+                pillColor = '#475569';
+                pillBorder = '#e2e8f0';
+                checkIcon = '<span style="color:#64748b; font-weight:800;">✓✓</span>';
+                totalColor = '#334155';
+            } else if (repartidorAsignado) {
+                cardBg = '#ffffff';
+                cardBorder = '#FFE600';
+                avatarBg = '#FFE600';
+                avatarBorder = '#eab308';
+                avatarColor = '#2D3277';
+                dotColor = '#10b981';
+                pillBg = '#fefce8';
+                pillColor = '#854d0e';
+                pillBorder = '#fde047';
+                checkIcon = '<span style="color:#10b981; font-weight:800;">✓✓</span>';
+                totalColor = '#2D3277';
+            } else if (esEmbalado) {
+                cardBg = '#ffffff';
+                cardBorder = '#facc15';
+                avatarBg = '#fef08a';
+                avatarBorder = '#eab308';
+                avatarColor = '#2D3277';
+                dotColor = '#eab308';
+                pillBg = '#fefce8';
+                pillColor = '#854d0e';
+                pillBorder = '#fde047';
             } else if (esNuevoPendiente || esConfirmado) {
-                cardBg = esNuevoPendiente ? '#fffbeb' : '#ffffff';
-                cardBorder = alertaStock ? '#f87171' : '#fb923c';
-                avatarBg = alertaStock ? '#fee2e2' : '#ffedd5';
-                avatarBorder = alertaStock ? '#fca5a5' : '#fdba74';
-                avatarColor = alertaStock ? '#b91c1c' : '#9a3412';
-                dotColor = alertaStock ? '#dc2626' : '#f97316';
-                pillBg = alertaStock ? '#fee2e2' : '#ffedd5';
-                pillColor = alertaStock ? '#b91c1c' : '#c2410c';
-                pillBorder = alertaStock ? '#fca5a5' : '#fed7aa';
+                cardBg = esNuevoPendiente ? '#fffef5' : '#ffffff';
+                cardBorder = alertaStock ? '#f87171' : '#FFE600';
+                avatarBg = alertaStock ? '#fee2e2' : '#FFE600';
+                avatarBorder = alertaStock ? '#fca5a5' : '#eab308';
+                avatarColor = alertaStock ? '#b91c1c' : '#2D3277';
+                dotColor = alertaStock ? '#dc2626' : '#FFE600';
+                pillBg = alertaStock ? '#fee2e2' : '#fefce8';
+                pillColor = alertaStock ? '#b91c1c' : '#854d0e';
+                pillBorder = alertaStock ? '#fca5a5' : '#fde047';
             }
 
             const resumenLinea = esRechazado
@@ -447,22 +477,22 @@
                         : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${cantItems} ítems` : `${cantItems} ítems · Pago Web`)));
 
             html += `
-                <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" style="background:${cardBg}; border-radius:16px; border:1.5px solid ${cardBorder}; box-shadow:0 2px 8px rgba(15,23,42,0.04); padding:10px 12px; position:relative; transition:all 0.18s ease;">
+                <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" style="background:${cardBg}; border-radius:18px; border:2px solid ${cardBorder}; box-shadow:0 3px 12px rgba(234,179,8,0.1), 0 1px 3px rgba(15,23,42,0.04); padding:12px 14px; position:relative; transition:all 0.18s ease;">
                     
-                    <!-- FILA COMPACTA (ESTILO MENSAJERÍA: AL CLICK SE ABRE PARA VER MÁS DETALLES) -->
+                    <!-- FILA COMPACTA (ESTILO MENSAJERÍA BLANCO Y AMARILLO) -->
                     <div onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
-                        <!-- Avatar Circular con Iniciales y Punto de Estado -->
-                        <div style="position:relative; width:40px; height:40px; border-radius:999px; background:${avatarBg}; border:1.5px solid ${avatarBorder}; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:13px; color:${avatarColor}; flex-shrink:0;">
+                        <!-- Avatar Circular Amarillo con Iniciales y Punto de Estado -->
+                        <div style="position:relative; width:42px; height:42px; border-radius:999px; background:${avatarBg}; border:2px solid ${avatarBorder}; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; color:${avatarColor}; flex-shrink:0; box-shadow:0 2px 5px rgba(234,179,8,0.25);">
                             <span>${escaparTextoChat(iniciales)}</span>
-                            <span style="position:absolute; bottom:-1px; right:-1px; width:11px; height:11px; border-radius:999px; background:${dotColor}; border:2px solid #fff;"></span>
+                            <span style="position:absolute; bottom:-1px; right:-1px; width:12px; height:12px; border-radius:999px; background:${dotColor}; border:2px solid #fff;"></span>
                         </div>
 
                         <!-- Centro: Cliente + #RF + Dirección + Resumen -->
                         <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
                                 <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1; overflow:hidden;">
-                                    <span style="font-weight:800; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#0f172a'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${escaparTextoChat(p.cliente_nombre || 'Cliente')}</span>
-                                    <span title="#${escaparTextoChat(p.id)}" style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px; white-space:nowrap; max-width:85px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:middle; flex-shrink:0;">#${escaparTextoChat(formatearIdCorto(p.id))}</span>
+                                    <span style="font-weight:900; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#2D3277'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${escaparTextoChat(p.cliente_nombre || 'Cliente')}</span>
+                                    <span title="#${escaparTextoChat(p.id)}" style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10px; font-weight:900; padding:1.5px 6px; border-radius:999px; white-space:nowrap; max-width:85px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:middle; flex-shrink:0;">#${escaparTextoChat(formatearIdCorto(p.id))}</span>
                                     ${badgeEstadoHtml}
                                 </div>
                                 <span style="color:#64748b; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;">${formatFecha(p.created_at)}</span>
@@ -472,7 +502,7 @@
                                 <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')}
                                 </div>
-                                <div style="font-size:13px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
+                                <div style="font-size:13.5px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
                                     ${formatMoney(p.total)}
                                 </div>
                             </div>
@@ -483,37 +513,37 @@
                         </div>
 
                         <!-- Flecha indicadora de desplegable -->
-                        <div id="chevron-pedido-${escaparTextoChat(p.id)}" style="color:#94a3b8; font-size:16px; font-weight:800; flex-shrink:0; transition:transform 0.2s ease; transform:${abierto ? 'rotate(90deg)' : 'rotate(0deg)'};">
+                        <div id="chevron-pedido-${escaparTextoChat(p.id)}" style="color:#2D3277; font-size:18px; font-weight:900; flex-shrink:0; transition:transform 0.2s ease; transform:${abierto ? 'rotate(90deg)' : 'rotate(0deg)'};">
                             ›
                         </div>
                     </div>
 
                     <!-- PANEL EXPANDIBLE AL CLICK: DETALLES, TICKET Y ACCIONES -->
-                    <div id="detalle-pedido-${escaparTextoChat(p.id)}" style="display:${abierto ? 'block' : 'none'}; margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
+                    <div id="detalle-pedido-${escaparTextoChat(p.id)}" style="display:${abierto ? 'block' : 'none'}; margin-top:12px; padding-top:12px; border-top:1px solid #fef08a;">
                         
-                        <!-- TICKET / COMANDA DIGITAL INTEGRADA (PEDIDOS ADENTRO DEL TICKET) -->
-                        <div style="background:#f8fafc; border:1.5px dashed #cbd5e1; border-radius:14px; padding:10px 12px; margin-bottom:10px; position:relative;">
+                        <!-- TICKET / COMANDA DIGITAL INTEGRADA (PEDIDOS ADENTRO DEL TICKET ESTILO BLANCO Y AMARILLO) -->
+                        <div style="background:#ffffff; border:2px dashed #facc15; border-radius:16px; padding:12px 14px; margin-bottom:10px; position:relative; box-shadow:0 2px 8px rgba(234,179,8,0.06);">
                             <!-- Encabezado del Ticket -->
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:7px; margin-bottom:7px; border-bottom:1px dashed #cbd5e1;">
+                            <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:8px; margin-bottom:8px; border-bottom:1px dashed #fde047;">
                                 <div style="display:flex; align-items:center; gap:6px;">
-                                    <span style="font-size:14px;">🧾</span>
+                                    <span style="font-size:15px;">🧾</span>
                                     <div>
-                                        <div style="font-size:11.5px; font-weight:900; color:#0f172a; text-transform:uppercase; letter-spacing:0.3px;">
+                                        <div style="font-size:12px; font-weight:900; color:#2D3277; text-transform:uppercase; letter-spacing:0.3px;">
                                             ${p.ticket_id ? `Ticket #${escaparTextoChat(p.ticket_id)}` : `Comanda #${escaparTextoChat(formatearIdCorto(p.id))}`}
                                         </div>
-                                        <div style="font-size:10px; color:#64748b; font-weight:600;">
+                                        <div style="font-size:10px; color:#64748b; font-weight:700;">
                                             ${escaparTextoChat(p.sucursal_origen || 'Sucursal Maciel')} · ${formatFecha(p.created_at)}
                                         </div>
                                     </div>
                                 </div>
                                 <div style="display:flex; align-items:center; gap:5px;">
                                     ${p.ticket_id ? `
-                                        <button type="button" onclick="window.RepartoFacilDespacho.verTicket(${argumentoPedido(p.ticket_id)})" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; font-size:10px; font-weight:800; padding:3px 7px; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
+                                        <button type="button" onclick="window.RepartoFacilDespacho.verTicket(${argumentoPedido(p.ticket_id)})" style="background:#fef9c3; color:#2D3277; border:1px solid #fde047; border-radius:8px; font-size:10.5px; font-weight:900; padding:3px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
                                             Ver / Imprimir ↗
                                         </button>
                                     ` : ''}
                                     ${puedeReasignar ? `
-                                        <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio(${argumentoPedido(p.id)})" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:7px; font-size:10px; font-weight:800; padding:3px 6px; cursor:pointer;">
+                                        <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio(${argumentoPedido(p.id)})" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:8px; font-size:10px; font-weight:800; padding:3px 6px; cursor:pointer;">
                                             ⚠️ Reasignar
                                         </button>
                                     ` : ''}
@@ -522,20 +552,20 @@
 
                             <!-- Teléfono y WhatsApp dentro del Ticket -->
                             ${p.cliente_telefono ? `
-                                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:4px 8px; margin-bottom:7px; font-size:11px;">
-                                    <span style="color:#64748b; font-weight:600;">📞 ${escaparTextoChat(p.cliente_telefono)}</span>
-                                    <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="color:#10b981; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:2px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between; background:#fffef5; border:1px solid #fde047; border-radius:9px; padding:5px 9px; margin-bottom:7px; font-size:11px;">
+                                    <span style="color:#2D3277; font-weight:700;">📞 ${escaparTextoChat(p.cliente_telefono)}</span>
+                                    <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="color:#15803d; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:#f0fdf4; border:1px solid #bbf7d0; padding:2px 8px; border-radius:6px;">
                                         <span>WhatsApp</span> ↗
                                     </a>
                                 </div>
                             ` : ''}
 
                             <!-- Domicilio exacto y enlace GPS -->
-                            <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:4px 8px; margin-bottom:7px; font-size:11px;">
-                                <span style="color:#334155; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px;" title="${escaparTextoChat(p.direccion_entrega || '')}">
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:#fffef5; border:1px solid #fde047; border-radius:9px; padding:5px 9px; margin-bottom:7px; font-size:11px;">
+                                <span style="color:#2D3277; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px;" title="${escaparTextoChat(p.direccion_entrega || '')}">
                                     📍 ${escaparTextoChat(p.direccion_entrega || 'Domicilio')}
                                 </span>
-                                <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer" style="color:#2563eb; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:2px; flex-shrink:0;">
+                                <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer" style="color:#2D3277; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:2px; flex-shrink:0; background:#FFE600; padding:2px 8px; border-radius:6px; border:1px solid #eab308;">
                                     <span>GPS</span> ↗
                                 </a>
                             </div>
@@ -560,19 +590,19 @@
                                         (s.name || s.nombre) === (item.name || item.nombre) ||
                                         s.id === item.id
                                     );
-                                    const styleSinStock = itemSinStock ? 'color:#b91c1c; text-decoration:line-through; opacity:0.6;' : 'color:#0f172a;';
+                                    const styleSinStock = itemSinStock ? 'color:#b91c1c; text-decoration:line-through; opacity:0.6;' : 'color:#2D3277;';
                                     const cant = Number(item.quantity || item.cantidad || 1);
                                     const precio = Number(item.price || item.precio || 0);
                                     const subtotal = precio * cant;
                                     return `
-                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; border-bottom:1px solid #f1f5f9;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; border-bottom:1px solid #fef9c3;">
                                         <div style="min-width:0; flex:1; padding-right:8px;">
                                             <div style="font-weight:700; ${styleSinStock} overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
                                                 • ${cant} ${escaparTextoChat(item.unit || item.unidad || 'KG')} de ${escaparTextoChat(item.name || item.nombre || 'Artículo')}
                                                 ${itemSinStock ? `<span style="color:#b91c1c; font-size:10px; margin-left:4px;">(falta stock)</span>` : ''}
                                             </div>
                                         </div>
-                                        <div style="font-weight:800; font-family:monospace; color:#0f172a; flex-shrink:0;">
+                                        <div style="font-weight:900; font-family:monospace; color:#2D3277; flex-shrink:0;">
                                             ${formatMoney(subtotal)}
                                         </div>
                                     </div>
@@ -580,41 +610,41 @@
                                 }).join('')}
                             </div>
                             ${itemsArray.length > 3 ? `
-                                <div style="font-size:9.5px; color:#94a3b8; text-align:center; padding-bottom:5px; font-weight:600;">
+                                <div style="font-size:9.5px; color:#854d0e; text-align:center; padding-bottom:5px; font-weight:700;">
                                     ↕ Deslizá para ver los ${itemsArray.length} cortes
                                 </div>
                             ` : ''}
 
                             ${p.notas ? `
-                                <div style="font-size:11px; color:#b45309; background:#fffbeb; padding:5px 8px; border-radius:7px; border:1px solid #fde68a; margin-bottom:7px;">
+                                <div style="font-size:11px; color:#854d0e; background:#fefce8; padding:6px 9px; border-radius:8px; border:1px solid #fde047; margin-bottom:7px;">
                                     <b>Nota del cliente:</b> "${escaparTextoChat(p.notas)}"
                                 </div>
                             ` : ''}
 
                             <!-- Pie del Ticket: Total y Método de Pago -->
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; border-top:1px dashed #cbd5e1; font-size:12.5px;">
-                                <span style="font-weight:800; color:#475569;">TOTAL TICKET:</span>
-                                <span style="font-weight:900; color:#0f172a; font-family:monospace; font-size:13.5px;">${formatMoney(p.total)}</span>
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px dashed #fde047; font-size:12.5px;">
+                                <span style="font-weight:800; color:#64748b;">TOTAL TICKET:</span>
+                                <span style="font-weight:900; color:#2D3277; font-family:monospace; font-size:14.5px;">${formatMoney(p.total)}</span>
                             </div>
                         </div>
 
                         ${esNuevoPendiente ? `
                             <!-- DECISIÓN DE COBRO FÁCIL: ACEPTAR O RECHAZAR -->
-                            <div style="background:#fff7ed; border:1.5px solid #fed7aa; border-radius:12px; padding:10px; margin-bottom:8px;">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
-                                    <span style="font-size:10.5px; font-weight:800; color:#9a3412; text-transform:uppercase;">¿Aceptar pedido para despacho?</span>
-                                    <span style="background:#ffedd5; color:#c2410c; border:1px solid #fed7aa; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">
+                            <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:12px; margin-bottom:8px; box-shadow:0 2px 6px rgba(234,179,8,0.08);">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                    <span style="font-size:11px; font-weight:900; color:#2D3277; text-transform:uppercase;">¿Aceptar pedido para despacho?</span>
+                                    <span style="background:#fef9c3; color:#2D3277; border:1px solid #fde047; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">
                                         ⏱️ Chofer a sucursal: ~${etaBaseMinutos}m
                                     </span>
                                 </div>
-                                <div style="font-size:10.5px; color:#78350f; line-height:1.4; margin-bottom:8px;">
+                                <div style="font-size:10.5px; color:#64748b; line-height:1.4; margin-bottom:10px;">
                                     💬 <i>Podés usar el <b>Chat con el cliente</b> para pulir el pedido antes de aceptar o embalar si necesitás unos minutos extra sin apurar al cliente.</i>
                                 </div>
                                 <div style="display:flex; gap:8px;">
-                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})" style="flex:1; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:11px; font-weight:800; padding:8px 6px !important; cursor:pointer;">
+                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})" style="flex:1; background:#ffffff; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:11px; font-weight:800; padding:8px 6px !important; cursor:pointer;">
                                         ✕ Rechazar
                                     </button>
-                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})" style="flex:1.5; background:#10b981; color:#ffffff; border:none; border-radius:10px; font-size:11.5px; font-weight:900; padding:8px 8px !important; cursor:pointer; box-shadow:0 3px 8px rgba(16,185,129,0.35);">
+                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})" style="flex:1.5; background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:12px; font-weight:900; padding:8px 8px !important; cursor:pointer; box-shadow:0 3px 10px rgba(255,230,0,0.35);">
                                         ✓ Aceptar y Publicar
                                     </button>
                                 </div>
@@ -623,17 +653,17 @@
 
                         <!-- BOTONES DE ACCIÓN: CERRAR DETALLE, CHAT Y EMBALADO CON IMPACTO DE TIEMPO -->
                         <div style="display:flex; gap:6px; width:100%; box-sizing:border-box;">
-                            <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="flex:1; min-width:0; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
+                            <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="flex:1; min-width:0; background:#ffffff; color:#475569; border:1.5px solid #e2e8f0; border-radius:12px; font-size:11px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap; transition:all 0.15s ease;">
                                 <span>📋</span>
                                 <span>Ocultar</span>
                             </button>
 
-                            <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" style="flex:1; min-width:0; background:#e0f2fe; color:#0369a1; border:1px solid #7dd3fc; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
+                            <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" style="flex:1; min-width:0; background:#fefce8; color:#2D3277; border:1.5px solid #fde047; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap; transition:all 0.15s ease;">
                                 <span>💬</span>
                                 <span>Chat</span>
                             </button>
 
-                            <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, ${recargoEsperaChofer}, ${minutosDemoraChofer})" ${puedeEmbalar ? '' : 'disabled'} style="flex:1.4; min-width:0; background:${bgBotonEmbalar}; color:#ffffff; border:none; border-radius:10px; font-size:10.5px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.15); white-space:nowrap;">
+                            <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, ${recargoEsperaChofer}, ${minutosDemoraChofer})" ${puedeEmbalar ? '' : 'disabled'} style="flex:1.4; min-width:0; background:${bgBotonEmbalar}; color:${colorBotonEmbalar}; border:${borderBotonEmbalar}; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(234,179,8,0.25); white-space:nowrap; transition:all 0.15s ease;">
                                 <span>${iconoBotonEmbalar}</span>
                                 <span>${textoBotonEmbalar}</span>
                             </button>
@@ -882,9 +912,9 @@
             modal.innerHTML = `
                 <div class="rf-ticket-container" style="background:#fff; width:100%; max-width:400px; border-radius:24px 24px 0 0; sm:border-radius:24px; box-shadow:0 -10px 40px rgba(0,0,0,0.3); padding:20px 24px; max-height:90vh; overflow-y:auto; border:1px solid #e2e8f0; font-family:'Inter', sans-serif;">
                     
-                    <div style="width:36px; height:4px; background:#cbd5e1; border-radius:999px; margin:0 auto 16px;"></div>
+                    <div style="width:36px; height:4px; background:#fde047; border-radius:999px; margin:0 auto 16px;"></div>
 
-                    <h2 id="rfTicketNumero" style="margin:0 0 16px; font-size:22px; font-weight:800; color:#0f172a;">Ticket #------</h2>
+                    <h2 id="rfTicketNumero" style="margin:0 0 16px; font-size:22px; font-weight:900; color:#2D3277;">Ticket #------</h2>
 
                     <div style="display:flex; flex-direction:column; gap:10px; font-size:14px; margin-bottom:16px;">
                         <div style="display:flex; justify-content:space-between; color:#64748b;">
@@ -906,17 +936,17 @@
                     </div>
 
                     <!-- Lista de Cortes e Ítems con Scroll Controlado si el Ticket es muy largo -->
-                    <div id="rfTicketItems" style="border-top:1px solid #f1f5f9; border-bottom:1px solid #f1f5f9; padding:12px 0; margin-bottom:16px; display:flex; flex-direction:column; gap:8px; max-height:240px; overflow-y:auto; padding-right:4px;">
+                    <div id="rfTicketItems" style="border-top:1px solid #fef9c3; border-bottom:1px solid #fef9c3; padding:12px 0; margin-bottom:16px; display:flex; flex-direction:column; gap:8px; max-height:240px; overflow-y:auto; padding-right:4px;">
                         <!-- Items inyectados -->
                     </div>
 
                     <!-- Total -->
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; font-size:16px;">
-                        <span style="color:#64748b; font-weight:600;">Total</span>
-                        <b id="rfTicketTotal" style="font-size:18px; font-weight:900; color:#0f172a;">$0,00</b>
+                        <span style="color:#64748b; font-weight:700;">Total</span>
+                        <b id="rfTicketTotal" style="font-size:20px; font-weight:900; color:#2D3277; font-family:monospace;">$0,00</b>
                     </div>
 
-                    <button type="button" onclick="window.RepartoFacilDespacho.cerrarTicketModal()" style="width:100%; background:#0f172a; color:#fff; border:none; border-radius:14px; padding:12px; font-size:14px; font-weight:800; cursor:pointer;">
+                    <button type="button" onclick="window.RepartoFacilDespacho.cerrarTicketModal()" style="width:100%; background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:14px; padding:12px; font-size:14px; font-weight:900; cursor:pointer; box-shadow:0 3px 10px rgba(255,230,0,0.35);">
                         Cerrar
                     </button>
 
@@ -981,38 +1011,38 @@
                 backdrop-filter:blur(4px);
             `;
             modal.innerHTML = `
-                <div style="background:#fff; width:100%; max-width:440px; border-radius:24px; box-shadow:0 25px 50px -12px rgba(0,0,0,0.5); display:flex; flex-direction:column; max-height:85vh; overflow:hidden; border:1px solid #e2e8f0;">
+                <div style="background:#fff; width:100%; max-width:440px; border-radius:24px; box-shadow:0 25px 50px -12px rgba(45,50,119,0.35); display:flex; flex-direction:column; max-height:85vh; overflow:hidden; border:2px solid #FFE600;">
                     
-                    <!-- Header Chat con Ticket Digital Integrado -->
-                    <div style="background:#0f172a; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center;">
+                    <!-- Header Chat con Ticket Digital Integrado (Estilo Reparto Fácil Blanco y Amarillo con Navy) -->
+                    <div style="background:#2D3277; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #FFE600;">
                         <div style="display:flex; align-items:center; gap:10px;">
-                            <div style="width:36px; height:36px; border-radius:12px; background:#10b981; color:#fff; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px;">
+                            <div style="width:36px; height:36px; border-radius:12px; background:#FFE600; color:#2D3277; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:15px; border:1.5px solid #eab308; box-shadow:0 2px 4px rgba(0,0,0,0.15);">
                                 💬
                             </div>
                             <div>
-                                <h4 id="rfChatTitle" style="margin:0; font-size:13px; font-weight:800; color:#fff;">Canal de Pedido</h4>
+                                <h4 id="rfChatTitle" style="margin:0; font-size:13.5px; font-weight:900; color:#fff;">Canal de Pedido</h4>
                                 <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
-                                    <small id="rfChatSub" style="color:#94a3b8; font-size:10px; font-weight:600;">Lazo Comercial Permanente</small>
-                                    <button type="button" id="rfChatTicketBtn" style="display:none; background:#2563eb; color:#fff; border:none; border-radius:6px; font-size:9.5px; font-weight:800; padding:1px 6px; cursor:pointer;">
+                                    <small id="rfChatSub" style="color:#fde047; font-size:10.5px; font-weight:700;">Lazo Comercial Permanente</small>
+                                    <button type="button" id="rfChatTicketBtn" style="display:none; background:#FFE600; color:#2D3277; border:1px solid #eab308; border-radius:6px; font-size:10px; font-weight:900; padding:1.5px 7px; cursor:pointer;">
                                         🧾 Ticket
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <button type="button" onclick="window.RepartoFacilDespacho.cerrarChatModal()" style="background:transparent; border:none; color:#cbd5e1; font-size:22px; cursor:pointer; line-height:1;">
+                        <button type="button" onclick="window.RepartoFacilDespacho.cerrarChatModal()" style="background:transparent; border:none; color:#fde047; font-size:22px; cursor:pointer; line-height:1; font-weight:900;">
                             ✕
                         </button>
                     </div>
 
                     <!-- Mensajes Cuerpo -->
-                    <div id="rfChatMessages" style="flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:8px; background:#f8fafc; min-height:260px;">
+                    <div id="rfChatMessages" style="flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:8px; background:#fffef5; min-height:260px;">
                         <div style="text-align:center; color:#64748b; font-size:12px; padding:20px;">Cargando mensajes del pedido…</div>
                     </div>
 
                     <!-- Input Footer -->
-                    <form onsubmit="window.RepartoFacilDespacho.enviarMensajeChat(event)" style="padding:12px; background:#fff; border-top:1px solid #e2e8f0; display:flex; gap:8px;">
-                        <input id="rfChatInput" type="text" placeholder="Escribir al comprador o chofer…" style="flex:1; border:1px solid #cbd5e1; border-radius:12px; padding:10px 14px; font-size:13px; outline:none;" autocomplete="off" />
-                        <button type="submit" style="background:#10b981; color:#fff; border:none; border-radius:12px; padding:0 18px; font-weight:800; font-size:13px; cursor:pointer;">
+                    <form onsubmit="window.RepartoFacilDespacho.enviarMensajeChat(event)" style="padding:12px; background:#fff; border-top:1.5px solid #fef08a; display:flex; gap:8px;">
+                        <input id="rfChatInput" type="text" placeholder="Escribir al comprador o chofer…" style="flex:1; border:1.5px solid #fde047; border-radius:12px; padding:10px 14px; font-size:13px; outline:none; background:#fffef5;" autocomplete="off" />
+                        <button type="submit" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:12px; padding:0 18px; font-weight:900; font-size:13px; cursor:pointer; box-shadow:0 2px 6px rgba(255,230,0,0.3);">
                             Enviar
                         </button>
                     </form>
@@ -1109,13 +1139,13 @@
                     const emisor = esMio ? 'Comercio (Tú)' : (esChofer ? `Repartidor (${m.author_name || 'Repartidor'})` : `Comprador (${m.author_name || 'Cliente'})`);
 
                     const checksHtml = m.is_read
-                        ? '<span style="color:#38bdf8; font-weight:800; font-size:10.5px; margin-left:3px;" title="Leído por destinatario ✓✓">✓✓</span>'
-                        : '<span style="color:#94a3b8; font-size:10.5px; margin-left:3px;" title="Enviado al chat ✓">✓</span>';
+                        ? '<span style="color:#2D3277; font-weight:900; font-size:10.5px; margin-left:3px;" title="Leído por destinatario ✓✓">✓✓</span>'
+                        : '<span style="color:#854d0e; font-size:10.5px; margin-left:3px;" title="Enviado al chat ✓">✓</span>';
 
                     return `
                         <div style="align-self:${esMio ? 'flex-end' : 'flex-start'}; max-width:82%; display:flex; flex-direction:column; align-items:${esMio ? 'flex-end' : 'flex-start'};">
                             <span style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:2px; padding:0 4px;">${escaparTextoChat(emisor)} · ${escaparTextoChat(m.timestamp_str || '')} ${esMio ? checksHtml : ''}</span>
-                            <div style="background:${esMio ? '#10b981' : (esChofer ? '#0f172a' : '#ffffff')}; color:${esMio || esChofer ? '#ffffff' : '#0f172a'}; padding:8px 12px; border-radius:14px; font-size:12.5px; border:1px solid ${esMio ? '#059669' : (esChofer ? '#1e293b' : '#cbd5e1')}; box-shadow:0 1px 3px rgba(0,0,0,0.05); word-break:break-word;">
+                            <div style="background:${esMio ? '#FFE600' : (esChofer ? '#2D3277' : '#ffffff')}; color:${esMio ? '#2D3277' : (esChofer ? '#ffffff' : '#0f172a')}; padding:8px 12px; border-radius:14px; font-size:12.5px; font-weight:${esMio ? '700' : '500'}; border:1.5px solid ${esMio ? '#eab308' : (esChofer ? '#1e293b' : '#fde047')}; box-shadow:0 1px 3px rgba(0,0,0,0.06); word-break:break-word;">
                                 ${escaparTextoChat(m.content)}
                             </div>
                         </div>
