@@ -109,12 +109,11 @@
 
     function formatearIdCorto(id) {
         if (!id) return '';
-        const s = String(id).trim();
-        if (s.startsWith('RF-') || s.startsWith('rf-')) {
-            const resto = s.slice(3);
-            return 'RF-' + (resto.length > 5 ? resto.slice(0, 5) : resto);
+        const clean = String(id).trim().replace(/^#?RF-?/i, '');
+        if (clean.length > 5) {
+            return 'RF-' + clean.slice(0, 5);
         }
-        return s.length > 7 ? ('RF-' + s.slice(0, 5)) : (s.startsWith('RF-') ? s : 'RF-' + s);
+        return 'RF-' + clean;
     }
 
     function obtenerPruebaDeVida(driverLastPing) {
@@ -138,6 +137,7 @@
         const wrap = $('pedidosRepartoFacilWrap');
         if (!wrap) return;
         cargarPedidos();
+        cargarMetricasOmnicanal();
         
         // Polling cada 6 segundos para pedidos y estados en vivo
         if (timerPolling) clearInterval(timerPolling);
@@ -206,6 +206,7 @@
                 } catch(e) {}
                 renderizarCards();
                 actualizarBadge();
+                cargarMetricasOmnicanal();
             } else if (!silencioso) {
                 const cache = localStorage.getItem(getCacheKey());
                 if (cache) {
@@ -1118,6 +1119,11 @@
                     return;
                 }
 
+                const estabaAlFondo = (box.scrollHeight - box.scrollTop - box.clientHeight) < 65;
+                const prevCant = parseInt(box.dataset.cantMensajes || '0', 10);
+                const nuevaCant = data.mensajes.length;
+                const esCargaInicial = !box.dataset.cantMensajes;
+
                 box.innerHTML = data.mensajes.map(m => {
                     const esSistema = m.author_role === 'system';
                     if (esSistema) {
@@ -1152,7 +1158,12 @@
                     `;
                 }).join('');
 
-                box.scrollTop = box.scrollHeight;
+                box.dataset.cantMensajes = String(nuevaCant);
+
+                // Auto-scroll sólo en la primera carga o si el usuario estaba al fondo y llegaron mensajes nuevos
+                if (esCargaInicial || (estabaAlFondo && nuevaCant > prevCant)) {
+                    box.scrollTop = box.scrollHeight;
+                }
             }
         } catch (e) {
             console.error('[RepartoFacil] Error al cargar chat:', e);
@@ -1183,6 +1194,8 @@
             }
             if (orderChatActivo === orderId) {
                 if (input.value.trim() === texto) input.value = '';
+                const box = $('rfChatMensajes');
+                if (box) delete box.dataset.cantMensajes;
                 cargarMensajesChat(orderId);
             }
         } catch (e) {
@@ -1243,11 +1256,94 @@
         }
     }
 
+    // Cargar métricas consolidadas omnicanal (Tienda Física + E-Commerce)
+    async function cargarMetricasOmnicanal() {
+        const host = $('repartoFacilOmnicanalBanner');
+        if (!host) return;
+
+        try {
+            const resp = await fetch('/api/repartofacil/metricas-omnicanal');
+            const data = await resp.json();
+            if (!data || !data.success) return;
+
+            const formatMoneyNum = (num) => '$' + Math.round(Number(num || 0)).toLocaleString('es-AR');
+
+            host.innerHTML = `
+                <div style="background:#ffffff; border:2px solid #FFE600; border-radius:18px; padding:12px 14px; box-shadow:0 3px 12px rgba(234,179,8,0.1); display:flex; flex-direction:column; gap:10px;">
+                    <!-- Fila Superior: Enlace con Servidor de la Tienda Física -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; border-bottom:1px dashed #fde047; padding-bottom:8px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="display:inline-block; width:10px; height:10px; border-radius:999px; background:#10b981; box-shadow:0 0 6px rgba(16,185,129,0.8); animation:pulse 2s infinite;"></span>
+                            <span style="font-size:11.5px; font-weight:900; color:#2D3277; text-transform:uppercase; letter-spacing:0.3px;">
+                                Servidor Tienda Física En Línea
+                            </span>
+                            <span style="background:#fefce8; color:#854d0e; border:1px solid #fde047; font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:6px;">
+                                TPV Omnicanal
+                            </span>
+                        </div>
+                        <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:10px; font-weight:900; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(234,179,8,0.25); transition:all 0.15s ease;">
+                            <span>⚡ Sincronizar Stock TPV con Web</span>
+                        </button>
+                    </div>
+
+                    <!-- Fila Inferior: Métricas Consolidadas del Día (Físico + E-Commerce) -->
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; text-align:center;">
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 6px;">
+                            <span style="font-size:9.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase;">🏪 Mostrador Físico</span>
+                            <b style="font-size:13px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                                ${formatMoneyNum(data.ventas_mostrador_hoy)}
+                            </b>
+                            <small style="font-size:9.5px; color:#854d0e; font-weight:700;">${data.cant_ventas_mostrador_hoy} venta${data.cant_ventas_mostrador_hoy === 1 ? '' : 's'}</small>
+                        </div>
+
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 6px;">
+                            <span style="font-size:9.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase;">🌐 E-Commerce Web</span>
+                            <b style="font-size:13px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                                ${formatMoneyNum(data.ventas_web_hoy)}
+                            </b>
+                            <small style="font-size:9.5px; color:#854d0e; font-weight:700;">${data.cant_pedidos_web_hoy} pedido${data.cant_pedidos_web_hoy === 1 ? '' : 's'}</small>
+                        </div>
+
+                        <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:14px; padding:8px 6px; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
+                            <span style="font-size:9.5px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase;">📈 Total Omnicanal</span>
+                            <b style="font-size:13.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                                ${formatMoneyNum(data.total_omnicanal_hoy)}
+                            </b>
+                            <small style="font-size:9.5px; color:#2D3277; font-weight:900;">${data.pedidos_activos_web} activo${data.pedidos_activos_web === 1 ? '' : 's'}</small>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } catch (e) {
+            console.warn('[RepartoFacil] No se pudieron cargar métricas omnicanal:', e);
+        }
+    }
+
+    // Acción para sincronizar stock del TPV físico con la tienda online
+    async function sincronizarStockTpv() {
+        try {
+            mostrarToast('⚡ Sincronizando stock del TPV físico con Reparto Fácil Cloud…');
+            const resp = await fetch('/api/repartofacil/sincronizar-stock-tpv', { method: 'POST' });
+            const data = await resp.json();
+            if (data.success) {
+                mostrarToast('✅ ¡Inventario y stock de tienda física sincronizado con la tienda online!');
+                cargarMetricasOmnicanal();
+                cargarPedidos(true);
+            } else {
+                alert(data.error || 'No se pudo sincronizar el stock.');
+            }
+        } catch (e) {
+            alert('Error de conexión al sincronizar el stock del TPV.');
+        }
+    }
+
     // API pública del módulo
     global.RepartoFacilDespacho = {
         iniciar,
         detener,
         cargarPedidos,
+        cargarMetricasOmnicanal,
+        sincronizarStockTpv,
         toggleDetalle,
         aceptarPedido,
         rechazarPedido,

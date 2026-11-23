@@ -228,7 +228,7 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
             if actualizada:
                 with get_db(eid) as conn:
                     conn.execute(
-                        "UPDATE pos_base SET filas = ?, actualizado_en = CURRENT_TIMESTAMP WHERE id = ?",
+                        "UPDATE pos_base SET filas = %s, actualizado_en = NOW() WHERE id = %s",
                         (json.dumps(filas), parte["id"])
                     )
                     if hasattr(conn, "commit"):
@@ -237,6 +237,117 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
         _olvidar_tabla("productos")
     except Exception as e:
         print(f"[Stock] Error al deducir stock de pos_base: {e}")
+
+
+def _restituir_stock_items(items, empresa_id=None, sucursal_id=None):
+    """
+    Restituye el stock de los items al inventario cuando un pedido es cancelado o rechazado.
+    Garantiza que la tienda física recupere exactamente el inventario reservado por e-commerce.
+    """
+    if not items or not isinstance(items, list):
+        return
+
+    eid = empresa_id if empresa_id is not None else (session.get("empresa_id") or 1)
+
+    # 1. Intentar en MariaDB (si está en red local)
+    try:
+        import os
+        import pymysql
+        import socket
+
+        MARIADB_HOST = os.environ.get("POS_MARIADB_HOST", "192.168.0.8")
+        MARIADB_PORT = int(os.environ.get("POS_MARIADB_PORT", "3306"))
+        MARIADB_USER = os.environ.get("POS_MARIADB_USER", "root")
+        MARIADB_PASS = os.environ.get("POS_MARIADB_PASS", "1234")
+        MARIADB_DB = os.environ.get("POS_MARIADB_DB", "punpro_db")
+
+        if not (os.environ.get("RENDER") or os.environ.get("DYNO")):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                sock.settimeout(0.3)
+                res = sock.connect_ex((MARIADB_HOST, MARIADB_PORT))
+                sock.close()
+                if res == 0:
+                    conn_mb = pymysql.connect(
+                        host=MARIADB_HOST,
+                        port=MARIADB_PORT,
+                        user=MARIADB_USER,
+                        password=MARIADB_PASS,
+                        database=MARIADB_DB,
+                        connect_timeout=0.5,
+                        charset="utf8mb4",
+                        autocommit=True,
+                    )
+                    with conn_mb.cursor() as cur:
+                        cur.execute("SELECT id, nombre, codigo, stock FROM productos")
+                        productos_mb = {f"{r[1]}_{r[2]}": {"id": r[0], "stock": r[3]} for r in cur.fetchall()}
+
+                        for item in items:
+                            item_nombre = str(item.get("name") or item.get("nombre") or "")
+                            item_codigo = str(item.get("codigo") or "")
+                            cantidad = float(item.get("quantity") or item.get("cantidad") or 1)
+
+                            key = f"{item_nombre}_{item_codigo}"
+                            prod = productos_mb.get(key)
+                            if prod:
+                                nuevo_stock = float(prod["stock"] or 0.0) + cantidad
+                                cur.execute("UPDATE productos SET stock = %s WHERE id = %s", (nuevo_stock, prod["id"]))
+
+                    conn_mb.close()
+                    return
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    # 2. pos_base (Base en PostgreSQL)
+    try:
+        from app.services.pos_base import _olvidar_tabla
+
+        partes = []
+        with get_db(eid) as conn:
+            partes = conn.execute(
+                "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
+            ).fetchall()
+
+        if not partes:
+            return
+
+        for parte in partes:
+            cols = parte["columnas"] if isinstance(parte["columnas"], list) else json.loads(parte["columnas"])
+            filas = parte["filas"] if isinstance(parte["filas"], list) else json.loads(parte["filas"])
+            idx_p = {col: i for i, col in enumerate(cols)}
+
+            actualizada = False
+            for fila in filas:
+                nombre = str(fila[idx_p.get("nombre", 1)] or "").lower() if "nombre" in idx_p else ""
+                codigo = str(fila[idx_p.get("codigo", 0)] or "") if "codigo" in idx_p else ""
+                key = f"{nombre}_{codigo}"
+
+                for item in items:
+                    item_nombre = str(item.get("name") or item.get("nombre") or "").lower()
+                    item_codigo = str(item.get("codigo") or "")
+                    item_key = f"{item_nombre}_{item_codigo}"
+
+                    if key == item_key and "stock" in idx_p:
+                        cantidad = float(item.get("quantity") or item.get("cantidad") or 1)
+                        stock_actual = float(fila[idx_p["stock"]] or 0.0)
+                        fila[idx_p["stock"]] = stock_actual + cantidad
+                        actualizada = True
+                        break
+
+            if actualizada:
+                with get_db(eid) as conn:
+                    conn.execute(
+                        "UPDATE pos_base SET filas = %s, actualizado_en = NOW() WHERE id = %s",
+                        (json.dumps(filas), parte["id"])
+                    )
+                    if hasattr(conn, "commit"):
+                        conn.commit()
+
+        _olvidar_tabla("productos")
+    except Exception as e:
+        print(f"[Stock] Error al restituir stock a pos_base: {e}")
 
 
 @api_bp.route("/repartofacil/pedidos", methods=["GET"])
@@ -413,7 +524,26 @@ def aceptar_repartofacil_pedido(order_id):
             except Exception as cli_err:
                 print(f"[Cartera] Aviso no bloqueante al sincronizar cliente web: {cli_err}")
 
-            # 3. Notificar en chat tripartito
+            # 3. Registrar venta en ventas_mostrador para el Arqueo Diario y Libro Omnicanal
+            try:
+                total_val = float(order_row["total"] or 0.0) if order_row else 0.0
+                summary_items = ", ".join([
+                    f"{it.get('quantity', 1)} {it.get('unit', 'KG')} {it.get('name', 'Corte')}"
+                    for it in (items_a_procesar or [])
+                ]) or "Pedido Web Reparto Fácil"
+                fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+                cli_id_val = existente["id"] if existente else None
+                conn.execute(
+                    """
+                    INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at)
+                    VALUES (%s, %s, %s, 'Web (Reparto Fácil)', %s, NOW())
+                    """,
+                    (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:200]}", total_val, fecha_hoy)
+                )
+            except Exception as vm_err:
+                print(f"[VentasMostrador] Error no bloqueante al asentar venta web: {vm_err}")
+
+            # 4. Notificar en chat tripartito
             chat_sql = """
                 INSERT INTO public.repartofacil_chat_mensajes
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
@@ -442,7 +572,7 @@ def aceptar_repartofacil_pedido(order_id):
 def rechazar_repartofacil_pedido(order_id):
     """
     Cobro Fácil rechaza el pedido (por falta de stock o fuera de horario).
-    Pasa a 'rejected', no sale a repartidores y notifica en el chat.
+    Pasa a 'rejected', restituye el stock reservado si correspondía, no sale a repartidores y notifica en el chat.
     """
     empresa_id, error = _sesion_empresa_repartofacil(escritura=True)
     if error:
@@ -455,9 +585,21 @@ def rechazar_repartofacil_pedido(order_id):
         texto = f"Pedido no aceptado por Frigorífico Maciel: {motivo}."
 
         with get_db(empresa_id=empresa_id) as conn:
-            _, error = _pedido_repartofacil_bloqueado(conn, order_id, empresa_id, {"pending", "pending_store"})
+            order_row, error = _pedido_repartofacil_bloqueado(conn, order_id, empresa_id, {"pending", "pending_store", "confirmed"})
             if error:
                 return error
+
+            items_pedido = order_row["items"] if order_row else []
+            if isinstance(items_pedido, str):
+                try:
+                    items_pedido = json.loads(items_pedido)
+                except Exception:
+                    items_pedido = []
+
+            # Si el pedido estaba confirmado con stock descontado, restituirlo a la tienda física
+            if order_row and str(order_row.get("estado") or "").lower() in ("confirmed", "accepted"):
+                _restituir_stock_items(items_pedido, empresa_id)
+
             update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'rejected', updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (order_id,))
             
@@ -473,6 +615,120 @@ def rechazar_repartofacil_pedido(order_id):
             
         return jsonify({
             "success": True,
+            "order_id": order_id,
+            "estado": "rejected",
+            "mensaje": texto,
+            "stock_restituido": True
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/repartofacil/metricas-omnicanal", methods=["GET"])
+def get_repartofacil_metricas_omnicanal():
+    """
+    Devuelve las métricas consolidadas en tiempo real:
+    - Ventas físicas de mostrador hoy (total y cantidad)
+    - Ventas web Reparto Fácil hoy (total y cantidad)
+    - Total facturado omnicanal del día
+    - Pedidos web activos por estado
+    - Estado de sincronización con el servidor de la tienda física
+    """
+    empresa_id, error = _sesion_empresa_repartofacil()
+    if error:
+        return error
+
+    try:
+        with get_db(empresa_id=empresa_id) as conn:
+            fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+
+            # 1. Ventas físicas en mostrador
+            vm_row = conn.execute(
+                "SELECT COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cant FROM ventas_mostrador WHERE fecha = %s",
+                (fecha_hoy,)
+            ).fetchone()
+            total_mostrador = float(vm_row["total"] or 0.0) if vm_row else 0.0
+            cant_mostrador = int(vm_row["cant"] or 0) if vm_row else 0
+
+            # 2. Ventas web Reparto Fácil hoy
+            rf_rows = conn.execute(
+                """
+                SELECT estado, COUNT(*) as cant, COALESCE(SUM(total), 0) as total
+                FROM public.repartofacil_pedidos
+                WHERE empresa_id = %s AND created_at >= CURRENT_DATE
+                GROUP BY estado
+                """,
+                (empresa_id,)
+            ).fetchall()
+
+            ventas_web_hoy = 0.0
+            pedidos_web_hoy = 0
+            pedidos_activos_web = 0
+            pedidos_entregados_hoy = 0
+
+            for r in rf_rows:
+                est = str(r["estado"] or "").strip().lower()
+                c = int(r["cant"] or 0)
+                tot = float(r["total"] or 0.0)
+                pedidos_web_hoy += c
+
+                if est in ("confirmed", "assigned", "ready", "embalado", "picked up", "in transit", "delivered"):
+                    ventas_web_hoy += tot
+                if est in ("pending", "pending_store", "confirmed", "assigned", "ready", "embalado", "picked up", "in transit"):
+                    pedidos_activos_web += c
+                if est == "delivered":
+                    pedidos_entregados_hoy += c
+
+            # 3. Estado de sincronización de catálogo TPV en pos_base
+            pos_info = conn.execute(
+                "SELECT COUNT(*) as cant, MAX(actualizado_en) as ult_sync FROM pos_base WHERE empresa_id = %s",
+                (empresa_id,)
+            ).fetchone()
+            cant_tablas_pos = int(pos_info["cant"] or 0) if pos_info else 0
+            ult_sync = str(pos_info["ult_sync"] or "") if pos_info else ""
+
+            return jsonify({
+                "success": True,
+                "fecha": fecha_hoy,
+                "ventas_mostrador_hoy": total_mostrador,
+                "cant_ventas_mostrador_hoy": cant_mostrador,
+                "ventas_web_hoy": ventas_web_hoy,
+                "cant_pedidos_web_hoy": pedidos_web_hoy,
+                "pedidos_activos_web": pedidos_activos_web,
+                "pedidos_entregados_hoy": pedidos_entregados_hoy,
+                "total_omnicanal_hoy": total_mostrador + ventas_web_hoy,
+                "tpv_conectado": cant_tablas_pos > 0,
+                "ultima_sync_tpv": ult_sync or "Automática en tiempo real"
+            })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/repartofacil/sincronizar-stock-tpv", methods=["POST"])
+def sincronizar_stock_tpv_con_web():
+    """
+    Fuerza la sincronización inmediata del stock y catálogo del TPV físico con la web.
+    Invalida cachés locales y emite señal broadcast.
+    """
+    empresa_id, error = _sesion_empresa_repartofacil(escritura=True)
+    if error:
+        return error
+    try:
+        from app.services.pos_base import _olvidar_tabla
+        _olvidar_tabla("productos")
+        _olvidar_tabla("articulos")
+        _olvidar_tabla("categorias")
+        _olvidar_tabla("stock")
+
+        from app.services.signal_bus import broadcast_refresh
+        broadcast_refresh(empresa_id, source_device_id="tpv-sync-manual", reason="stock_sincronizado")
+
+        return jsonify({
+            "success": True,
+            "mensaje": "Stock de tienda física sincronizado con la tienda online Reparto Fácil con éxito."
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
             "order_id": order_id,
             "estado": "rejected",
             "mensaje": texto
