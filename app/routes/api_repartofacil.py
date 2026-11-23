@@ -729,12 +729,6 @@ def sincronizar_stock_tpv_con_web():
         })
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
-            "order_id": order_id,
-            "estado": "rejected",
-            "mensaje": texto
-        })
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
 
 
 @api_bp.route("/repartofacil/pedidos/<order_id>/embalar", methods=["POST"])
@@ -958,13 +952,15 @@ def get_repartofacil_chat(order_id):
                     SELECT %s, m.id FROM public.repartofacil_chat_mensajes m
                     WHERE m.order_id = %s AND LOWER(COALESCE(m.author_role, '')) <> 'store'
                     ON CONFLICT (usuario_id, mensaje_id) DO NOTHING
+                    RETURNING usuario_id
                     """,
                     (f"store-{empresa_id}", order_id)
                 )
                 if hasattr(conn, "commit"):
                     conn.commit()
             except Exception:
-                pass
+                if hasattr(conn, "rollback"):
+                    conn.rollback()
 
             sql = """
                 SELECT m.id, m.order_id, m.author_role, m.author_name, m.content, m.timestamp_str, m.created_at,

@@ -1055,8 +1055,9 @@
             modal.style.display = 'flex';
         }
 
-        $('rfChatTitle').textContent = `Chat Pedido #${orderId}`;
-        $('rfChatSub').textContent = `Cliente: ${clienteNombre} · Blindado a orden #${orderId}`;
+        const shortCode = formatearIdCorto(orderId);
+        $('rfChatTitle').textContent = `Chat · ${clienteNombre}`;
+        $('rfChatSub').textContent = `📍 ${order && order.direccion_entrega ? order.direccion_entrega : 'Entrega a domicilio'} · #${shortCode}`;
         
         const ticketBtn = $('rfChatTicketBtn');
         if (order && order.ticket_id) {
