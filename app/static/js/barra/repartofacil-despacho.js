@@ -530,6 +530,16 @@
                                 </div>
                             ` : ''}
 
+                            <!-- Domicilio exacto y enlace GPS -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:4px 8px; margin-bottom:7px; font-size:11px;">
+                                <span style="color:#334155; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px;" title="${escaparTextoChat(p.direccion_entrega || '')}">
+                                    📍 ${escaparTextoChat(p.direccion_entrega || 'Domicilio')}
+                                </span>
+                                <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer" style="color:#2563eb; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:2px; flex-shrink:0;">
+                                    <span>GPS</span> ↗
+                                </a>
+                            </div>
+
                             <!-- Indicador de ETA y Chofer en Camino dentro del Ticket -->
                             ${indicadorEtaHtml}
 

@@ -16,7 +16,7 @@
 - **Controlador SPA (`app.js`):** Navegación fluida entre paneles (`Reporte`, `Jefe`, `Vitrina`, `Contabilidad`, `Cartera`, `Digitales`, `Pedidos`) sin recarga de página completa.
 - **Ficha y Edición de Cliente Estilo WhatsApp:** En la ficha individual de cliente, el botón superior `#btnRefresh` cambia automáticamente de filtro a lápiz de edición (`.es-editar-cliente`). Al tocar el lápiz, el avatar o la cabecera superior se abre la hoja modal con datos de contacto (nombre, DNI, teléfono, dirección, límite) y accesos directos de llamada/WhatsApp. El botón de ticket en movimientos se destaca en azul claro (`#eff6ff`) con flecha `↗` para abrir cortes.
 - **Selector de Sucursales:** Menú desplegable y modal flotante que permite alternar entre `Todas`, `Maciel` (ID 1) y `alfaro 1964` (ID 2), actualizando instantáneamente la barra superior (`MACIEL · ALFARO 1964`) y los montos filtrados.
-- **Pedidos y chat:** La bandeja de despacho muestra errores de sesión y envío, conserva el texto no enviado y escapa los mensajes antes de renderizarlos.
+- **Pedidos y chat:** La bandeja de despacho muestra errores de sesión y envío, conserva el texto no enviado y escapa los datos del pedido y del chat antes de renderizarlos.
 - **Caja y Perfil:** Caja ofrece historial y desglose de ventas desde su menú lateral. El primer botón abre el perfil público, sus reseñas y la edición con selección de ubicación en el mapa.
 - **Inventario:** el resumen destaca quiebres, productos sin contar hoy y diferencias de auditoría. Los indicadores describen el catálogo recibido, no reservas ni umbrales de stock bajo; la lista muestra el stock del sistema. Se advierte que la selección de sucursal no filtra esta vista ni sus conteos.
 

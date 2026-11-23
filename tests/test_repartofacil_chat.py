@@ -96,6 +96,9 @@ def test_aislamiento_y_pedido_inexistente(chat_client):
 
 def test_lista_y_ticket_filtran_empresa_de_sesion(chat_client, monkeypatch):
     iniciar_sesion(chat_client)
+    monkeypatch.setattr(api_repartofacil, "_validar_stock_pedido", lambda items, empresa: {
+        "valido": True, "items_sin_stock": [], "items_con_stock": [],
+    })
     response = chat_client.get("/api/repartofacil/pedidos?empresa_id=3", headers={"X-Empresa-ID": "3"})
     assert response.status_code == 200
     ids = {pedido["id"] for pedido in response.get_json()["pedidos"]}
@@ -168,9 +171,16 @@ def test_rechazar_pendiente_una_sola_vez(chat_client):
     assert len(chat_client.get("/api/repartofacil/chat/pendiente").get_json()["mensajes"]) == 1
 
 
-def test_aceptar_no_procesa_dos_veces(chat_client, monkeypatch):
+def test_aceptar_no_deduce_stock_dos_veces(chat_client, monkeypatch):
     iniciar_sesion(chat_client)
+    stock = []
+    monkeypatch.setattr(api_repartofacil, "_validar_stock_pedido", lambda items, empresa: {
+        "valido": True, "items_sin_stock": [], "items_con_stock": items,
+    })
+    monkeypatch.setattr(api_repartofacil, "_deducir_stock_items", lambda items, empresa: stock.append((items, empresa)))
     url = "/api/repartofacil/pedidos/aceptar/aceptar"
     assert chat_client.post(url, json={}).status_code == 200
     assert chat_client.post(url, json={}).status_code == 409
+    assert len(stock) == 1
+    assert stock[0][1] == 2
     assert len(chat_client.get("/api/repartofacil/chat/aceptar").get_json()["mensajes"]) == 1
