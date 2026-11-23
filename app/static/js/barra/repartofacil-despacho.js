@@ -114,7 +114,7 @@
             const resto = s.slice(3);
             return 'RF-' + (resto.length > 5 ? resto.slice(0, 5) : resto);
         }
-        return s.length > 7 ? s.slice(0, 7) : s;
+        return s.length > 7 ? ('RF-' + s.slice(0, 5)) : (s.startsWith('RF-') ? s : 'RF-' + s);
     }
 
     function obtenerPruebaDeVida(driverLastPing) {
