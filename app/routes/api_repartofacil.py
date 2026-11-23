@@ -493,9 +493,19 @@ def marcar_pedido_embalado(order_id):
     if error:
         return error
     try:
+        data = request.get_json(silent=True) or {}
+        recargo_espera = 0
+        try:
+            recargo_espera = int(data.get("recargo_espera") or 0)
+        except Exception:
+            recargo_espera = 0
+
         msg_id = f"msg-store-{uuid.uuid4()}"
         hora_str = datetime.now().strftime("%H:%M")
-        texto = "Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅"
+        if recargo_espera > 0:
+            texto = f"Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅ (Demora de mostrador: se acreditó +${recargo_espera:,} extra de compensación por espera al repartidor ⏱️)"
+        else:
+            texto = "Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅"
 
         with get_db(empresa_id=empresa_id) as conn:
             pedido, error = _pedido_repartofacil_bloqueado(
@@ -505,8 +515,15 @@ def marcar_pedido_embalado(order_id):
                 return error
             if str(pedido["estado"]).strip().lower() in {"ready", "embalado"}:
                 return jsonify({"success": True, "order_id": order_id, "estado": pedido["estado"]})
-            update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'ready', updated_at = NOW() WHERE id = %s"
-            conn.execute(update_sql, (order_id,))
+            
+            if recargo_espera > 0 and pedido.get("repartidor_id"):
+                ganancia_actual = float(pedido.get("ganancia_repartidor") or 0)
+                nueva_ganancia = ganancia_actual + float(recargo_espera)
+                update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'ready', ganancia_repartidor = %s, updated_at = NOW() WHERE id = %s"
+                conn.execute(update_sql, (nueva_ganancia, order_id))
+            else:
+                update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'ready', updated_at = NOW() WHERE id = %s"
+                conn.execute(update_sql, (order_id,))
             
             chat_sql = """
                 INSERT INTO public.repartofacil_chat_mensajes 
@@ -522,6 +539,7 @@ def marcar_pedido_embalado(order_id):
             "success": True,
             "order_id": order_id,
             "estado": "ready",
+            "recargo_espera": recargo_espera,
             "mensaje": texto,
             "timestamp": hora_str
         })

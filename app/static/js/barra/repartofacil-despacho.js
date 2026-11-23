@@ -107,6 +107,16 @@
         }
     }
 
+    function formatearIdCorto(id) {
+        if (!id) return '';
+        const s = String(id).trim();
+        if (s.startsWith('RF-') || s.startsWith('rf-')) {
+            const resto = s.slice(3);
+            return 'RF-' + (resto.length > 5 ? resto.slice(0, 5) : resto);
+        }
+        return s.length > 7 ? s.slice(0, 7) : s;
+    }
+
     // Iniciar el módulo cuando se entra a la pantalla
     function iniciar() {
         const wrap = $('pedidosRepartoFacilWrap');
@@ -280,11 +290,77 @@
             const itemsSinStock = Array.isArray(p.items_sin_stock) ? p.items_sin_stock : [];
             const alertaStock = !tieneStockValido && itemsSinStock.length > 0;
 
+            // Cálculo de ETA y Tiempo de Espera para el Repartidor
+            const distanciaKm = Number(p.distancia_km || 1.8);
+            const etaBaseMinutos = Math.max(3, Math.min(15, Math.round(Number(p.minutos_estimados || 8) * 0.5) || 6));
+
+            let minutosRestantesChofer = etaBaseMinutos;
+            let minutosDemoraChofer = 0;
+            let recargoEsperaChofer = 0;
+
+            if (repartidorAsignado && !esEntregado && !esRechazado) {
+                const fechaReferencia = p.driver_last_ping ? new Date(p.driver_last_ping).getTime() : new Date(p.updated_at || p.created_at).getTime();
+                const tiempoTranscurridoMin = Math.max(0, Math.floor((Date.now() - fechaReferencia) / 60000));
+                
+                if (tiempoTranscurridoMin < etaBaseMinutos) {
+                    minutosRestantesChofer = etaBaseMinutos - tiempoTranscurridoMin;
+                } else {
+                    minutosRestantesChofer = 0;
+                    minutosDemoraChofer = tiempoTranscurridoMin - etaBaseMinutos;
+                    // Recargo por espera al chofer en mostrador: base $500 + $100/min extra (tope $2500)
+                    recargoEsperaChofer = Math.min(2500, 500 + (minutosDemoraChofer * 100));
+                }
+            }
+
+            // Indicador de ETA visual dentro del ticket
+            let indicadorEtaHtml = '';
+            if (repartidorAsignado && !esEntregado && !esRechazado) {
+                if (minutosRestantesChofer > 0) {
+                    indicadorEtaHtml = `
+                        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; align-items:center; justify-content:space-between;">
+                            <span style="font-weight:700;">🛵 ${escaparTextoChat(repartidorAsignado)} en camino</span>
+                            <span style="font-weight:900; background:#d1fae5; padding:1px 6px; border-radius:6px;">Llega en ~${minutosRestantesChofer} min</span>
+                        </div>
+                    `;
+                } else {
+                    indicadorEtaHtml = `
+                        <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:8px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#92400e; display:flex; align-items:center; justify-content:space-between;">
+                            <span style="font-weight:800;">⏱️ Chofer esperando (+${minutosDemoraChofer}m)</span>
+                            <span style="font-weight:900; background:#fef3c7; color:#b45309; padding:1px 6px; border-radius:6px;">Demora: +$${recargoEsperaChofer} al chofer</span>
+                        </div>
+                    `;
+                }
+            } else if (esNuevoPendiente || esConfirmado) {
+                indicadorEtaHtml = `
+                    <div style="background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:5px 8px; margin-bottom:8px; font-size:10.5px; color:#1e40af; display:flex; align-items:center; justify-content:space-between;">
+                        <span style="font-weight:700;">⏱️ Tiempo estimado chofer al local:</span>
+                        <span style="font-weight:900;">~${etaBaseMinutos} min (~${distanciaKm.toFixed(1)} km)</span>
+                    </div>
+                `;
+            }
+
+            // Estado dinámico del botón de Embalar
+            let textoBotonEmbalar = 'Embalar';
+            let iconoBotonEmbalar = '📦';
+            let bgBotonEmbalar = puedeEmbalar ? '#047857' : '#94a3b8';
+
+            if (esEmbalado) {
+                textoBotonEmbalar = 'Embalado';
+                iconoBotonEmbalar = '✓';
+                bgBotonEmbalar = '#10b981';
+            } else if (repartidorAsignado) {
+                if (minutosRestantesChofer > 0) {
+                    textoBotonEmbalar = `Embalar (~${minutosRestantesChofer}m)`;
+                    iconoBotonEmbalar = '📦';
+                    bgBotonEmbalar = '#047857';
+                } else {
+                    textoBotonEmbalar = `Embalar (+⏱️$${recargoEsperaChofer})`;
+                    iconoBotonEmbalar = '⚠️';
+                    bgBotonEmbalar = '#b45309';
+                }
+            }
+
             // Tema cromático por estado:
-            // - Cancelado / Rechazado -> ROJO
-            // - Entregado -> AZUL / CELESTE
-            // - Nuevo / Pendiente -> NARANJA / ÁMBAR
-            // - Embalado / En curso -> VERDE ESMERALDA
             let cardBg = '#ffffff';
             let cardBorder = '#4ade80';
             let avatarBg = '#ecfdf5';
@@ -355,9 +431,9 @@
                         <!-- Centro: Cliente + #RF + Dirección + Resumen -->
                         <div style="flex:1; min-width:0;">
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
-                                <div style="display:flex; align-items:center; gap:6px; min-width:0; flex-wrap:wrap;">
-                                    <span style="font-weight:800; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#0f172a'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${escaparTextoChat(p.cliente_nombre || 'Cliente')}</span>
-                                    <span style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10.5px; font-weight:800; padding:1px 6px; border-radius:999px; white-space:nowrap;">#${escaparTextoChat(p.id)}</span>
+                                <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1; overflow:hidden;">
+                                    <span style="font-weight:800; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#0f172a'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${escaparTextoChat(p.cliente_nombre || 'Cliente')}</span>
+                                    <span title="#${escaparTextoChat(p.id)}" style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10px; font-weight:800; padding:1px 6px; border-radius:999px; white-space:nowrap; max-width:85px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:middle; flex-shrink:0;">#${escaparTextoChat(formatearIdCorto(p.id))}</span>
                                     ${badgeEstadoHtml}
                                 </div>
                                 <span style="color:#64748b; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;">${formatFecha(p.created_at)}</span>
@@ -386,65 +462,110 @@
                     <!-- PANEL EXPANDIBLE AL CLICK: DETALLES, TICKET Y ACCIONES -->
                     <div id="detalle-pedido-${escaparTextoChat(p.id)}" style="display:${abierto ? 'block' : 'none'}; margin-top:10px; padding-top:10px; border-top:1px solid #f1f5f9;">
                         
-                        <!-- Barra de Ticket, Teléfono y Reasignación -->
-                        <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; margin-bottom:8px;">
-                            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:6px;">
-                                ${p.ticket_id ? `
-                                    <button type="button" onclick="window.RepartoFacilDespacho.verTicket(${argumentoPedido(p.ticket_id)})" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; font-size:10.5px; font-weight:800; padding:3px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:3px; white-space:nowrap;">
-                                        🧾 Ticket #${escaparTextoChat(p.ticket_id)} ↗
-                                    </button>
-                                ` : ''}
-                                ${p.cliente_telefono ? `
-                                    <span style="font-size:11px; color:#64748b; font-weight:600;">📞 ${escaparTextoChat(p.cliente_telefono)}</span>
-                                    <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="font-size:11px; color:#10b981; font-weight:800; text-decoration:none;">(WhatsApp)</a>
-                                ` : ''}
+                        <!-- TICKET / COMANDA DIGITAL INTEGRADA (PEDIDOS ADENTRO DEL TICKET) -->
+                        <div style="background:#f8fafc; border:1.5px dashed #cbd5e1; border-radius:14px; padding:10px 12px; margin-bottom:10px; position:relative;">
+                            <!-- Encabezado del Ticket -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:7px; margin-bottom:7px; border-bottom:1px dashed #cbd5e1;">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-size:14px;">🧾</span>
+                                    <div>
+                                        <div style="font-size:11.5px; font-weight:900; color:#0f172a; text-transform:uppercase; letter-spacing:0.3px;">
+                                            ${p.ticket_id ? `Ticket #${escaparTextoChat(p.ticket_id)}` : `Comanda #${escaparTextoChat(formatearIdCorto(p.id))}`}
+                                        </div>
+                                        <div style="font-size:10px; color:#64748b; font-weight:600;">
+                                            ${escaparTextoChat(p.sucursal_origen || 'Sucursal Maciel')} · ${formatFecha(p.created_at)}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="display:flex; align-items:center; gap:5px;">
+                                    ${p.ticket_id ? `
+                                        <button type="button" onclick="window.RepartoFacilDespacho.verTicket(${argumentoPedido(p.ticket_id)})" style="background:#eff6ff; color:#2563eb; border:1px solid #bfdbfe; border-radius:8px; font-size:10px; font-weight:800; padding:3px 7px; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
+                                            Ver / Imprimir ↗
+                                        </button>
+                                    ` : ''}
+                                    ${puedeReasignar ? `
+                                        <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio(${argumentoPedido(p.id)})" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:7px; font-size:10px; font-weight:800; padding:3px 6px; cursor:pointer;">
+                                            ⚠️ Reasignar
+                                        </button>
+                                    ` : ''}
+                                </div>
                             </div>
-                            ${puedeReasignar ? `
-                                <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio(${argumentoPedido(p.id)})" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:7px; font-size:10px; font-weight:800; padding:2px 6px; cursor:pointer;">
-                                    ⚠️ Reasignar chofer
-                                </button>
-                            ` : ''}
-                        </div>
 
-                        <!-- Lista de Cortes e Ítems del Pedido -->
-                        <div style="background:#f8fafc; border-radius:10px; padding:8px 10px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px;">
+                            <!-- Teléfono y WhatsApp dentro del Ticket -->
+                            ${p.cliente_telefono ? `
+                                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:4px 8px; margin-bottom:7px; font-size:11px;">
+                                    <span style="color:#64748b; font-weight:600;">📞 ${escaparTextoChat(p.cliente_telefono)}</span>
+                                    <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="color:#10b981; font-weight:800; text-decoration:none; display:inline-flex; align-items:center; gap:2px;">
+                                        <span>WhatsApp</span> ↗
+                                    </a>
+                                </div>
+                            ` : ''}
+
+                            <!-- Indicador de ETA y Chofer en Camino dentro del Ticket -->
+                            ${indicadorEtaHtml}
+
+                            <!-- Alerta de Stock si faltan cortes -->
                             ${alertaStock ? `
-                                <div style="background:#fee2e2; color:#b91c1c; padding:6px 8px; border-radius:7px; font-size:11px; font-weight:700; margin-bottom:4px; border:1px solid #fca5a5;">
-                                    ⚠️ Faltan productos en stock:
+                                <div style="background:#fee2e2; color:#b91c1c; padding:6px 8px; border-radius:7px; font-size:11px; font-weight:700; margin-bottom:6px; border:1px solid #fca5a5;">
+                                    ⚠️ Faltan productos en stock para este ticket:
                                     ${itemsSinStock.map(i => `
                                         <div style="margin-top:2px; font-weight:600;">• ${escaparTextoChat(i.producto_nombre || i.name || i.nombre)}: stock ${escaparTextoChat(i.stock_disponible)} de ${escaparTextoChat(i.stock_requerido)}</div>
                                     `).join('')}
                                 </div>
                             ` : ''}
-                            ${itemsArray.map(item => {
-                                const itemSinStock = itemsSinStock.find(s =>
-                                    (s.name || s.nombre) === (item.name || item.nombre) ||
-                                    s.id === item.id
-                                );
-                                const styleSinStock = itemSinStock ? 'color:#b91c1c; text-decoration:line-through; opacity:0.6;' : 'color:#0f172a;';
-                                return `
-                                <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; color:#1e293b;">
-                                    <div>
-                                        <b style="${styleSinStock}">${escaparTextoChat(item.name || item.nombre || 'Artículo')}</b>
-                                        ${itemSinStock ? `<span style="color:#b91c1c; font-size:10px; margin-left:4px;">(falta stock)</span>` : ''}
-                                        <span style="color:#64748b; font-size:11px; margin-left:4px;">x ${escaparTextoChat(item.quantity || item.cantidad || 1)} ${escaparTextoChat(item.unit || item.unidad || 'un')}</span>
+
+                            <!-- LISTA DE PEDIDOS / CORTES ADENTRO DEL TICKET -->
+                            <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px;">
+                                ${itemsArray.map(item => {
+                                    const itemSinStock = itemsSinStock.find(s =>
+                                        (s.name || s.nombre) === (item.name || item.nombre) ||
+                                        s.id === item.id
+                                    );
+                                    const styleSinStock = itemSinStock ? 'color:#b91c1c; text-decoration:line-through; opacity:0.6;' : 'color:#0f172a;';
+                                    const cant = Number(item.quantity || item.cantidad || 1);
+                                    const precio = Number(item.price || item.precio || 0);
+                                    const subtotal = precio * cant;
+                                    return `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; border-bottom:1px solid #f1f5f9;">
+                                        <div style="min-width:0; flex:1; padding-right:8px;">
+                                            <div style="font-weight:700; ${styleSinStock} overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                                • ${cant} ${escaparTextoChat(item.unit || item.unidad || 'KG')} de ${escaparTextoChat(item.name || item.nombre || 'Artículo')}
+                                                ${itemSinStock ? `<span style="color:#b91c1c; font-size:10px; margin-left:4px;">(falta stock)</span>` : ''}
+                                            </div>
+                                        </div>
+                                        <div style="font-weight:800; font-family:monospace; color:#0f172a; flex-shrink:0;">
+                                            ${formatMoney(subtotal)}
+                                        </div>
                                     </div>
-                                    <div style="font-weight:700; font-family:monospace;">
-                                        ${formatMoney((item.price || item.precio || 0) * (item.quantity || item.cantidad || 1))}
-                                    </div>
-                                </div>
-                            `}).join('')}
+                                    `;
+                                }).join('')}
+                            </div>
+
                             ${p.notas ? `
-                                <div style="margin-top:4px; font-size:11px; color:#b45309; background:#fffbeb; padding:5px 8px; border-radius:7px; border:1px solid #fde68a;">
-                                    <b>Nota:</b> "${escaparTextoChat(p.notas)}"
+                                <div style="font-size:11px; color:#b45309; background:#fffbeb; padding:5px 8px; border-radius:7px; border:1px solid #fde68a; margin-bottom:7px;">
+                                    <b>Nota del cliente:</b> "${escaparTextoChat(p.notas)}"
                                 </div>
                             ` : ''}
+
+                            <!-- Pie del Ticket: Total y Método de Pago -->
+                            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; border-top:1px dashed #cbd5e1; font-size:12.5px;">
+                                <span style="font-weight:800; color:#475569;">TOTAL TICKET:</span>
+                                <span style="font-weight:900; color:#0f172a; font-family:monospace; font-size:13.5px;">${formatMoney(p.total)}</span>
+                            </div>
                         </div>
 
                         ${esNuevoPendiente ? `
                             <!-- DECISIÓN DE COBRO FÁCIL: ACEPTAR O RECHAZAR -->
-                            <div style="background:#fff7ed; border:1px solid #ffedd5; border-radius:12px; padding:9px; margin-bottom:8px;">
-                                <div style="font-size:10.5px; font-weight:800; color:#9a3412; margin-bottom:6px; text-transform:uppercase;">¿Aceptar pedido para despacho?</div>
+                            <div style="background:#fff7ed; border:1.5px solid #fed7aa; border-radius:12px; padding:10px; margin-bottom:8px;">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                    <span style="font-size:10.5px; font-weight:800; color:#9a3412; text-transform:uppercase;">¿Aceptar pedido para despacho?</span>
+                                    <span style="background:#ffedd5; color:#c2410c; border:1px solid #fed7aa; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">
+                                        ⏱️ Chofer a sucursal: ~${etaBaseMinutos}m
+                                    </span>
+                                </div>
+                                <div style="font-size:10.5px; color:#78350f; line-height:1.4; margin-bottom:8px;">
+                                    💬 <i>Podés usar el <b>Chat con el cliente</b> para pulir el pedido antes de aceptar o embalar si necesitás unos minutos extra sin apurar al cliente.</i>
+                                </div>
                                 <div style="display:flex; gap:8px;">
                                     <button type="button" class="btn" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})" style="flex:1; background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:11px; font-weight:800; padding:8px 6px !important; cursor:pointer;">
                                         ✕ Rechazar
@@ -456,7 +577,7 @@
                             </div>
                         ` : ''}
 
-                        <!-- BOTONES DE ACCIÓN: CERRAR DETALLE, CHAT Y EMBALADO -->
+                        <!-- BOTONES DE ACCIÓN: CERRAR DETALLE, CHAT Y EMBALADO CON IMPACTO DE TIEMPO -->
                         <div style="display:flex; gap:6px; width:100%; box-sizing:border-box;">
                             <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="flex:1; min-width:0; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:700; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap;">
                                 <span>📋</span>
@@ -468,9 +589,9 @@
                                 <span>Chat</span>
                             </button>
 
-                            <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)})" ${puedeEmbalar ? '' : 'disabled'} style="flex:1.25; min-width:0; background:${esEmbalado ? '#10b981' : (puedeEmbalar ? '#047857' : '#94a3b8')}; color:#ffffff; border:none; border-radius:10px; font-size:11px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(16,185,129,0.3); white-space:nowrap;">
-                                <span>${esEmbalado ? '✓' : '📦'}</span>
-                                <span>${esEmbalado ? 'Embalado' : 'Embalar'}</span>
+                            <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, ${recargoEsperaChofer}, ${minutosDemoraChofer})" ${puedeEmbalar ? '' : 'disabled'} style="flex:1.4; min-width:0; background:${bgBotonEmbalar}; color:#ffffff; border:none; border-radius:10px; font-size:10.5px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.15); white-space:nowrap;">
+                                <span>${iconoBotonEmbalar}</span>
+                                <span>${textoBotonEmbalar}</span>
                             </button>
                         </div>
                     </div>
@@ -655,8 +776,8 @@
         }
     }
 
-    // Acción de marcar EMBALADO
-    async function marcarEmbalado(orderId) {
+    // Acción de marcar EMBALADO con impacto de demora y compensación al chofer
+    async function marcarEmbalado(orderId, recargoEspera = 0, minutosDemora = 0) {
         const order = pedidosLista.find(p => p.id === orderId);
         const card = Array.from(document.querySelectorAll('.rf-order-card'))
             .find(element => element.dataset.orderId === String(orderId));
@@ -670,15 +791,26 @@
         try {
             const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/embalar`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    recargo_espera: Number(recargoEspera) || 0,
+                    minutos_demora: Number(minutosDemora) || 0
+                })
             });
             const data = await resp.json();
 
             if (data && data.success) {
-                mostrarToast(`✅ Pedido #${escaparTextoChat(orderId)} embalado. Mensaje enviado al repartidor: "Pedido listo y embalado" 📦`);
+                if (recargoEspera > 0) {
+                    mostrarToast(`✅ Pedido embalado. Chofer esperando: se acreditó +$${Number(recargoEspera).toLocaleString('es-AR')} extra de compensación 📦⏱️`);
+                } else {
+                    mostrarToast(`✅ Pedido #${escaparTextoChat(formatearIdCorto(orderId))} embalado. Mensaje enviado al repartidor: "Pedido listo y embalado" 📦`);
+                }
 
                 if (order) {
                     order.estado = 'ready';
+                    if (recargoEspera > 0 && order.ganancia_repartidor !== undefined) {
+                        order.ganancia_repartidor = Number(order.ganancia_repartidor || 0) + Number(recargoEspera);
+                    }
                 }
                 renderizarCards();
             } else {
