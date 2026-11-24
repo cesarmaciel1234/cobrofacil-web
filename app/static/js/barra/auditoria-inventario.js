@@ -452,7 +452,7 @@
                 ` : `<div class="pedido-vacio" style="padding:24px; text-align:center; color:#64748b;">
                     <p>No hay artículos con estos filtros.</p>
                     ${(texto || filtroDepto || filtroEstado !== 'todos') ? '<button type="button" id="btnRestablecerFiltros" style="border:0; background:none; color:#2563eb; font-weight:800; cursor:pointer;">Limpiar filtros y búsqueda</button>' : ''}
-                   </div>`);
+                   </div>`));
 
         const sinResultados = puedeCrear;
         const inputPrevio = $('auditoriaSearchInput');
