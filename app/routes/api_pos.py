@@ -296,10 +296,14 @@ def api_pos_proveedores_export():
 def api_pos_novedades():
     """Los tickets nuevos desde la última bajada. Sin marca, no manda el libro."""
     from app.services.pos_base import novedades_desde
+    from app.security import current_sucursal_id
 
-    sucursal = request.args.get("sucursal_id", type=int)
-    if sucursal is None:
-        sucursal = request.args.get("branch_id", type=int)
+    user_sid = current_sucursal_id()
+    if user_sid is not None:
+        sucursal = user_sid
+    else:
+        s_raw = request.args.get("sucursal_id") or request.args.get("branch_id")
+        sucursal = int(s_raw) if s_raw and str(s_raw).isdigit() else None
     return jsonify(novedades_desde(
         request.args.get("desde") or request.args.get("last_sync") or "",
         sucursal,
@@ -320,9 +324,13 @@ def api_pos_nodo():
     from app.services.nodo import estado, filtro_de, leer
 
     pieza = (request.args.get("pieza") or "estado").strip().lower()
-    sucursal_id = request.args.get("sucursal_id", type=int)
-    if sucursal_id is None:
-        sucursal_id = request.args.get("branch_id", type=int)
+    from app.security import current_sucursal_id
+    user_sid = current_sucursal_id()
+    if user_sid is not None:
+        sucursal_id = user_sid
+    else:
+        sid_raw = request.args.get("sucursal_id") or request.args.get("branch_id")
+        sucursal_id = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
     if pieza == "estado":
         return jsonify(estado(sucursal_id))
     filtro = filtro_de(pieza, request.args.to_dict())
@@ -522,9 +530,20 @@ def api_pos_resolver_empresa():
 def api_pos_jefe():
     """Reporte, jefe, contabilidad, admin, proveedor, promedio o ticket. Con filtro multi-sucursal y período."""
     from app.services.pos_jefe import panel
+    from app.security import current_sucursal_id
 
     nombre = (request.args.get("panel") or "reporte").strip().lower()
-    sucursal_id = request.args.get("sucursal_id", type=int)
+    user_sid = current_sucursal_id()
+    if user_sid is not None:
+        sucursal_id = user_sid
+    else:
+        suc_raw = request.args.get("sucursal_id") or request.args.get("branch_id")
+        if suc_raw is not None and str(suc_raw).strip().lower() == "web":
+            sucursal_id = "web"
+        elif suc_raw is not None and str(suc_raw).strip().isdigit():
+            sucursal_id = int(str(suc_raw).strip())
+        else:
+            sucursal_id = None
     periodo = (request.args.get("periodo") or "Hoy").strip()
     desde = request.args.get("desde")
     hasta = request.args.get("hasta")
@@ -571,9 +590,14 @@ def api_pos_jefe():
 def api_pos_sucursales():
     """Lista de sucursales activas registradas en la base espejo."""
     from app.services.pos_base import listar_sucursales
+    from app.security import current_sucursal_id
 
     emp_id = int(session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.args.get("empresa_id") or 1)
-    return jsonify({"ok": True, "sucursales": listar_sucursales(empresa_id=emp_id)})
+    sucursales = listar_sucursales(empresa_id=emp_id)
+    user_sid = current_sucursal_id()
+    if user_sid is not None:
+        sucursales = [s for s in sucursales if s.get("id") == user_sid]
+    return jsonify({"ok": True, "sucursales": sucursales})
 
 
 @api_bp.route("/pos/carga", methods=["GET"])
@@ -661,11 +685,16 @@ def api_pos_sync_confirmar():
 def api_pos_inventario_auditoria():
     """Retorna el catálogo completo para auditoría con stock vivo y conteos."""
     from app.services.pos_inventario import obtener_catalogo_auditoria
+    from app.security import current_sucursal_id
 
     emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.args.get("empresa_id") or 1
     emp_id = int(emp_raw) if str(emp_raw).isdigit() else 1
-    sid_raw = request.args.get("sucursal_id")
-    sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+    user_sid = current_sucursal_id()
+    if user_sid is not None:
+        sid = user_sid
+    else:
+        sid_raw = request.args.get("sucursal_id")
+        sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
     dato = obtener_catalogo_auditoria(sucursal_id=sid, empresa_id=emp_id)
     return jsonify(dato)
 
@@ -674,6 +703,7 @@ def api_pos_inventario_auditoria():
 def api_pos_inventario_ajuste():
     """Aplica un ajuste de stock SET inmediato y registra auditoría."""
     from app.services.pos_inventario import registrar_ajuste_inventario
+    from app.security import current_sucursal_id
 
     data = request.get_json(silent=True) or {}
     emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or data.get("empresa_id") or 1
@@ -682,8 +712,12 @@ def api_pos_inventario_ajuste():
     stock_fisico = data.get("stock_fisico")
     responsable = str(data.get("responsable") or session.get("user") or "Admin").strip()
     motivo = str(data.get("motivo") or "Recuento físico").strip()
-    sid_raw = data.get("sucursal_id")
-    sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+    user_sid = current_sucursal_id()
+    if user_sid is not None:
+        sid = user_sid
+    else:
+        sid_raw = data.get("sucursal_id")
+        sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
 
     if pid is None or stock_fisico is None:
         return jsonify({"ok": False, "error": "producto_id y stock_fisico son obligatorios"}), 400
@@ -706,12 +740,17 @@ def api_pos_inventario_ajuste():
 def api_pos_inventario_crear_producto():
     """Alta rápida de artículo desde el buscador del Inventario (nombre + código de barras)."""
     from app.services.pos_inventario import crear_producto_catalogo
+    from app.security import current_sucursal_id
 
     data = request.get_json(silent=True) or {}
     emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or data.get("empresa_id") or 1
     emp_id = int(emp_raw) if str(emp_raw).isdigit() else 1
-    sid_raw = data.get("sucursal_id")
-    sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+    user_sid = current_sucursal_id()
+    if user_sid is not None:
+        sid = user_sid
+    else:
+        sid_raw = data.get("sucursal_id")
+        sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
     resultado = crear_producto_catalogo(
         nombre=data.get("nombre"),
         codigo=str(data.get("codigo") or ""),

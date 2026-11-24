@@ -133,8 +133,19 @@ def set_session_user(user: dict, *, auth_method: str = "password") -> None:
     session["username"] = user["username"]
     session["role"] = user["role"]
     session["empresa_id"] = user.get("empresa_id") or 1
+    session["sucursal_id"] = user.get("sucursal_id")
     session["auth_method"] = auth_method
     session["last_activity"] = datetime.now(timezone.utc).timestamp()
+
+
+def current_sucursal_id() -> int | None:
+    sid = session.get("sucursal_id")
+    return int(sid) if sid not in (None, "") else None
+
+
+def is_global_manager() -> bool:
+    """Retorna True si el usuario tiene rol admin y no está fijado a una sucursal única."""
+    return current_role() == "admin" and current_sucursal_id() is None
 
 
 def set_session_api_key() -> None:

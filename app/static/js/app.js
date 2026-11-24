@@ -2020,11 +2020,14 @@ const $ = id => document.getElementById(id);
                 const snap = localStorage.getItem(SESSION_SNAPSHOT_KEY);
                 if (snap) return JSON.parse(snap);
             } catch (_) {}
+            const sid = localStorage.getItem('session_sucursal_id');
             return {
                 role: localStorage.getItem('session_role') || 'admin',
                 username: localStorage.getItem('sync_user') || '',
                 empresa_id: parseInt(localStorage.getItem('sync_empresa') || '1', 10),
                 empresa_nombre: localStorage.getItem('session_empresa_nombre') || '',
+                sucursal_id: sid != null && sid !== '' ? parseInt(sid, 10) : null,
+                sucursal_nombre: localStorage.getItem('session_sucursal_nombre') || '',
             };
         }
 
@@ -2033,6 +2036,10 @@ const $ = id => document.getElementById(id);
                 localStorage.setItem(SESSION_SNAPSHOT_KEY, JSON.stringify(user));
                 localStorage.setItem('session_role', user.role || 'admin');
                 localStorage.setItem('session_empresa_nombre', user.empresa_nombre || '');
+                if (user.sucursal_id != null) localStorage.setItem('session_sucursal_id', String(user.sucursal_id));
+                else localStorage.removeItem('session_sucursal_id');
+                if (user.sucursal_nombre) localStorage.setItem('session_sucursal_nombre', user.sucursal_nombre);
+                else localStorage.removeItem('session_sucursal_nombre');
             } catch (_) {}
         }
 
@@ -2051,6 +2058,9 @@ const $ = id => document.getElementById(id);
 
         function hydrateSessionLocal() {
             sessionUser = sessionUserFromLocalSnapshot();
+            if (sessionUser && sessionUser.sucursal_id != null) {
+                activeSucursalId = sessionUser.sucursal_id;
+            }
             updateSessionGreetingUI();
             if (window.CrmSync) {
                 CrmSync.init(db, sessionUser);
@@ -2070,7 +2080,13 @@ const $ = id => document.getElementById(id);
                     username: s.username || '',
                     empresa_id: s.empresa_id || 1,
                     empresa_nombre: s.empresa_nombre || '',
+                    sucursal_id: s.sucursal_id != null ? s.sucursal_id : null,
+                    sucursal_nombre: s.sucursal_nombre || '',
                 };
+                if (sessionUser.sucursal_id != null) {
+                    activeSucursalId = sessionUser.sucursal_id;
+                    try { localStorage.setItem('crm_active_sucursal_id', String(activeSucursalId)); } catch (_) {}
+                }
                 fromServer = true;
                 persistSessionSnapshot(sessionUser);
                 updateSessionGreetingUI();
@@ -3285,6 +3301,11 @@ const $ = id => document.getElementById(id);
         }
 
         async function abrirSelectorSucursal() {
+            if (sessionUser && sessionUser.sucursal_id != null) {
+                const nom = sessionUser.sucursal_nombre || ('Sucursal ' + sessionUser.sucursal_id);
+                toast(`🔒 Asignado a ${nom}. Tu usuario opera exclusivamente en este local.`);
+                return;
+            }
             try {
                 const data = await fetch('/api/pos/sucursales').then((r) => r.json());
                 if (data && Array.isArray(data.sucursales)) {
@@ -3354,20 +3375,31 @@ const $ = id => document.getElementById(id);
                 const res = await fetch('/api/pos/sucursales');
                 const data = await res.json();
                 const sucursales = data.sucursales || [];
+                const esColaboradorFijo = sessionUser && sessionUser.sucursal_id != null;
                 sucursalesConocidas = sucursales;
-                if (!sucursalesConocidas.some((s) => String(s.id) === 'web')) {
+                if (!esColaboradorFijo && !sucursalesConocidas.some((s) => String(s.id) === 'web')) {
                     sucursalesConocidas.push({ id: 'web', nombre: 'Tienda Web' });
                 }
                 try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursalesConocidas)); } catch (_) {}
                 if (window.Espejo && Espejo.fijarSucursales) {
                     Espejo.fijarSucursales(sucursalesConocidas);
                 }
-                if (activeSucursalId != null && !sucursales.some((s) => String(s.id) === String(activeSucursalId))) {
+                if (esColaboradorFijo) {
+                    if (activeSucursalId !== sessionUser.sucursal_id) {
+                        aplicarSucursal(sessionUser.sucursal_id);
+                    }
+                } else if (activeSucursalId != null && !sucursales.some((s) => String(s.id) === String(activeSucursalId))) {
                     aplicarSucursal(null);
                 }
                 actualizarNombreEmpresaTopbar();
                 const cont = $('sucursalPillsContainer');
                 if (!cont) return;
+
+                if (esColaboradorFijo) {
+                    cont.style.display = 'none';
+                    return;
+                }
+                cont.style.display = '';
 
                 let html = `<button type="button" class="btn btn-sm ${activeSucursalId === null ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="todas" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">Consolidado (Todas)</button>`;
 

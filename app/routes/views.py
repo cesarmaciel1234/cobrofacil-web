@@ -40,6 +40,8 @@ def auth_session():
         return jsonify({"authenticated": False}), 401
     empresa_id = session.get("empresa_id") or 1
     empresa_nombre = ""
+    sucursal_id = session.get("sucursal_id")
+    sucursal_nombre = ""
     try:
         from app.services.users import get_db
         with get_db(empresa_id=0) as conn:
@@ -49,6 +51,13 @@ def auth_session():
             ).fetchone()
             if row:
                 empresa_nombre = row["nombre"] or ""
+            if sucursal_id:
+                srow = conn.execute(
+                    "SELECT nombre FROM sucursales WHERE id = ?",
+                    (sucursal_id,),
+                ).fetchone()
+                if srow:
+                    sucursal_nombre = srow["nombre"] or ""
     except Exception:
         pass
     return jsonify({
@@ -58,6 +67,8 @@ def auth_session():
         "auth_method": session.get("auth_method"),
         "empresa_id": empresa_id,
         "empresa_nombre": empresa_nombre,
+        "sucursal_id": sucursal_id,
+        "sucursal_nombre": sucursal_nombre,
     })
 
 

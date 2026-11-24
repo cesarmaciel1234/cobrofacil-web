@@ -60,6 +60,7 @@ def _row_to_user(row) -> dict[str, Any]:
         "role": r["role"],
         "activo": bool(r.get("activo", 1)),
         "empresa_id": r.get("empresa_id"),
+        "sucursal_id": r.get("sucursal_id"),
         "created_at": r.get("created_at"),
     }
 
@@ -109,20 +110,58 @@ def authenticate_user(username: str, password: str) -> dict[str, Any] | None:
 
 
 def get_user(user_id: int) -> dict[str, Any] | None:
-    with get_db() as conn:
-        row = conn.execute("SELECT * FROM usuarios WHERE id = ?", (user_id,)).fetchone()
-    return _row_to_user(row) if row else None
+    with get_db(empresa_id=0) as conn:
+        row = conn.execute(
+            """SELECT u.id, u.username, u.nombre, u.role, u.activo, u.empresa_id, u.sucursal_id, u.created_at,
+                      s.nombre as sucursal_nombre
+               FROM usuarios u
+               LEFT JOIN sucursales s ON s.id = u.sucursal_id
+               WHERE u.id = ?""",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        return None
+    d = _row_to_user(row)
+    d["sucursal_nombre"] = row["sucursal_nombre"]
+    return d
 
 
-def list_users() -> list[dict[str, Any]]:
-    with get_db() as conn:
-        rows = conn.execute(
-            "SELECT id, username, nombre, role, activo, created_at FROM usuarios ORDER BY username"
-        ).fetchall()
-    return [_row_to_user(r) for r in rows]
+def list_users(empresa_id: int | None = None) -> list[dict[str, Any]]:
+    with get_db(empresa_id=0) as conn:
+        if empresa_id:
+            rows = conn.execute(
+                """SELECT u.id, u.username, u.nombre, u.role, u.activo, u.empresa_id, u.sucursal_id, u.created_at,
+                          s.nombre as sucursal_nombre
+                   FROM usuarios u
+                   LEFT JOIN sucursales s ON s.id = u.sucursal_id
+                   WHERE u.empresa_id = ?
+                   ORDER BY u.username""",
+                (empresa_id,),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT u.id, u.username, u.nombre, u.role, u.activo, u.empresa_id, u.sucursal_id, u.created_at,
+                          s.nombre as sucursal_nombre
+                   FROM usuarios u
+                   LEFT JOIN sucursales s ON s.id = u.sucursal_id
+                   ORDER BY u.username"""
+            ).fetchall()
+    users = []
+    for r in rows:
+        d = _row_to_user(r)
+        d["sucursal_nombre"] = r["sucursal_nombre"]
+        users.append(d)
+    return users
 
 
-def create_user(username: str, password: str, role: str = "operador", nombre: str = "", empresa_id: int | None = None) -> int:
+def create_user(
+    username: str,
+    password: str,
+    role: str = "operador",
+    nombre: str = "",
+    empresa_id: int | None = None,
+    sucursal_id: int | None = None,
+) -> int:
     role = (role or "operador").lower()
     if role not in ROLES:
         raise ValueError("Rol inválido")
@@ -131,22 +170,32 @@ def create_user(username: str, password: str, role: str = "operador", nombre: st
         raise ValueError("Usuario demasiado corto")
     if len(password) < 6:
         raise ValueError("La contraseña debe tener al menos 6 caracteres")
+    sid = int(sucursal_id) if sucursal_id not in (None, "") else None
     with get_db(empresa_id=0) as conn:
         exists = conn.execute("SELECT 1 FROM usuarios WHERE username = ?", (username,)).fetchone()
         if exists:
             raise ValueError("El nombre de usuario ya está registrado")
         cur = conn.execute(
             """
-            INSERT INTO usuarios (username, nombre, password_hash, role, activo, empresa_id)
-            VALUES (?, ?, ?, ?, 1, ?)
+            INSERT INTO usuarios (username, nombre, password_hash, role, activo, empresa_id, sucursal_id)
+            VALUES (?, ?, ?, ?, 1, ?, ?)
             """,
-            (username, nombre or username, generate_password_hash(password), role, empresa_id),
+            (username, nombre or username, generate_password_hash(password), role, empresa_id, sid),
         )
+        if hasattr(conn, "commit"):
+            conn.commit()
         return int(cur.lastrowid)
 
 
-def update_user(user_id: int, *, role: str | None = None, activo: bool | None = None, nombre: str | None = None) -> dict[str, Any]:
-    with get_db() as conn:
+def update_user(
+    user_id: int,
+    *,
+    role: str | None = None,
+    activo: bool | None = None,
+    nombre: str | None = None,
+    sucursal_id: Any = "NO_CHANGE",
+) -> dict[str, Any]:
+    with get_db(empresa_id=0) as conn:
         row = conn.execute("SELECT id FROM usuarios WHERE id = ?", (user_id,)).fetchone()
         if not row:
             raise ValueError("Usuario no encontrado")
@@ -159,6 +208,11 @@ def update_user(user_id: int, *, role: str | None = None, activo: bool | None = 
             conn.execute("UPDATE usuarios SET activo = ? WHERE id = ?", (1 if activo else 0, user_id))
         if nombre is not None:
             conn.execute("UPDATE usuarios SET nombre = ? WHERE id = ?", (nombre.strip() or "", user_id))
+        if sucursal_id != "NO_CHANGE":
+            sid = int(sucursal_id) if sucursal_id not in (None, "") else None
+            conn.execute("UPDATE usuarios SET sucursal_id = ? WHERE id = ?", (sid, user_id))
+        if hasattr(conn, "commit"):
+            conn.commit()
     user = get_user(user_id)
     if not user:
         raise ValueError("Usuario no encontrado")

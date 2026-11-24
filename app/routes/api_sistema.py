@@ -197,8 +197,9 @@ def api_empresa():
 def api_usuarios():
     if not role_at_least("admin"):
         return jsonify({"error": "Permiso denegado"}), 403
+    emp_id = session.get("empresa_id") or 1
     if request.method == "GET":
-        return jsonify(list_users())
+        return jsonify(list_users(empresa_id=emp_id))
     d = request.get_json(silent=True) or {}
     try:
         uid = create_user(
@@ -206,6 +207,8 @@ def api_usuarios():
             d.get("password", ""),
             d.get("role", "operador"),
             d.get("nombre", ""),
+            empresa_id=emp_id,
+            sucursal_id=d.get("sucursal_id"),
         )
         return jsonify({"id": uid, "ok": True}), 201
     except ValueError as e:
@@ -217,11 +220,16 @@ def api_usuario_update(user_id: int):
         return jsonify({"error": "Permiso denegado"}), 403
     d = request.get_json(silent=True) or {}
     try:
+        kwargs = {
+            "role": d.get("role"),
+            "activo": d.get("activo") if "activo" in d else None,
+            "nombre": d.get("nombre"),
+        }
+        if "sucursal_id" in d:
+            kwargs["sucursal_id"] = d.get("sucursal_id")
         user = update_user(
             user_id,
-            role=d.get("role"),
-            activo=d.get("activo") if "activo" in d else None,
-            nombre=d.get("nombre"),
+            **kwargs,
         )
         log_audit("CONFIG", entidad="usuario", entidad_id=user_id, detalle=f"rol={user['role']}")
         return jsonify(user)
