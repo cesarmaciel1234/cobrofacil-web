@@ -1673,8 +1673,8 @@
                         </div>
                         <div style="display:flex; align-items:center; gap:6px;">
                             <button type="button" id="btnToggleSonidoReparto" onclick="window.RepartoFacilDespacho.toggleSonido()" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:11px; padding:5px 8px; cursor:pointer; color:#2D3277; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Activar / Silenciar alerta sonora">
-                                <span id="iconoSonidoReparto">${sonidoActivado ? '🔔' : '🔕'}</span>
-                                <span id="lblSonidoReparto" style="font-size:9.5px; font-weight:900;">${sonidoActivado ? 'ON' : 'OFF'}</span>
+                                <span id="iconoSonidoReparto">${sonidoHabilitado ? '🔔' : '🔕'}</span>
+                                <span id="lblSonidoReparto" style="font-size:9.5px; font-weight:900;">${sonidoHabilitado ? 'ON' : 'OFF'}</span>
                             </button>
                             <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos(true)" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:13px; font-weight:900; padding:4px 9px; cursor:pointer; color:#2D3277; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Refrescar pedidos">
                                 ↻

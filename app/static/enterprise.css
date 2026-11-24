@@ -4251,13 +4251,7 @@ body.wa-modal-open {
 
 /* Encapsular botón WhatsApp y modo edición de ficha estrictamente a Cartera */
 #view-cartera:not(.active) #btnFabWa,
-body:not([data-view="cartera"]) #btnFabWa,
-#ficha[hidden] #btnFabWa,
-#ficha[hidden] ~ #btnFabWa {
-    display: none !important;
-}
-body:not([data-view="cartera"]) #btnRefresh.es-editar-cliente .ico-pencil,
-#view-cartera:not(.active) ~ * #btnRefresh.es-editar-cliente .ico-pencil {
+#ficha[hidden] #btnFabWa {
     display: none !important;
 }
 
