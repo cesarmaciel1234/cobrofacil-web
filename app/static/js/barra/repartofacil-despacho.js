@@ -1686,34 +1686,34 @@
                     </div>
 
                     <!-- Fila Inferior: Las 3 tarjetas de Pedidos Web exclusivas -->
-                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center;">
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 4px;">
-                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🏪 Retiro en Local</span>
-                            <b style="font-size:12.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                    <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; text-align:center;">
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
+                            <span style="font-size:8.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🏪 Retiro Local</span>
+                            <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.retiro_local_monto || 0)}
                             </b>
-                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;">
-                                ${data.retiro_local_cant || 0} pedido${data.retiro_local_cant === 1 ? '' : 's'} (${data.retiro_local_activos || 0} act.)
+                            <small style="font-size:8.5px; color:#854d0e; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
+                                ${data.retiro_local_cant || 0} ped. (${data.retiro_local_activos || 0} act.)
                             </small>
                         </div>
 
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 4px;">
-                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🛵 Con Delivery</span>
-                            <b style="font-size:12.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
+                            <span style="font-size:8.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🛵 Con Delivery</span>
+                            <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.delivery_monto || 0)}
                             </b>
-                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;">
-                                ${data.delivery_cant || 0} pedido${data.delivery_cant === 1 ? '' : 's'} (${data.delivery_activos || 0} act.)
+                            <small style="font-size:8.5px; color:#854d0e; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
+                                ${data.delivery_cant || 0} ped. (${data.delivery_activos || 0} act.)
                             </small>
                         </div>
 
-                        <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:14px; padding:8px 4px; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
-                            <span style="font-size:9px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📦 Total Pedidos Web</span>
-                            <b style="font-size:13px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                        <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:12px; padding:7px 2px; min-width:0; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
+                            <span style="font-size:8.5px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📦 Pedidos Web</span>
+                            <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.total_web_monto != null ? data.total_web_monto : data.monto_web_total)}
                             </b>
-                            <small style="font-size:9px; color:#2D3277; font-weight:900; white-space:nowrap;">
-                                ${data.total_web_cant != null ? data.total_web_cant : (data.cant_pedidos_web_hoy || 0)} ped. (${data.total_web_activos != null ? data.total_web_activos : (data.pedidos_activos_web || 0)} activos)
+                            <small style="font-size:8.5px; color:#2D3277; font-weight:900; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
+                                ${data.total_web_cant != null ? data.total_web_cant : (data.cant_pedidos_web_hoy || 0)} ped. (${data.total_web_activos != null ? data.total_web_activos : (data.pedidos_activos_web || 0)} act.)
                             </small>
                         </div>
                     </div>
