@@ -127,10 +127,22 @@
 
     async function resolverDireccionInversa(lat, lng, rev) {
         try {
-            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
-            const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
-            if (!res.ok) return;
-            const data = await res.json();
+            // 1. Intentar por backend local (sin problemas de CSP ni CORS)
+            let data = null;
+            try {
+                const localRes = await fetch(`/api/repartofacil/geo/reverse?lat=${lat}&lng=${lng}`);
+                if (localRes.ok) data = await localRes.json();
+            } catch (e) {
+                data = null;
+            }
+
+            // 2. Fallback directo a Nominatim si hiciera falta
+            if (!data || !data.address) {
+                const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+                const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+                if (res.ok) data = await res.json();
+            }
+
             if (rev !== ubicacionRevision || !data || !data.address) return;
             
             const addr = data.address;
@@ -199,18 +211,28 @@
         cerrarSugerencias();
         estadoMapa.textContent = `Buscando "${query}"...`;
         try {
-            // Si la consulta es corta o no incluye provincia, ayudamos a la búsqueda
-            let queryArg = query;
-            if (!/argentina|buenos aires|caba|santa fe|cordoba|rosario|hurlingham/i.test(query)) {
-                queryArg = `${query}, Buenos Aires, Argentina`;
-            } else if (!/argentina/i.test(query)) {
-                queryArg = `${query}, Argentina`;
+            let results = null;
+
+            // 1. Intentar por backend local (sin bloqueo de CSP)
+            try {
+                const localRes = await fetch(`/api/repartofacil/geo/search?q=${encodeURIComponent(query)}`);
+                if (localRes.ok) results = await localRes.json();
+            } catch (e) {
+                results = null;
             }
 
-            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryArg)}&limit=5&countrycodes=ar&addressdetails=1`;
-            const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
-            if (!res.ok) throw new Error('Error en el servicio de mapas');
-            let results = await res.json();
+            // 2. Fallback a Nominatim directo
+            if (!results || results.length === 0) {
+                let queryArg = query;
+                if (!/argentina|buenos aires|caba|santa fe|cordoba|rosario|hurlingham/i.test(query)) {
+                    queryArg = `${query}, Buenos Aires, Argentina`;
+                } else if (!/argentina/i.test(query)) {
+                    queryArg = `${query}, Argentina`;
+                }
+                const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryArg)}&limit=5&countrycodes=ar&addressdetails=1`;
+                const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+                if (res.ok) results = await res.json();
+            }
             
             // Si no encontró con el filtro estricto, probamos con el texto original sin agregados
             if ((!results || results.length === 0) && queryArg !== query) {

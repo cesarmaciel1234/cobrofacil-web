@@ -1,7 +1,53 @@
 from flask import current_app, jsonify, request, session
+import urllib.request
+import urllib.parse
+import json
 
 from app.routes.api import api_bp
 from app.services.perfil_comercio import guardar_perfil, leer_perfil
+
+
+@api_bp.route("/repartofacil/geo/search", methods=["GET"])
+def geo_search():
+    query = (request.args.get("q") or "").strip()
+    if not query:
+        return jsonify([])
+    try:
+        # Priorizar búsqueda local en Argentina
+        query_arg = query if "argentina" in query.lower() else f"{query}, Buenos Aires, Argentina"
+        encoded = urllib.parse.quote(query_arg)
+        url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded}&limit=5&countrycodes=ar&addressdetails=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "CobroFacil-Geo/1.0", "Accept-Language": "es"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if not data and query_arg != query:
+            # Fallback a texto directo
+            encoded_raw = urllib.parse.quote(query)
+            url_raw = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded_raw}&limit=5&countrycodes=ar&addressdetails=1"
+            req_raw = urllib.request.Request(url_raw, headers={"User-Agent": "CobroFacil-Geo/1.0", "Accept-Language": "es"})
+            with urllib.request.urlopen(req_raw, timeout=5) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+        return jsonify(data or [])
+    except Exception as e:
+        current_app.logger.warning("Error en geo_search: %s", e)
+        return jsonify([])
+
+
+@api_bp.route("/repartofacil/geo/reverse", methods=["GET"])
+def geo_reverse():
+    lat = request.args.get("lat")
+    lng = request.args.get("lng")
+    if not lat or not lng:
+        return jsonify({})
+    try:
+        url = f"https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat={lat}&lon={lng}"
+        req = urllib.request.Request(url, headers={"User-Agent": "CobroFacil-Geo/1.0", "Accept-Language": "es"})
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        return jsonify(data or {})
+    except Exception as e:
+        current_app.logger.warning("Error en geo_reverse: %s", e)
+        return jsonify({})
 
 
 @api_bp.route("/repartofacil/mi-empresa", methods=["GET", "PUT"])
