@@ -396,6 +396,16 @@ def api_pos_base_tabla():
     data = request.get_json(silent=True) or {}
     emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.headers.get("X-Company-ID") or data.get("empresa_id")
     emp_id = int(emp_raw) if str(emp_raw or "").isdigit() else 1
+    
+    # Resolución jerárquica: PC/Terminal -> Sucursal -> Empresa
+    identificador_pc = str(data.get("identificador_pc") or data.get("nombre_maquina") or data.get("host_name") or "").strip()
+    suc_id_input = data.get("sucursal_id") if data.get("sucursal_id") not in (None, "") else data.get("branch_id")
+    try:
+        from app.services.sucursales_service import resolver_sucursal_terminal
+        suc_id_resuelto = resolver_sucursal_terminal(emp_id, identificador_pc, suc_id_input)
+    except Exception:
+        suc_id_resuelto = suc_id_input
+
     try:
         resultado = guardar_parte(
             str(data.get("tabla") or ""),
@@ -403,7 +413,7 @@ def api_pos_base_tabla():
             data.get("filas") or [],
             data.get("parte") or 1,
             data.get("partes") or 1,
-            data.get("sucursal_id") if data.get("sucursal_id") not in (None, "") else data.get("branch_id"),
+            suc_id_resuelto,
             data.get("sucursal") or data.get("sucursal_nombre"),
             str(data.get("modo") or "reemplazo"),
             data.get("bajas") or [],

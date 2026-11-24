@@ -165,6 +165,7 @@
             pintar(datos, usuario.role);
             resumen.hidden = false;
             estado.textContent = usuario.role === 'admin' ? '' : 'Tu usuario puede consultar la ficha, pero no editarla.';
+            cargarSucursales();
         } catch (error) {
             if (actual === version) estado.textContent = error.message || 'No se pudo cargar la ficha.';
         }
@@ -556,5 +557,164 @@
             guardando = false;
         }
     });
-    global.MiEmpresa = { entrar };
+    // =========================================================================
+    // 🏢 GESTIÓN PIRAMIDAL DE SUCURSALES Y TERMINALES / CAJAS (TPV)
+    // =========================================================================
+    function textoSeguro(str) {
+        if (!str) return '';
+        const d = document.createElement('div');
+        d.textContent = String(str);
+        return d.innerHTML;
+    }
+
+    async function cargarSucursales() {
+        const subtitulo = document.getElementById('empresaSucursalesSubtitulo');
+        const listaCont = document.getElementById('empresaListaSucursales');
+        if (!listaCont) return;
+
+        try {
+            if (subtitulo) subtitulo.textContent = 'Consultando locales y cajas...';
+            const res = await fetch('/api/sucursales');
+            const data = await res.json();
+            if (!data.success || !Array.isArray(data.sucursales)) {
+                if (subtitulo) subtitulo.textContent = 'No se pudo cargar la lista.';
+                return;
+            }
+            const sucursales = data.sucursales;
+            const esUnico = data.es_negocio_unico;
+            if (subtitulo) {
+                subtitulo.textContent = esUnico
+                    ? '1 local activo · Negocio Único (Cero fricción en catálogo)'
+                    : `${sucursales.length} locales activos · Red Multi-sucursal`;
+            }
+
+            if (sucursales.length === 0) {
+                listaCont.innerHTML = '<p style="color:#64748b; font-size:13px; padding:10px 0;">No hay sucursales registradas.</p>';
+                return;
+            }
+
+            let html = '';
+            sucursales.forEach((suc) => {
+                const terms = suc.terminales || [];
+                const badgeUnico = esUnico ? '<span style="background:#e0f2fe; color:#0369a1; font-size:10px; font-weight:800; padding:2px 8px; border-radius:12px; margin-left:6px;">⭐ LOCAL ÚNICO</span>' : '';
+                const badgeCd = suc.es_centro_distribucion ? '<span style="background:#fef3c7; color:#92400e; font-size:10px; font-weight:800; padding:2px 8px; border-radius:12px; margin-left:6px;">📦 CENTRO DISTRIBUCIÓN</span>' : '';
+
+                html += `
+                <div class="sucursal-card" style="border:1.5px solid #e2e8f0; border-radius:14px; padding:12px 14px; background:#f8fafc; display:flex; flex-direction:column; gap:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <div style="display:flex; align-items:center; flex-wrap:wrap; gap:4px;">
+                                <strong style="font-size:14px; color:#2D3277;">${textoSeguro(suc.nombre)}</strong>
+                                ${badgeUnico}
+                                ${badgeCd}
+                            </div>
+                            <small style="display:block; color:#64748b; font-size:11px; margin-top:3px;">
+                                📍 ${textoSeguro(suc.direccion || 'Sin dirección asignada')}
+                            </small>
+                            ${suc.horario ? `<small style="display:block; color:#64748b; font-size:11px;">⏰ ${textoSeguro(suc.horario)}</small>` : ''}
+                            ${suc.whatsapp ? `<small style="display:block; color:#16a34a; font-size:11px; font-weight:700;">📱 WhatsApp: ${textoSeguro(suc.whatsapp)}</small>` : ''}
+                        </div>
+                        <button type="button" class="btn-editar-sucursal" data-id="${suc.id}" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:4px 8px; font-size:11px; font-weight:700; color:#475569; cursor:pointer;">
+                            ✎ Editar
+                        </button>
+                    </div>
+
+                    <!-- Terminales / Cajas conectadas a esta sucursal -->
+                    <div style="border-top:1px dashed #cbd5e1; padding-top:8px; margin-top:2px;">
+                        <span style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; letter-spacing:0.5px;">
+                            Cajas / PCs Conectadas (${terms.length})
+                        </span>
+                        <div style="margin-top:4px; display:flex; flex-direction:column; gap:4px;">
+                            ${terms.length === 0 ? '<span style="font-size:11px; color:#94a3b8; font-style:italic;">⚠️ Sin cajas TPV vinculadas aún</span>' : ''}
+                            ${terms.map(t => `
+                                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:4px 10px; font-size:11px;">
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <span style="font-size:13px;">💻</span>
+                                        <strong style="color:#1e293b;">${textoSeguro(t.nombre)}</strong>
+                                        <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px; font-size:10px; color:#64748b;">${textoSeguro(t.identificador_pc)}</code>
+                                    </div>
+                                    <span style="display:inline-flex; align-items:center; gap:4px; color:#16a34a; font-weight:700; font-size:10px;">
+                                        <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#16a34a;"></span>
+                                        En vivo
+                                    </span>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            listaCont.innerHTML = html;
+
+            listaCont.querySelectorAll('.btn-editar-sucursal').forEach(btn => {
+                btn.onclick = () => {
+                    const sid = Number(btn.dataset.id);
+                    const suc = sucursales.find(s => s.id === sid);
+                    if (suc) abrirModalSucursal(suc);
+                };
+            });
+        } catch (e) {
+            if (subtitulo) subtitulo.textContent = 'Error al cargar sucursales.';
+        }
+    }
+
+    function abrirModalSucursal(suc = null) {
+        const modal = document.getElementById('modalSucursal');
+        const tit = document.getElementById('modalSucursalTitulo');
+        if (!modal) return;
+        document.getElementById('sucursalFormId').value = suc ? suc.id : '';
+        document.getElementById('sucursalFormNombre').value = suc ? suc.nombre : '';
+        document.getElementById('sucursalFormCodigo').value = suc ? (suc.codigo || '') : '';
+        document.getElementById('sucursalFormWhatsapp').value = suc ? (suc.whatsapp || '') : '';
+        document.getElementById('sucursalFormDireccion').value = suc ? (suc.direccion || '') : '';
+        document.getElementById('sucursalFormHorario').value = suc ? (suc.horario || '') : '';
+        document.getElementById('sucursalFormEsCd').checked = suc ? !!suc.es_centro_distribucion : false;
+        if (tit) tit.textContent = suc ? '✎ Editar Sucursal' : '+ Nueva Sucursal';
+        modal.style.display = 'block';
+    }
+
+    function cerrarModalSucursal() {
+        const modal = document.getElementById('modalSucursal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    document.getElementById('empresaBtnNuevaSucursal')?.addEventListener('click', () => abrirModalSucursal());
+    document.getElementById('modalSucursalCerrar')?.addEventListener('click', cerrarModalSucursal);
+    document.getElementById('modalSucursalCancelar')?.addEventListener('click', cerrarModalSucursal);
+
+    document.getElementById('formSucursal')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const idVal = f.elements['id'].value;
+        const datos = {
+            id: idVal ? parseInt(idVal, 10) : null,
+            nombre: f.elements['nombre'].value.trim(),
+            codigo: f.elements['codigo'].value.trim(),
+            whatsapp: f.elements['whatsapp'].value.trim(),
+            direccion: f.elements['direccion'].value.trim(),
+            horario: f.elements['horario'].value.trim(),
+            es_centro_distribucion: f.elements['es_centro_distribucion'].checked
+        };
+        try {
+            const res = await fetch('/api/sucursales', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(datos)
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalSucursal();
+                cargarSucursales();
+                if (window.cargarSucursalesSelector) {
+                    window.cargarSucursalesSelector();
+                }
+            } else {
+                alert(data.error || 'Error al guardar sucursal');
+            }
+        } catch (err) {
+            alert('Error de red al guardar la sucursal');
+        }
+    });
+
+    global.MiEmpresa = { entrar, cargarSucursales };
 })(window);

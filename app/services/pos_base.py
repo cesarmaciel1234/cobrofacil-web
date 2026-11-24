@@ -934,26 +934,24 @@ def ultima_carga(sucursal_id: int | str | None = None, empresa_id: int | None = 
 def consolidar_sucursales(conn) -> None:
     """Unifica terminales registradas con el hostname del equipo si se duplicó el nodo."""
     try:
-        row_maciel = conn.execute("SELECT 1 FROM pos_base WHERE sucursal_id = 1 AND LOWER(TRIM(COALESCE(sucursal_nombre, ''))) = 'maciel' LIMIT 1").fetchone()
-        row_nodo2 = conn.execute("SELECT 1 FROM pos_base WHERE sucursal_id = 2 AND LOWER(COALESCE(sucursal_nombre, '')) LIKE '%desktop%' LIMIT 1").fetchone()
-        if row_maciel and row_nodo2:
-            conn.execute(
-                """
-                UPDATE pos_base p1
-                SET sucursal_id = 2, sucursal_nombre = 'maciel - DESKTOP-7Q2Q4VD'
-                WHERE p1.sucursal_id = 1
-                  AND LOWER(TRIM(COALESCE(p1.sucursal_nombre, ''))) = 'maciel'
-                  AND NOT EXISTS (
-                      SELECT 1 FROM pos_base p2
-                      WHERE p2.sucursal_id = 2 AND p2.tabla = p1.tabla AND p2.parte = p1.parte
-                  )
-                """
-            )
-            conn.execute("DELETE FROM pos_base WHERE sucursal_id = 1 AND LOWER(TRIM(COALESCE(sucursal_nombre, ''))) = 'maciel'")
-            conn.execute("DELETE FROM clientes WHERE sucursal_id = 1")
-            conn.execute("DELETE FROM pos_novedad WHERE sucursal_id = 1")
-            if hasattr(conn, "commit"):
-                conn.commit()
+        conn.execute(
+            """
+            DELETE FROM pos_base
+            WHERE sucursal_id = 2 AND empresa_id = 1
+              AND (tabla, parte) IN (
+                  SELECT tabla, parte FROM pos_base WHERE sucursal_id = 1 AND empresa_id = 1
+              )
+            """
+        )
+        conn.execute(
+            """
+            UPDATE pos_base
+            SET sucursal_id = 1, sucursal_nombre = 'Casa Central - Alfaro 1964'
+            WHERE sucursal_id = 2 AND empresa_id = 1
+            """
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
     except Exception as exc:
         logger.warning("consolidar_sucursales: %s", exc)
 
@@ -986,6 +984,33 @@ def listar_sucursales(empresa_id: int | None = None) -> list[dict]:
         hit = _sucursales_mem.get(ambito)
         if hit and _vigente(hit[0], ahora, ambito):
             return hit[1]
+
+    # Prioridad: Consultar tabla de sucursales configuradas oficialmente
+    try:
+        from app.services import sucursales_service
+        info = sucursales_service.listar_sucursales(eid)
+        if info and info.get("sucursales"):
+            salida = []
+            for s in info["sucursales"]:
+                salida.append({
+                    "id": s["id"],
+                    "nombre": s["nombre"],
+                    "codigo": s.get("codigo") or "",
+                    "direccion": s.get("direccion") or "",
+                    "telefono": s.get("telefono") or "",
+                    "whatsapp": s.get("whatsapp") or "",
+                    "horario": s.get("horario") or "",
+                    "es_centro_distribucion": bool(s.get("es_centro_distribucion", False)),
+                    "terminales": s.get("terminales") or [],
+                    "cantidad_terminales": len(s.get("terminales") or []),
+                })
+            salida.append({"id": "web", "nombre": "Tienda Web"})
+            with _cache_lock:
+                _sucursales_mem[ambito] = (time.monotonic(), salida)
+            return salida
+    except Exception as exc:
+        logger.warning("listar_sucursales usando sucursales_service falló: %s", exc)
+
     with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
         consolidar_sucursales(conn)

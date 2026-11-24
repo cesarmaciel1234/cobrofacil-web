@@ -3306,15 +3306,34 @@ const $ = id => document.getElementById(id);
             }
             document.getElementById('sucursalSheet')?.remove();
             const actual = activeSucursalId == null ? '' : String(activeSucursalId);
-            const opciones = [{ id: '', nombre: '— Todas —' }].concat(
-                sucursalesConocidas.map((s) => ({ id: String(s.id), nombre: s.nombre || ('Sucursal ' + s.id) }))
+            const opciones = [{ id: '', nombre: '— Todas las Sucursales — (Consolidado Master)', icono: '🏢' }].concat(
+                sucursalesConocidas.map((s) => ({
+                    id: String(s.id),
+                    nombre: s.nombre || ('Sucursal ' + s.id),
+                    direccion: s.direccion || '',
+                    icono: String(s.id) === 'web' ? '🌐' : (s.es_centro_distribucion ? '📦' : '🏪')
+                }))
             );
             const fondo = document.createElement('div');
             fondo.id = 'sucursalSheet';
             fondo.className = 'pedido-sheet-back';
-            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Sucursales">
-                <strong class="pedido-sheet-titulo">Sucursales</strong>
-                ${opciones.map((op) => `<button type="button" class="pedido-opcion${op.id === actual ? ' active' : ''}" data-sucursal="${textoJefe(op.id)}">${op.id === 'web' ? '🌐 ' : ''}${textoJefe(op.nombre)}</button>`).join('')}
+            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Sucursales" style="border-radius:24px 24px 0 0; padding:20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <strong class="pedido-sheet-titulo" style="font-size:16px; font-weight:800; color:#2D3277; margin:0;">🏢 Filtro por Sucursal</strong>
+                    <span style="font-size:11px; font-weight:700; color:#64748b;">${sucursalesConocidas.filter(s => s.id !== 'web').length <= 1 ? '⭐ Local Único' : '🏢 Red de Locales'}</span>
+                </div>
+                <div style="display:flex; flex-direction:column; gap:8px;">
+                    ${opciones.map((op) => `
+                        <button type="button" class="pedido-opcion${op.id === actual ? ' active' : ''}" data-sucursal="${textoJefe(op.id)}" style="display:flex; flex-direction:column; align-items:flex-start; text-align:left; padding:12px 14px; border-radius:12px; border:1.5px solid ${op.id === actual ? '#2D3277' : '#e2e8f0'}; background:${op.id === actual ? '#eff6ff' : '#ffffff'};">
+                            <span style="font-size:14px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:6px;">
+                                <span>${op.icono}</span>
+                                <span>${textoJefe(op.nombre)}</span>
+                                ${op.id === actual ? '<span style="margin-left:auto; color:#2563eb; font-weight:900;">✓</span>' : ''}
+                            </span>
+                            ${op.direccion ? `<small style="font-size:11px; color:#64748b; margin-top:2px;">📍 ${textoJefe(op.direccion)}</small>` : ''}
+                        </button>
+                    `).join('')}
+                </div>
             </div>`;
             fondo.addEventListener('click', (ev) => {
                 const opcion = ev.target.closest('[data-sucursal]');
