@@ -424,7 +424,7 @@
                     borderBotonEmbalar = '1px solid #cbd5e1';
                     accionBotonEmbalar = '';
                 } else if (esEmbalado) {
-                    textoBotonEmbalar = 'Entregar al Cliente';
+                    textoBotonEmbalar = 'Entregar';
                     iconoBotonEmbalar = '✓';
                     bgBotonEmbalar = '#10b981';
                     colorBotonEmbalar = '#ffffff';
@@ -992,7 +992,11 @@
             const data = await resp.json();
 
             if (data && data.success) {
-                if (recargoEspera > 0) {
+                const tipoEntregaNormalizado = String(order ? order.tipo_entrega : '').toLowerCase();
+                const esRetiro = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+                if (esRetiro) {
+                    mostrarToast(`🛍️ Pedido #${escaparTextoChat(formatearIdCorto(orderId))} listo para retirar en mostrador.`);
+                } else if (recargoEspera > 0) {
                     mostrarToast(`✅ Pedido embalado. Chofer esperando: se acreditó +$${Number(recargoEspera).toLocaleString('es-AR')} extra de compensación 📦⏱️`);
                 } else {
                     mostrarToast(`✅ Pedido #${escaparTextoChat(formatearIdCorto(orderId))} embalado. Mensaje enviado al repartidor: "Pedido listo y embalado" 📦`);
