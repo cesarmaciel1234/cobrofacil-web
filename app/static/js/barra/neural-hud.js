@@ -411,16 +411,16 @@
                     </div>
 
                     <!-- CONSOLA DE ENTRADA CON VOZ Y TEXTO -->
-                    <form id="formJarvisCommand" style="display: flex; gap: 8px; align-items: center; background: rgba(15, 23, 42, 0.9); border: 1.5px solid rgba(0, 242, 254, 0.4); border-radius: 14px; padding: 4px 6px 4px 14px; box-shadow: 0 0 15px rgba(0, 242, 254, 0.15);">
-                        <input type="text" id="inputJarvisPrompt" placeholder="Jarvis: Ingresa una orden o consulta de negocio..." autocomplete="off"
-                               style="flex: 1; background: transparent; border: none; color: #f8fafc; font-size: 13.5px; font-weight: 700; outline: none;">
+                    <form id="formJarvisCommand" style="display: flex; gap: 6px; align-items: center; background: rgba(15, 23, 42, 0.9); border: 1.5px solid rgba(0, 242, 254, 0.4); border-radius: 14px; padding: 4px 6px 4px 10px; box-shadow: 0 0 15px rgba(0, 242, 254, 0.15); box-sizing: border-box; width: 100%;">
+                        <input type="text" id="inputJarvisPrompt" placeholder="Jarvis: Orden o consulta..." autocomplete="off"
+                               style="flex: 1; min-width: 0; background: transparent; border: none; color: #f8fafc; font-size: 13px; font-weight: 700; outline: none;">
                         
                         <!-- BOTÓN DE MICRÓFONO CON ONDAS CYBER -->
-                        <button type="button" id="btnJarvisVoice" title="Hablarle a Jarvis" style="background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; color: #00f2fe; border-radius: 10px; width: 38px; height: 38px; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                        <button type="button" id="btnJarvisVoice" title="Hablarle a Jarvis" style="background: rgba(0, 242, 254, 0.15); border: 1px solid #00f2fe; color: #00f2fe; border-radius: 10px; width: 34px; height: 34px; font-size: 15px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
                             🎤
                         </button>
 
-                        <button type="submit" id="btnJarvisSend" style="background: #00f2fe; color: #020617; border: none; border-radius: 10px; padding: 0 14px; height: 38px; font-size: 13px; font-weight: 900; cursor: pointer; flex-shrink: 0;">
+                        <button type="submit" id="btnJarvisSend" style="background: #00f2fe; color: #020617; border: none; border-radius: 10px; padding: 0 12px; height: 34px; font-size: 12px; font-weight: 900; cursor: pointer; flex-shrink: 0;">
                             ENVIAR
                         </button>
                     </form>
