@@ -550,12 +550,13 @@ def aceptar_repartofacil_pedido(order_id):
                         for it in (items_a_procesar or [])
                     ]) or "Pedido Web Reparto Fácil"
                     fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+                    tipo_str = "En Tienda" if str(order_row.get("tipo_entrega") or "").lower() in ("pickup", "takeaway", "retiro", "tienda") else "Delivery"
                     aux_conn.execute(
                         """
                         INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at)
                         VALUES (%s, %s, %s, 'CONTADO', %s, NOW())
                         """,
-                        (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:200]} (Web)", total_val, fecha_hoy)
+                        (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:180]} (Web - {tipo_str})", total_val, fecha_hoy)
                     )
                 except Exception as vm_err:
                     print(f"[VentasMostrador] Aviso no bloqueante al asentar venta web: {vm_err}")
@@ -892,6 +893,7 @@ def get_repartofacil_ticket(target_id):
                     cliente_nombre,
                     cliente_telefono,
                     direccion_entrega,
+                    tipo_entrega,
                     metodo_pago,
                     estado,
                     repartidor_nombre,
@@ -929,6 +931,7 @@ def get_repartofacil_ticket(target_id):
                 "ticket_numero": d.get("ticket_id") or d.get("id"),
                 "fecha": fecha_str,
                 "pago": "Web",
+                "tipo_entrega": d.get("tipo_entrega") or "delivery",
                 "cajero": "—",
                 "caja": "—",
                 "cliente": d.get("cliente_nombre") or "Cliente",

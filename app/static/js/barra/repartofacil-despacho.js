@@ -469,6 +469,12 @@
                 pillBorder = alertaStock ? '#fca5a5' : '#fde047';
             }
 
+            const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
+            const esRetiroEnTienda = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+            const badgeTipoEntrega = esRetiroEnTienda
+                ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🏪 En Tienda</span>`
+                : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🛵 Con Delivery</span>`;
+
             const resumenLinea = esRechazado
                 ? `<span style="color:#b91c1c; font-weight:700;">${esCanceladoCliente ? 'Cancelado por el cliente' : (esRechazadoComercio ? 'Rechazado por el comercio' : 'Cancelado por tiempo de espera')} · ${cantItems} ítems</span>`
                 : (alertaStock
@@ -488,22 +494,27 @@
                             <span style="position:absolute; bottom:-1px; right:-1px; width:12px; height:12px; border-radius:999px; background:${dotColor}; border:2px solid #fff;"></span>
                         </div>
 
-                        <!-- Centro: Cliente + #RF + Dirección + Resumen -->
+                        <!-- Centro: Cliente + Tipo Entrega + Dirección + Resumen -->
                         <div style="flex:1; min-width:0;">
-                            <!-- Fila 1: Nombre del cliente a la izquierda y Estado a la derecha -->
+                            <!-- Fila 1: Nombre del cliente + Badge Tipo Entrega a la izquierda y Estado a la derecha -->
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:3px;">
-                                <span style="font-weight:900; font-size:14px; color:${esRechazado ? '#991b1b' : '#2D3277'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    ${escaparTextoChat(p.cliente_nombre || 'Cliente')}
-                                </span>
+                                <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
+                                    <span style="font-weight:900; font-size:14px; color:${esRechazado ? '#991b1b' : '#2D3277'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                        ${escaparTextoChat(p.cliente_nombre || 'Cliente')}
+                                    </span>
+                                    ${badgeTipoEntrega}
+                                </div>
                                 <div style="flex-shrink:0;">
                                     ${badgeEstadoHtml}
                                 </div>
                             </div>
 
-                            <!-- Fila 2: Dirección a la izquierda y Monto Total a la derecha -->
+                            <!-- Fila 2: Dirección/Retiro a la izquierda y Monto Total a la derecha -->
                             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px;">
                                 <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')}
+                                    ${esRetiroEnTienda 
+                                        ? `🏪 Retira en: ${escaparTextoChat(p.sucursal_origen || 'Local Maciel')}` 
+                                        : `📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')}`}
                                 </div>
                                 <div style="font-size:14px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
                                     ${formatMoney(p.total)}
@@ -568,15 +579,21 @@
                                 </div>
                             ` : ''}
 
-                            <!-- Domicilio exacto y enlace GPS -->
+                            <!-- Modalidad: Retiro en Tienda o Domicilio exacto y enlace GPS -->
+                            ${esRetiroEnTienda ? `
+                            <div style="display:flex; align-items:center; gap:6px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:9px; padding:7px 10px; margin-bottom:7px; font-size:11.5px; color:#065f46; font-weight:800;">
+                                <span>🏪 VENTA CON RETIRO EN TIENDA / LOCAL · El comprador retira directamente en el mostrador</span>
+                            </div>
+                            ` : `
                             <div style="display:flex; align-items:center; justify-content:space-between; background:#fffef5; border:1px solid #fde047; border-radius:9px; padding:5px 9px; margin-bottom:7px; font-size:11px;">
                                 <span style="color:#2D3277; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px;" title="${escaparTextoChat(p.direccion_entrega || '')}">
-                                    📍 ${escaparTextoChat(p.direccion_entrega || 'Domicilio')}
+                                    🛵 Domicilio: ${escaparTextoChat(p.direccion_entrega || 'Domicilio')}
                                 </span>
                                 <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer" style="color:#2D3277; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:2px; flex-shrink:0; background:#FFE600; padding:2px 8px; border-radius:6px; border:1px solid #eab308;">
                                     <span>GPS</span> ↗
                                 </a>
                             </div>
+                            `}
 
                             <!-- Indicador de ETA y Chofer en Camino dentro del Ticket -->
                             ${indicadorEtaHtml}
@@ -930,6 +947,10 @@
                             <b id="rfTicketFecha" style="color:#0f172a; font-weight:700;">2026-11-20 09:54:56</b>
                         </div>
                         <div style="display:flex; justify-content:space-between; color:#64748b;">
+                            <span>Modalidad</span>
+                            <b id="rfTicketModalidad" style="color:#0f172a; font-weight:700;">—</b>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; color:#64748b;">
                             <span>Pago</span>
                             <b id="rfTicketPago" style="color:#0f172a; font-weight:700;">Web</b>
                         </div>
@@ -975,6 +996,12 @@
             {
                 $('rfTicketNumero').textContent = `Ticket #${t.ticket_numero || t.id}`;
                 $('rfTicketFecha').textContent = t.fecha || '2026-11-20 09:54:56';
+                const esPickupTicket = String(t.tipo_entrega || '').toLowerCase() === 'pickup' || String(t.tipo_entrega || '').toLowerCase() === 'takeaway' || String(t.tipo_entrega || '').toLowerCase() === 'retiro' || String(t.tipo_entrega || '').toLowerCase() === 'tienda';
+                if ($('rfTicketModalidad')) {
+                    $('rfTicketModalidad').innerHTML = esPickupTicket
+                        ? '<span style="color:#047857; font-weight:800;">🏪 En Tienda (Retiro)</span>'
+                        : '<span style="color:#1d4ed8; font-weight:800;">🛵 Con Delivery</span>';
+                }
                 $('rfTicketPago').textContent = 'Web';
                 $('rfTicketCajero').textContent = t.cajero || '—';
                 $('rfTicketCaja').textContent = t.caja || '—';
