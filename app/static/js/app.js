@@ -3289,6 +3289,9 @@ const $ = id => document.getElementById(id);
                 const data = await fetch('/api/pos/sucursales').then((r) => r.json());
                 if (data && Array.isArray(data.sucursales)) {
                     sucursalesConocidas = data.sucursales;
+                    if (!sucursalesConocidas.some((s) => String(s.id) === 'web')) {
+                        sucursalesConocidas.push({ id: 'web', nombre: 'Tienda Web' });
+                    }
                     try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursalesConocidas)); } catch (_) {}
                     if (window.Espejo && Espejo.fijarSucursales) {
                         Espejo.fijarSucursales(sucursalesConocidas);
@@ -3298,6 +3301,9 @@ const $ = id => document.getElementById(id);
                     }
                 }
             } catch (_) {}
+            if (!sucursalesConocidas.some((s) => String(s.id) === 'web')) {
+                sucursalesConocidas.push({ id: 'web', nombre: 'Tienda Web' });
+            }
             document.getElementById('sucursalSheet')?.remove();
             const actual = activeSucursalId == null ? '' : String(activeSucursalId);
             const opciones = [{ id: '', nombre: '— Todas —' }].concat(
@@ -3330,7 +3336,10 @@ const $ = id => document.getElementById(id);
                 const data = await res.json();
                 const sucursales = data.sucursales || [];
                 sucursalesConocidas = sucursales;
-                try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursales)); } catch (_) {}
+                if (!sucursalesConocidas.some((s) => String(s.id) === 'web')) {
+                    sucursalesConocidas.push({ id: 'web', nombre: 'Tienda Web' });
+                }
+                try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursalesConocidas)); } catch (_) {}
                 if (window.Espejo && Espejo.fijarSucursales) {
                     Espejo.fijarSucursales(sucursalesConocidas);
                 }
