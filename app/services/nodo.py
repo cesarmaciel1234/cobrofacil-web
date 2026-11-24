@@ -5,12 +5,16 @@ import json
 import logging
 import threading
 import time
+from datetime import datetime
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from app.services.pos_base import _ambito_cache, ultimo_dia_ventas
 from app.database import get_db
 
 logger = logging.getLogger(__name__)
+
+_ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 
 _PANELES = {
     "reporte": "reporte",
@@ -75,10 +79,13 @@ def _candado(clave: tuple) -> threading.Lock:
         return candado
 
 
-def _marca(sucursal_id: int | None) -> tuple[str, str]:
-    sid = int(sucursal_id) if sucursal_id is not None else None
+def _marca(sucursal_id: int | str | None) -> tuple[str, str]:
+    es_web = str(sucursal_id or "").strip().lower() == "web"
+    sid = "web" if es_web else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
     with get_db() as conn:
-        if sid is None:
+        if es_web:
+            fila = conn.execute("SELECT MAX(created_at) FROM public.repartofacil_pedidos").fetchone()
+        elif sid is None:
             fila = conn.execute("SELECT MAX(actualizado_en) FROM pos_base").fetchone()
         else:
             fila = conn.execute(
@@ -86,21 +93,23 @@ def _marca(sucursal_id: int | None) -> tuple[str, str]:
                 (sid,),
             ).fetchone()
     sello = str((fila[0] if fila else "") or "")
-    return sello, ultimo_dia_ventas(sid)
+    dia = datetime.now(_ZONA).date().isoformat() if es_web else ultimo_dia_ventas(sid)
+    return sello, dia
 
 
 def _clave(
     pieza: str,
-    sucursal_id: int | None,
+    sucursal_id: int | str | None,
     periodo: str,
     desde: str | None,
     hasta: str | None,
     filtro: dict | None,
 ) -> tuple:
+    sid = "web" if str(sucursal_id or "").strip().lower() == "web" else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
     return (
         _ambito_cache(),
         pieza,
-        int(sucursal_id) if sucursal_id is not None else None,
+        sid,
         periodo or "",
         desde or "",
         hasta or "",
@@ -108,11 +117,11 @@ def _clave(
     )
 
 
-def estado(sucursal_id: int | None = None) -> dict[str, Any]:
+def estado(sucursal_id: int | str | None = None) -> dict[str, Any]:
     """Sello del libro y qué piezas ya están armadas. No calcula los paneles."""
     sello, dia = _marca(sucursal_id)
     ambito = _ambito_cache()
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = "web" if str(sucursal_id or "").strip().lower() == "web" else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
     with _lock:
         piezas = sorted({
             clave[1]

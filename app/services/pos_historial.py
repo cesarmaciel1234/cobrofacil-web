@@ -571,6 +571,9 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
     if pedido.get("fecha_ini"):
         ini = str(pedido.get("fecha_ini"))[:10]
         fin = str(pedido.get("fecha_fin") or ini)[:10]
+    elif pedido.get("desde") and pedido.get("hasta"):
+        ini = str(pedido.get("desde"))[:10]
+        fin = str(pedido.get("hasta"))[:10]
     else:
         ini, fin = rango_fechas(
             str(pedido.get("alcance") or "dia"),

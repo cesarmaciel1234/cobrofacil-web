@@ -1426,10 +1426,27 @@ def _etiqueta_caja(pedido: dict, ini: str | None, fin: str | None, hoy: str) -> 
     return ("Hoy · " if dia == hoy else "Día · ") + dia
 
 
-def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, sucursal_id: int | None, etiqueta: str) -> dict:
+def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, sucursal_id: int | str | None, etiqueta: str) -> dict:
     medios_lista = medios_pago or []
     total_medios = round(sum(_numero(m.get("monto")) for m in medios_lista), 2)
     tickets = sum(int(m.get("tickets") or 0) for m in medios_lista)
+
+    es_web = str(sucursal_id or "").strip().lower() == "web"
+    if es_web:
+        return {
+            "ventas": total_medios,
+            "tickets": tickets,
+            "etiqueta": etiqueta,
+            "medios_pago": medios_lista,
+            "cobros": 0.0,
+            "cobros_cant": 0,
+            "cobros_por_medio": {},
+            "detalle_cobros": [],
+            "gastos": 0.0,
+            "resultado": total_medios,
+            "detalle_gastos": [],
+            "caja": [],
+        }
 
     idx_cc, movimientos = _filas_en_rango("cuenta_corriente", ini, fin, sucursal_id)
     cobros = 0.0

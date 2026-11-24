@@ -330,7 +330,12 @@ def api_pos_nodo():
         sucursal_id = user_sid
     else:
         sid_raw = request.args.get("sucursal_id") or request.args.get("branch_id")
-        sucursal_id = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+        if sid_raw is not None and str(sid_raw).strip().lower() == "web":
+            sucursal_id = "web"
+        elif sid_raw is not None and str(sid_raw).strip().isdigit():
+            sucursal_id = int(str(sid_raw).strip())
+        else:
+            sucursal_id = None
     if pieza == "estado":
         return jsonify(estado(sucursal_id))
     filtro = filtro_de(pieza, request.args.to_dict())
