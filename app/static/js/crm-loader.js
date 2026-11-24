@@ -263,10 +263,11 @@
     }
 
     function limpiarCopiasDelTelefono() {
+        try { if (global.Espejo && global.Espejo.limpiarTodo) void global.Espejo.limpiarTodo(); } catch (_) {}
         const borrar = [];
         for (let i = 0; i < localStorage.length; i += 1) {
             const clave = localStorage.key(i);
-            if (clave && (clave.indexOf('crm-jefe:') === 0 || clave === 'crm-cartera-app' || clave === 'crm_sucursales_cache')) borrar.push(clave);
+            if (clave && (clave.indexOf('crm-jefe:') === 0 || clave === 'crm-cartera-app' || clave === 'crm_sucursales_cache' || clave.indexOf('panel_jefe:') === 0)) borrar.push(clave);
         }
         borrar.forEach((clave) => localStorage.removeItem(clave));
         try { sessionStorage.removeItem('crm-cartera-app'); } catch (_) {}
@@ -278,6 +279,9 @@
         const { clearTenantCaches, tenantCacheGet } = global.CrmDb;
         const prevUser = localStorage.getItem('sync_user') || '';
         const prevEmpresa = localStorage.getItem('sync_empresa') || '';
+        const CURRENT_CACHE_EPOCH = '20261124_reset_v1';
+        const prevEpoch = localStorage.getItem('crm_cache_epoch');
+        const epochCambio = prevEpoch !== CURRENT_CACHE_EPOCH;
 
         const sessionFromServer = await bus().emit('loadSession');
         const sessionUser = bus().emit('getSessionUser') || {};
@@ -286,9 +290,10 @@
         const usuarioCambio = sessionFromServer && prevUser && prevUser !== curUser;
         const empresaCambio = sessionFromServer && prevEmpresa && prevEmpresa !== curEmpresa;
 
-        if (usuarioCambio || empresaCambio) {
+        if (usuarioCambio || empresaCambio || epochCambio) {
             await clearTenantCaches();
             limpiarCopiasDelTelefono();
+            localStorage.setItem('crm_cache_epoch', CURRENT_CACHE_EPOCH);
         }
         if (curUser) localStorage.setItem('sync_user', curUser);
         if (curEmpresa) localStorage.setItem('sync_empresa', curEmpresa);
