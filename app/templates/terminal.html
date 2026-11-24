@@ -181,13 +181,15 @@
                         <p id="empresaPerfilUbicacion" class="perfil-empresa-ayuda"></p>
                         <div id="empresaPerfilMapaPanel" hidden>
                             <div class="perfil-empresa-buscador-fila">
-                                <input type="text" id="empresaPerfilBuscadorInput" class="buscar" placeholder="Buscar calle, altura o localidad (ej: Alfaro 1964, Hurlingham)">
+                                <input type="text" id="empresaPerfilBuscadorInput" class="buscar" placeholder="Escribí calle y altura (ej: Alfaro 1964, Hurlingham)">
                                 <button type="button" id="empresaPerfilBuscadorBoton" class="perfil-empresa-mapa-boton">🔍 Buscar</button>
                             </div>
-                            <p class="perfil-empresa-ayuda" style="margin-top:2px;">Tocá el mapa para fijar el punto exacto de tu local:</p>
+                            <div id="empresaPerfilSugerencias" class="perfil-empresa-sugerencias" hidden></div>
+                            <p class="perfil-empresa-ayuda" style="margin-top:2px;">Arrastrá el pin amarillo o tocá el mapa para ubicar tu local:</p>
                             <div id="empresaPerfilMapa" aria-label="Mapa para elegir la ubicación del comercio"></div>
                             <div class="perfil-empresa-mapa-acciones">
                                 <button type="button" id="empresaPerfilGps" class="perfil-empresa-mapa-boton">🎯 Mi ubicación GPS</button>
+                                <button type="button" id="empresaPerfilCentrarPin" class="perfil-empresa-mapa-boton">📍 Fijar al centro</button>
                                 <button type="button" id="empresaPerfilConfirmarMapa" class="perfil-empresa-mapa-boton perfil-empresa-mapa-confirmar">✓ Confirmar punto</button>
                                 <button type="button" id="empresaPerfilCerrarMapa" class="perfil-empresa-mapa-boton" style="background:#f1f5f9; border-color:#cbd5e1; color:#475569;">Cerrar</button>
                             </div>

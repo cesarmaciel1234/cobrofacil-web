@@ -90,8 +90,31 @@
 .perfil-empresa-ayuda { margin: 8px 0 12px; }
 .perfil-empresa-acciones, .perfil-empresa-mapa-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .perfil-empresa-acciones { justify-content: flex-end; }
-.perfil-empresa-buscador-fila { display: flex; gap: 8px; margin-bottom: 10px; }
+.perfil-empresa-buscador-fila { display: flex; gap: 8px; margin-bottom: 8px; }
 .perfil-empresa-buscador-fila input { flex: 1; min-width: 0; }
+.perfil-empresa-sugerencias {
+    background: #fff;
+    border: 1.5px solid #fde047;
+    border-radius: 12px;
+    margin-bottom: 10px;
+    max-height: 190px;
+    overflow-y: auto;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+}
+.perfil-empresa-sugerencia-item {
+    padding: 10px 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #2D3277;
+    border-bottom: 1px solid #fef08a;
+    cursor: pointer;
+    transition: background 0.15s ease;
+}
+.perfil-empresa-sugerencia-item:last-child { border-bottom: none; }
+.perfil-empresa-sugerencia-item:hover, .perfil-empresa-sugerencia-item:active {
+    background: #fef9c3;
+    color: #1e2255;
+}
 #empresaPerfilEstado:not(:empty) { margin: 0 0 12px; color: #475569; }
 #empresaPerfilMapa { height: 300px; border: 1.5px solid #fde047; border-radius: 14px; z-index: 0; }
 .perfil-empresa-pin {
