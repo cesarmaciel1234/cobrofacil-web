@@ -1004,7 +1004,16 @@ def listar_sucursales(empresa_id: int | None = None) -> list[dict]:
                     "terminales": s.get("terminales") or [],
                     "cantidad_terminales": len(s.get("terminales") or []),
                 })
-            salida.append({"id": "web", "nombre": "Tienda Web"})
+            salida.append({"id": "web", "nombre": "Tienda Web · Todas", "direccion": "Consolidado de todas las ventas online", "canal": "web"})
+            fisicas = [x for x in salida if str(x["id"]) != "web" and not str(x["id"]).startswith("web-")]
+            if len(fisicas) > 1:
+                for s in fisicas:
+                    salida.append({
+                        "id": f"web-{s['id']}",
+                        "nombre": f"Tienda Web · {s['nombre']}",
+                        "direccion": f"Pedidos online y despacho de {s['nombre']}",
+                        "canal": "web"
+                    })
             with _cache_lock:
                 _sucursales_mem[ambito] = (time.monotonic(), salida)
             return salida
@@ -1105,7 +1114,7 @@ def sellos_de(tablas: tuple[str, ...], sucursal_id: int | str | None = None, emp
     pedidas = [tabla for tabla in tablas if _TABLA.match(tabla or "")]
     if not pedidas:
         return ()
-    if str(sucursal_id or "").strip().lower() == "web":
+    if str(sucursal_id or "").strip().lower().startswith("web"):
         return tuple((None, 0) for _ in pedidas)
     eid = _empresa_activa(empresa_id)
     sid = _sid_int(sucursal_id)

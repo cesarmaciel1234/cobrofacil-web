@@ -3338,6 +3338,7 @@ const $ = id => document.getElementById(id);
             document.getElementById('sucursalSheet')?.remove();
             const actual = activeSucursalId == null ? '' : String(activeSucursalId);
             const fisicas = sucursalesConocidas.filter(s => String(s.id) !== 'web' && !String(s.id).startsWith('web-'));
+            const webSucs = sucursalesConocidas.filter(s => String(s.id) === 'web' || String(s.id).startsWith('web-'));
             const opciones = [
                 { id: '', nombre: '— Todas las Sucursales — (Consolidado Master)', direccion: 'Todas las cajas, locales y ventas web', icono: '🏢' }
             ];
@@ -3351,21 +3352,17 @@ const $ = id => document.getElementById(id);
                 });
             });
             // 2. Sucursales Web (Online / Reparto Fácil)
-            opciones.push({
-                id: 'web',
-                nombre: 'Tienda Web · Todas',
-                direccion: 'Consolidado de todas las ventas online',
-                icono: '🌐'
-            });
-            if (fisicas.length > 1) {
-                fisicas.forEach((s) => {
+            if (webSucs.length > 0) {
+                webSucs.forEach((s) => {
                     opciones.push({
-                        id: 'web-' + s.id,
-                        nombre: 'Tienda Web · ' + s.nombre,
-                        direccion: 'Pedidos online y despacho de ' + s.nombre,
+                        id: String(s.id),
+                        nombre: s.nombre,
+                        direccion: s.direccion || 'Pedidos online y envíos',
                         icono: '🌐'
                     });
                 });
+            } else {
+                opciones.push({ id: 'web', nombre: 'Tienda Web · Todas', direccion: 'Consolidado de todas las ventas online', icono: '🌐' });
             }
 
             const fondo = document.createElement('div');
@@ -3410,9 +3407,6 @@ const $ = id => document.getElementById(id);
                 const sucursales = data.sucursales || [];
                 const esColaboradorFijo = sessionUser && sessionUser.sucursal_id != null;
                 sucursalesConocidas = sucursales;
-                if (!esColaboradorFijo && !sucursalesConocidas.some((s) => String(s.id) === 'web')) {
-                    sucursalesConocidas.push({ id: 'web', nombre: 'Tienda Web' });
-                }
                 try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursalesConocidas)); } catch (_) {}
                 if (window.Espejo && Espejo.fijarSucursales) {
                     Espejo.fijarSucursales(sucursalesConocidas);
@@ -3421,7 +3415,7 @@ const $ = id => document.getElementById(id);
                     if (activeSucursalId !== sessionUser.sucursal_id) {
                         aplicarSucursal(sessionUser.sucursal_id);
                     }
-                } else if (activeSucursalId != null && !sucursales.some((s) => String(s.id) === String(activeSucursalId))) {
+                } else if (activeSucursalId != null && !sucursalesConocidas.some((s) => String(s.id) === String(activeSucursalId))) {
                     aplicarSucursal(null);
                 }
                 actualizarNombreEmpresaTopbar();
@@ -3437,7 +3431,8 @@ const $ = id => document.getElementById(id);
                 let html = `<button type="button" class="btn btn-sm ${activeSucursalId === null ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="todas" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">Consolidado (Todas)</button>`;
 
                 const vistas = new Set();
-                sucursales.forEach(s => {
+                const pillsList = sucursalesConocidas.filter(s => !String(s.id).startsWith('web-'));
+                pillsList.forEach(s => {
                     const idStr = String(s.id);
                     if (vistas.has(idStr)) return;
                     vistas.add(idStr);

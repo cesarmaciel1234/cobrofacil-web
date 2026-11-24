@@ -1622,7 +1622,7 @@ def panel(
     hasta: str | None = None,
     filtro: dict | None = None,
 ) -> dict:
-    sid = "web" if str(sucursal_id or "").strip().lower() == "web" else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
+    sid = str(sucursal_id).strip().lower() if str(sucursal_id or "").strip().lower().startswith("web") else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
     clave = _clave_panel(nombre, sid, periodo, desde, hasta, filtro)
     with _panel_lock:
         guardado = _panel_cache.get(clave)

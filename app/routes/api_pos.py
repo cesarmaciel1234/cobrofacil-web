@@ -599,10 +599,10 @@ def api_pos_sucursales():
     from app.security import current_sucursal_id
 
     emp_id = int(session.get("empresa_id") or request.headers.get("X-Empresa-ID") or request.args.get("empresa_id") or 1)
-    sucursales = listar_sucursales(empresa_id=emp_id)
+    sucursales = list(listar_sucursales(empresa_id=emp_id))
     user_sid = current_sucursal_id()
     if user_sid is not None:
-        sucursales = [s for s in sucursales if s.get("id") == user_sid]
+        sucursales = [s for s in sucursales if str(s.get("id")) == str(user_sid)]
     return jsonify({"ok": True, "sucursales": sucursales})
 
 
