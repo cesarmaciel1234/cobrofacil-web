@@ -151,18 +151,59 @@
                     <div id="empresaPerfilResumen" hidden>
                         <div class="perfil-empresa-cabecera">
                             <span id="empresaPerfilInicial" class="perfil-empresa-avatar" aria-hidden="true"></span>
-                            <div class="perfil-empresa-identidad">
-                                <h2 id="empresaPerfilNombre"></h2>
+                            <div class="perfil-empresa-identidad" style="flex:1;">
+                                <div style="display:flex; align-items:center; gap:8px;">
+                                    <h2 id="empresaPerfilNombre" style="margin:0;"></h2>
+                                    <button type="button" class="perfil-empresa-fila-lapiz" data-editar-campo="nombre" aria-label="Editar nombre del comercio" title="Editar nombre">
+                                        <svg viewBox="0 0 24 24" width="15" height="15" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                    </button>
+                                </div>
                                 <span>Ficha pública</span>
                             </div>
                             <button type="button" class="perfil-empresa-editar" id="empresaPerfilEditar" hidden>Editar</button>
                         </div>
                         <div class="perfil-empresa-tarjeta">
                             <h3>Datos del comercio</h3>
-                            <div class="perfil-empresa-fila"><span aria-hidden="true">⌂</span><div><small>Dirección</small><p id="empresaPerfilDireccion"></p></div></div>
-                            <div class="perfil-empresa-fila"><span aria-hidden="true">☎</span><div><small>WhatsApp</small><p id="empresaPerfilWhatsapp"></p></div></div>
-                            <div class="perfil-empresa-fila"><span aria-hidden="true">◷</span><div><small>Horario</small><p id="empresaPerfilHorario"></p></div></div>
-                            <div class="perfil-empresa-fila"><span aria-hidden="true">✎</span><div><small>Descripción</small><p id="empresaPerfilDescripcion"></p></div></div>
+                            <div class="perfil-empresa-fila">
+                                <span aria-hidden="true" class="perfil-empresa-icono">⌂</span>
+                                <div class="perfil-empresa-campo-info">
+                                    <small>Dirección</small>
+                                    <p id="empresaPerfilDireccion"></p>
+                                </div>
+                                <button type="button" class="perfil-empresa-fila-lapiz" data-editar-campo="direccion" aria-label="Editar dirección" title="Editar dirección y ubicación en mapa">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                </button>
+                            </div>
+                            <div class="perfil-empresa-fila">
+                                <span aria-hidden="true" class="perfil-empresa-icono">☎</span>
+                                <div class="perfil-empresa-campo-info">
+                                    <small>WhatsApp</small>
+                                    <p id="empresaPerfilWhatsapp"></p>
+                                </div>
+                                <button type="button" class="perfil-empresa-fila-lapiz" data-editar-campo="whatsapp" aria-label="Editar WhatsApp" title="Editar WhatsApp">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                </button>
+                            </div>
+                            <div class="perfil-empresa-fila">
+                                <span aria-hidden="true" class="perfil-empresa-icono">◷</span>
+                                <div class="perfil-empresa-campo-info">
+                                    <small>Horario</small>
+                                    <p id="empresaPerfilHorario"></p>
+                                </div>
+                                <button type="button" class="perfil-empresa-fila-lapiz" data-editar-campo="horario" aria-label="Editar horario" title="Editar horario">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                </button>
+                            </div>
+                            <div class="perfil-empresa-fila">
+                                <span aria-hidden="true" class="perfil-empresa-icono">✎</span>
+                                <div class="perfil-empresa-campo-info">
+                                    <small>Descripción</small>
+                                    <p id="empresaPerfilDescripcion"></p>
+                                </div>
+                                <button type="button" class="perfil-empresa-fila-lapiz" data-editar-campo="descripcion" aria-label="Editar descripción" title="Editar descripción">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                </button>
+                            </div>
                         </div>
                         <section class="perfil-empresa-tarjeta perfil-empresa-resenas" aria-label="Reseñas">
                             <h3>Reseñas de compradores</h3>
@@ -174,7 +215,20 @@
                         <h3>Editar ficha pública</h3>
                         <label>Nombre del comercio <input name="nombre" required maxlength="120" class="buscar"></label>
                         <label>Descripción <textarea name="descripcion" maxlength="500" class="buscar"></textarea></label>
-                        <label>Dirección física del comercio <input name="direccion" maxlength="250" class="buscar" placeholder="Ej.: Alfaro 1964, Hurlingham"></label>
+                        
+                        <div class="perfil-empresa-campos-direccion">
+                            <label style="margin-bottom:4px; font-weight:700;">Dirección física del comercio</label>
+                            <div style="display:grid; grid-template-columns: 2fr 1fr; gap:8px;">
+                                <input type="text" id="empresaPerfilCalle" class="buscar" placeholder="Calle (ej: Alfaro)">
+                                <input type="text" id="empresaPerfilAltura" class="buscar" placeholder="N° / Altura (ej: 1964)" inputmode="numeric">
+                            </div>
+                            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px; margin-top:6px;">
+                                <input type="text" id="empresaPerfilPiso" class="buscar" placeholder="Piso / Local (opcional)">
+                                <input type="text" id="empresaPerfilLocalidad" class="buscar" placeholder="Localidad (ej: Hurlingham)">
+                            </div>
+                            <input name="direccion" type="hidden">
+                        </div>
+
                         <input name="latitud" type="hidden">
                         <input name="longitud" type="hidden">
                         <button type="button" id="empresaPerfilAbrirMapa" class="perfil-empresa-mapa-boton">📍 Seleccionar ubicación precisa en el mapa</button>
@@ -185,6 +239,11 @@
                                 <button type="button" id="empresaPerfilBuscadorBoton" class="perfil-empresa-mapa-boton">🔍 Buscar</button>
                             </div>
                             <div id="empresaPerfilSugerencias" class="perfil-empresa-sugerencias" hidden></div>
+                            <div class="perfil-empresa-altura-inline" style="display:flex; align-items:center; gap:8px; margin: 6px 0;">
+                                <label for="empresaPerfilMapaAltura" style="margin:0; font-size:12px; font-weight:700;">N° / Altura exacta:</label>
+                                <input type="text" id="empresaPerfilMapaAltura" placeholder="1964" class="buscar" style="width:90px; text-align:center; font-weight:800; padding:4px 8px;">
+                                <span class="perfil-empresa-ayuda" style="margin:0; font-size:11px;">(se conserva al tocar el mapa)</span>
+                            </div>
                             <p class="perfil-empresa-ayuda" style="margin-top:2px;">Arrastrá el pin amarillo o tocá el mapa para ubicar tu local:</p>
                             <div id="empresaPerfilMapa" aria-label="Mapa para elegir la ubicación del comercio"></div>
                             <div class="perfil-empresa-mapa-acciones">

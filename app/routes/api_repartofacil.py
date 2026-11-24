@@ -497,65 +497,7 @@ def aceptar_repartofacil_pedido(order_id):
             update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, metodo_pago = 'Web', updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (ticket_id, order_id))
 
-            # 2. Registrar/vincular cliente en la Cartera de Clientes local y web compartida
-            try:
-                conn.execute("SAVEPOINT sp_cartera")
-                existente = conn.execute(
-                    "SELECT id FROM clientes WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(%s)) OR (telefono IS NOT NULL AND telefono != '' AND telefono = %s) LIMIT 1",
-                    (nombre_cliente, tel_cliente)
-                ).fetchone()
-                if not existente:
-                    conn.execute(
-                        """
-                        INSERT INTO clientes (nombre, telefono, direccion, scoring, tipo_cliente, techo_deuda, saldo_actual, saldo_inicial, created_at)
-                        VALUES (%s, %s, %s, 'A', 'Web', 0, 0, 0, NOW())
-                        """,
-                        (nombre_cliente, tel_cliente, dir_cliente)
-                    )
-                else:
-                    conn.execute(
-                        """
-                        UPDATE clientes
-                        SET direccion = COALESCE(NULLIF(direccion, ''), %s),
-                            telefono = COALESCE(NULLIF(telefono, ''), %s)
-                        WHERE id = %s
-                        """,
-                        (dir_cliente, tel_cliente, existente["id"])
-                    )
-                conn.execute("RELEASE SAVEPOINT sp_cartera")
-            except Exception as cli_err:
-                try:
-                    conn.execute("ROLLBACK TO SAVEPOINT sp_cartera")
-                except Exception:
-                    pass
-                print(f"[Cartera] Aviso no bloqueante al sincronizar cliente web: {cli_err}")
-
-            # 3. Registrar venta en ventas_mostrador para el Arqueo Diario y Libro Omnicanal
-            try:
-                conn.execute("SAVEPOINT sp_vm")
-                total_val = float(order_row["total"] or 0.0) if order_row else 0.0
-                summary_items = ", ".join([
-                    f"{it.get('quantity', 1)} {it.get('unit', 'KG')} {it.get('name', 'Corte')}"
-                    for it in (items_a_procesar or [])
-                ]) or "Pedido Web Reparto Fácil"
-                fecha_hoy = datetime.now().strftime("%Y-%m-%d")
-                cli_id_val = existente["id"] if existente else None
-                conn.execute(
-                    """
-                    INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at)
-                    VALUES (%s, %s, %s, 'CONTADO', %s, NOW())
-                    """,
-                    (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:200]} (Web)", total_val, fecha_hoy)
-                )
-                conn.execute("RELEASE SAVEPOINT sp_vm")
-            except Exception as vm_err:
-                try:
-                    conn.execute("ROLLBACK TO SAVEPOINT sp_vm")
-                except Exception:
-                    pass
-                print(f"[VentasMostrador] Error no bloqueante al asentar venta web: {vm_err}")
-
-            # 4. Notificar en chat tripartito
+            # 2. Notificar en chat tripartito
             chat_sql = """
                 INSERT INTO public.repartofacil_chat_mensajes
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
@@ -565,6 +507,63 @@ def aceptar_repartofacil_pedido(order_id):
 
             if hasattr(conn, "commit"):
                 conn.commit()
+
+        # 3. Asentamiento auxiliar en Cartera de Clientes y Ventas Mostrador (aislado, no bloqueante)
+        try:
+            with get_db(empresa_id=empresa_id) as aux_conn:
+                existente = None
+                try:
+                    existente = aux_conn.execute(
+                        "SELECT id FROM clientes WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(%s)) OR (telefono IS NOT NULL AND telefono != '' AND telefono = %s) LIMIT 1",
+                        (nombre_cliente, tel_cliente)
+                    ).fetchone()
+                    if not existente:
+                        aux_conn.execute(
+                            """
+                            INSERT INTO clientes (nombre, telefono, direccion, scoring, tipo_cliente, techo_deuda, saldo_actual, saldo_inicial, created_at)
+                            VALUES (%s, %s, %s, 'A', 'Web', 0, 0, 0, NOW())
+                            """,
+                            (nombre_cliente, tel_cliente, dir_cliente)
+                        )
+                        existente = aux_conn.execute(
+                            "SELECT id FROM clientes WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(%s)) LIMIT 1",
+                            (nombre_cliente,)
+                        ).fetchone()
+                    else:
+                        aux_conn.execute(
+                            """
+                            UPDATE clientes
+                            SET direccion = COALESCE(NULLIF(direccion, ''), %s),
+                                telefono = COALESCE(NULLIF(telefono, ''), %s)
+                            WHERE id = %s
+                            """,
+                            (dir_cliente, tel_cliente, existente["id"])
+                        )
+                except Exception as cli_err:
+                    print(f"[Cartera] Aviso no bloqueante al sincronizar cliente web: {cli_err}")
+
+                try:
+                    cli_id_val = existente["id"] if existente else None
+                    total_val = float(order_row["total"] or 0.0) if order_row else 0.0
+                    summary_items = ", ".join([
+                        f"{it.get('quantity', 1)} {it.get('unit', 'KG')} {it.get('name', 'Corte')}"
+                        for it in (items_a_procesar or [])
+                    ]) or "Pedido Web Reparto Fácil"
+                    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+                    aux_conn.execute(
+                        """
+                        INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at)
+                        VALUES (%s, %s, %s, 'CONTADO', %s, NOW())
+                        """,
+                        (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:200]} (Web)", total_val, fecha_hoy)
+                    )
+                except Exception as vm_err:
+                    print(f"[VentasMostrador] Aviso no bloqueante al asentar venta web: {vm_err}")
+
+                if hasattr(aux_conn, "commit"):
+                    aux_conn.commit()
+        except Exception as aux_err:
+            print(f"[Auxiliar] Aviso general al sincronizar cartera/ventas: {aux_err}")
 
         return jsonify({
             "success": True,

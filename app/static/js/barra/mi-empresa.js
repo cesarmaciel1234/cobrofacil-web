@@ -16,6 +16,11 @@
     const sugerenciasContenedor = document.getElementById('empresaPerfilSugerencias');
     const centrarPinBoton = document.getElementById('empresaPerfilCentrarPin');
     const confirmarMapa = document.getElementById('empresaPerfilConfirmarMapa');
+    const inputCalle = document.getElementById('empresaPerfilCalle');
+    const inputAltura = document.getElementById('empresaPerfilAltura');
+    const inputPiso = document.getElementById('empresaPerfilPiso');
+    const inputLocalidad = document.getElementById('empresaPerfilLocalidad');
+    const inputMapaAltura = document.getElementById('empresaPerfilMapaAltura');
     const campos = ['nombre', 'descripcion', 'direccion', 'latitud', 'longitud', 'whatsapp', 'horario'];
     let version = 0;
     let guardando = false;
@@ -25,6 +30,64 @@
     let marcador = null;
     let ubicacionConfirmada = false;
     let ubicacionRevision = 0;
+
+    function desglosarDireccion(dirTexto) {
+        if (!dirTexto) return { calle: '', altura: '', piso: '', localidad: '' };
+        const partes = dirTexto.split(',').map(s => s.trim());
+        const primeraParte = partes[0] || '';
+        const match = primeraParte.match(/^(.*?)(?:\s+(\d+[\w\s/-]*))?$/);
+        const calle = match && match[1] ? match[1].trim() : primeraParte;
+        const altura = match && match[2] ? match[2].trim() : '';
+        const localidad = partes.slice(1).join(', ').trim();
+        return { calle, altura, piso: '', localidad };
+    }
+
+    function sincronizarCamposDesdeDireccion(dirTexto) {
+        const { calle, altura, piso, localidad } = desglosarDireccion(dirTexto);
+        if (inputCalle) inputCalle.value = calle;
+        if (inputAltura) inputAltura.value = altura;
+        if (inputMapaAltura) inputMapaAltura.value = altura;
+        if (inputPiso) inputPiso.value = piso;
+        if (inputLocalidad) inputLocalidad.value = localidad;
+    }
+
+    function reconstruirDireccion() {
+        const calle = (inputCalle?.value || '').trim();
+        const altura = (inputAltura?.value || inputMapaAltura?.value || '').trim();
+        const piso = (inputPiso?.value || '').trim();
+        const loc = (inputLocalidad?.value || '').trim();
+        
+        let dir = '';
+        if (calle) {
+            dir = calle + (altura ? ' ' + altura : '');
+            if (piso) dir += ', ' + piso;
+            if (loc) dir += ', ' + loc;
+        } else if (altura || loc) {
+            dir = [altura, loc].filter(Boolean).join(', ');
+        }
+        if (dir) {
+            form.elements.direccion.value = dir;
+            if (buscadorInput) buscadorInput.value = dir;
+            actualizarUbicacion();
+        }
+        return dir;
+    }
+
+    if (inputMapaAltura) {
+        inputMapaAltura.addEventListener('input', () => {
+            if (inputAltura) inputAltura.value = inputMapaAltura.value;
+            reconstruirDireccion();
+        });
+    }
+    if (inputAltura) {
+        inputAltura.addEventListener('input', () => {
+            if (inputMapaAltura) inputMapaAltura.value = inputAltura.value;
+            reconstruirDireccion();
+        });
+    }
+    [inputCalle, inputPiso, inputLocalidad].forEach(inp => {
+        if (inp) inp.addEventListener('input', () => reconstruirDireccion());
+    });
 
     function cerrarMapa() {
         panelMapa.hidden = true;
@@ -65,6 +128,7 @@
             lista.appendChild(tarjeta);
         });
         ubicacionConfirmada = Boolean(perfil.latitud && perfil.longitud);
+        sincronizarCamposDesdeDireccion(perfil.direccion || '');
         actualizarUbicacion();
     }
 
@@ -111,6 +175,37 @@
         resumen.hidden = true;
         form.hidden = false;
     });
+
+    document.querySelectorAll('[data-editar-campo]').forEach((btn) => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            if (!sesionValida() || guardando) {
+                estado.textContent = 'La sesión cambió. Volvé a abrir la ficha.';
+                return;
+            }
+            const campo = btn.getAttribute('data-editar-campo');
+            estado.textContent = '';
+            resumen.hidden = true;
+            form.hidden = false;
+            if (campo === 'direccion') {
+                document.getElementById('empresaPerfilAbrirMapa').click();
+                if (inputMapaAltura && !inputMapaAltura.value) {
+                    inputMapaAltura.focus();
+                } else if (buscadorInput) {
+                    buscadorInput.focus();
+                }
+            } else if (campo === 'nombre') {
+                if (form.elements.nombre) form.elements.nombre.focus();
+            } else if (campo === 'whatsapp') {
+                if (form.elements.whatsapp) form.elements.whatsapp.focus();
+            } else if (campo === 'horario') {
+                if (form.elements.horario) form.elements.horario.focus();
+            } else if (campo === 'descripcion') {
+                if (form.elements.descripcion) form.elements.descripcion.focus();
+            }
+        });
+    });
+
     document.getElementById('empresaPerfilCancelar').addEventListener('click', () => {
         if (guardando || !datosActuales) return;
         cerrarMapa();
@@ -147,14 +242,20 @@
             
             const addr = data.address;
             const road = addr.road || addr.pedestrian || addr.street || '';
-            const house = addr.house_number || '';
+            const existingHouse = (inputMapaAltura ? inputMapaAltura.value.trim() : '') || (inputAltura ? inputAltura.value.trim() : '');
+            const house = addr.house_number || existingHouse;
             const suburb = addr.suburb || addr.neighbourhood || addr.city_district || '';
             const city = addr.city || addr.town || addr.village || '';
-            
-            const streetLine = road ? (road + (house ? ' ' + house : '')) : '';
             const locality = [suburb, city].filter(Boolean).join(', ');
-            const finalAddr = [streetLine, locality].filter(Boolean).join(', ') || (data.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : '');
+
+            if (inputCalle && road) inputCalle.value = road;
+            if (house) {
+                if (inputAltura) inputAltura.value = house;
+                if (inputMapaAltura) inputMapaAltura.value = house;
+            }
+            if (inputLocalidad && locality) inputLocalidad.value = locality;
             
+            const finalAddr = reconstruirDireccion() || [road + (house ? ' ' + house : ''), locality].filter(Boolean).join(', ') || (data.display_name ? data.display_name.split(',').slice(0, 3).join(', ') : '');
             if (finalAddr) {
                 form.elements.direccion.value = finalAddr;
                 if (buscadorInput) buscadorInput.value = finalAddr;
