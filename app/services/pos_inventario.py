@@ -495,9 +495,19 @@ def registrar_ajuste_inventario(
             asegurar_tabla_local(conn)
 
             # Si MariaDB no estaba, leer nombre y stock anterior de pos_base
-            partes_pb = conn.execute(
-                "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
-            ).fetchall()
+            if sucursal_id is not None and str(sucursal_id).isdigit():
+                partes_pb = conn.execute(
+                    "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos' AND sucursal_id = ?",
+                    (int(sucursal_id),)
+                ).fetchall()
+                if not partes_pb:
+                    partes_pb = conn.execute(
+                        "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos' AND sucursal_id IS NULL"
+                    ).fetchall()
+            else:
+                partes_pb = conn.execute(
+                    "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
+                ).fetchall()
             if not actualizado_mb and partes_pb:
                 for row_base in partes_pb:
                     cols = row_base["columnas"] if isinstance(row_base["columnas"], list) else json.loads(row_base["columnas"])

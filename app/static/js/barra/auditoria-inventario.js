@@ -1427,7 +1427,8 @@
                     precio: !isNaN(precioEditado) ? precioEditado : prod.precio,
                     departamento: deptoEditado,
                     responsable: 'Admin',
-                    motivo: motivo
+                    motivo: motivo,
+                    sucursal_id: global.activeSucursalId
                 })
             });
 
