@@ -885,11 +885,30 @@ def resumen_base(empresa_id: int | None = None) -> list[dict]:
     ]
 
 
-def ultima_carga(sucursal_id: int | None = None, empresa_id: int | None = None) -> str | None:
+def _sid_int(sucursal_id) -> int | None:
+    if sucursal_id is None:
+        return None
+    s = str(sucursal_id).strip().lower()
+    if not s or s in ("none", "null", "todas", "web"):
+        return None
+    try:
+        return int(sucursal_id)
+    except (TypeError, ValueError):
+        return None
+
+
+def ultima_carga(sucursal_id: int | str | None = None, empresa_id: int | None = None) -> str | None:
     """Cuándo llegó el último trozo del libro a la nube."""
     eid = _empresa_activa(empresa_id)
     ambito = _ambito_cache(eid)
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    if str(sucursal_id or "").strip().lower() == "web":
+        with get_db(eid) as conn:
+            row = conn.execute(
+                "SELECT MAX(created_at) AS marca FROM public.repartofacil_pedidos WHERE empresa_id = %s",
+                (eid,),
+            ).fetchone()
+            return str(row["marca"]) if row and row["marca"] else None
+    sid = _sid_int(sucursal_id)
     with _cache_lock:
         marcas = [
             hit[1][0]
@@ -900,12 +919,12 @@ def ultima_carga(sucursal_id: int | None = None, empresa_id: int | None = None) 
         return max(marcas)
     with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
-        if sucursal_id is None:
+        if sid is None:
             row = conn.execute("SELECT MAX(actualizado_en) AS marca FROM pos_base WHERE empresa_id = ?", (eid,)).fetchone()
         else:
             row = conn.execute(
                 "SELECT MAX(actualizado_en) AS marca FROM pos_base WHERE empresa_id = ? AND sucursal_id = ?",
-                (eid, int(sucursal_id)),
+                (eid, sid),
             ).fetchone()
     if not row:
         return None
@@ -988,6 +1007,8 @@ def listar_sucursales(empresa_id: int | None = None) -> list[dict]:
         suc_map[sid] = nom
 
     salida = [{"id": sid, "nombre": nom} for sid, nom in sorted(suc_map.items())]
+    # Canal online integrado: Reparto Fácil
+    salida.append({"id": "web", "nombre": "Tienda Web"})
     with _cache_lock:
         _sucursales_mem[ambito] = (time.monotonic(), salida)
     return salida
@@ -1054,13 +1075,15 @@ def _olvidar_tabla(tabla: str) -> None:
             pass
 
 
-def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None, empresa_id: int | None = None) -> tuple:
+def sellos_de(tablas: tuple[str, ...], sucursal_id: int | str | None = None, empresa_id: int | None = None) -> tuple:
     """Marca barata de las tablas. Si no cambió, la cartera armada sigue sirviendo."""
     pedidas = [tabla for tabla in tablas if _TABLA.match(tabla or "")]
     if not pedidas:
         return ()
+    if str(sucursal_id or "").strip().lower() == "web":
+        return tuple((None, 0) for _ in pedidas)
     eid = _empresa_activa(empresa_id)
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = _sid_int(sucursal_id)
     ambito = _ambito_cache(eid)
     ahora = time.monotonic()
 
@@ -1094,12 +1117,13 @@ def sellos_de(tablas: tuple[str, ...], sucursal_id: int | None = None, empresa_i
     return tuple(por_tabla.get(tabla, (None, 0)) for tabla in pedidas)
 
 
-def _sello(conn, tabla: str, sucursal_id: int | None, empresa_id: int | None = None) -> tuple:
+def _sello(conn, tabla: str, sucursal_id: int | str | None, empresa_id: int | None = None) -> tuple:
     eid = _empresa_activa(empresa_id)
-    if sucursal_id is not None:
+    sid = _sid_int(sucursal_id)
+    if sid is not None:
         row = conn.execute(
             "SELECT MAX(actualizado_en) AS marca, COALESCE(SUM(cantidad), 0) AS n FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ?",
-            (eid, tabla, int(sucursal_id)),
+            (eid, tabla, sid),
         ).fetchone()
     else:
         row = conn.execute(
@@ -1231,15 +1255,17 @@ def _publicar_tabla(ambito: str, tabla: str, partes: list, ahora: float, sellos:
 
 
 def preparar_vista(
-    sucursal_id: int | None,
+    sucursal_id: int | str | None,
     desde: str,
     hasta: str,
     desplazar_hoy: bool = False,
     empresa_id: int | None = None,
 ) -> str:
     """Una sola lectura trae el día y los catálogos. Devuelve el día que quedó."""
+    if str(sucursal_id or "").strip().lower() == "web":
+        return desde
     eid = _empresa_activa(empresa_id)
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = _sid_int(sucursal_id)
     ambito = _ambito_cache(eid)
     ahora = time.monotonic()
     dia_tablas = list(_TABLAS_DIA)
@@ -1348,13 +1374,16 @@ def ultimo_dia_ventas(sucursal_id: int | None = None, empresa_id: int | None = N
     return str(fila[0] or "") if fila else ""
 
 
-def hay_dia_ventas(dia: str, sucursal_id: int | None = None, empresa_id: int | None = None) -> bool:
+def hay_dia_ventas(dia: str, sucursal_id: int | str | None = None, empresa_id: int | None = None) -> bool:
     if not dia:
         return False
+    if str(sucursal_id or "").strip().lower() == "web":
+        return True
     eid = _empresa_activa(empresa_id)
+    sid = _sid_int(sucursal_id)
     try:
         with get_db(eid) as conn:
-            if sucursal_id is None:
+            if sid is None:
                 fila = conn.execute(
                     "SELECT 1 FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND dia = ? LIMIT 1",
                     (eid, dia),
@@ -1362,16 +1391,18 @@ def hay_dia_ventas(dia: str, sucursal_id: int | None = None, empresa_id: int | N
             else:
                 fila = conn.execute(
                     "SELECT 1 FROM pos_base WHERE empresa_id = ? AND tabla = 'ventas' AND sucursal_id = ? AND dia = ? LIMIT 1",
-                    (eid, int(sucursal_id), dia),
+                    (eid, sid, dia),
                 ).fetchone()
     except Exception:
         return False
     return fila is not None
 
 
-def _filas_del_rango(tabla: str, sucursal_id: int | None, desde: str, hasta: str, empresa_id: int | None = None) -> tuple[list[str], list[list]]:
+def _filas_del_rango(tabla: str, sucursal_id: int | str | None, desde: str, hasta: str, empresa_id: int | None = None) -> tuple[list[str], list[list]]:
+    if str(sucursal_id or "").strip().lower() == "web":
+        return [], []
     eid = _empresa_activa(empresa_id)
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = _sid_int(sucursal_id)
     ambito = _ambito_cache(eid)
     ahora = time.monotonic()
     clave = (ambito, tabla, sid, desde, hasta)
@@ -1417,12 +1448,14 @@ def _filas_sucursal(columnas: list, filas: list, sid: int) -> tuple[list, list]:
     return columnas, salida
 
 
-def hay_tabla(tabla: str, sucursal_id: int | None = None, empresa_id: int | None = None) -> bool:
+def hay_tabla(tabla: str, sucursal_id: int | str | None = None, empresa_id: int | None = None) -> bool:
     """La tabla existe en el libro, aunque el período pedido no tenga filas."""
     if not _TABLA.match(tabla or ""):
         return False
+    if str(sucursal_id or "").strip().lower() == "web":
+        return True
     eid = _empresa_activa(empresa_id)
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = _sid_int(sucursal_id)
     try:
         with get_db(eid) as conn:
             if sid is None:
@@ -1442,17 +1475,21 @@ def hay_tabla(tabla: str, sucursal_id: int | None = None, empresa_id: int | None
 
 def filas_de(
     tabla: str,
-    sucursal_id: int | None = None,
+    sucursal_id: int | str | None = None,
     desde: str | None = None,
     hasta: str | None = None,
     empresa_id: int | None = None,
 ) -> tuple[list[str], list[list]]:
     if not _TABLA.match(tabla or ""):
         return [], []
+    if str(sucursal_id or "").strip().lower() == "web":
+        if tabla in ("productos", "articulos"):
+            return filas_de(tabla, None, desde=desde, hasta=hasta, empresa_id=empresa_id)
+        return [], []
     eid = _empresa_activa(empresa_id)
     if desde and hasta and tabla in _TABLAS_DIA:
         return _filas_del_rango(tabla, sucursal_id, desde[:10], hasta[:10], empresa_id=eid)
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = _sid_int(sucursal_id)
     ambito = _ambito_cache(eid)
     ahora = time.monotonic()
     with _cache_lock:
@@ -1472,7 +1509,7 @@ def filas_de(
 
 def precargar_tablas(
     tablas: tuple[str, ...] | list[str],
-    sucursal_id: int | None = None,
+    sucursal_id: int | str | None = None,
     empresa_id: int | None = None,
 ) -> None:
     """Una lectura del libro alcanza para Todas y para cada sucursal.
@@ -1482,8 +1519,10 @@ def precargar_tablas(
     pedidas = [t for t in tablas if _TABLA.match(t or "")]
     if not pedidas:
         return
+    if str(sucursal_id or "").strip().lower() == "web":
+        return
     eid = _empresa_activa(empresa_id)
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = _sid_int(sucursal_id)
     ambito = _ambito_cache(eid)
     ahora = time.monotonic()
 

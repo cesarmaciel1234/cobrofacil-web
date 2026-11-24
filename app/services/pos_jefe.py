@@ -84,38 +84,76 @@ def _es_digital(pago) -> bool:
     return any(marca in texto for marca in _MARCAS_DIGITAL)
 
 
-def _comercio(sucursal_id: int | None, sucursales: list[dict]) -> str:
+def _comercio(sucursal_id: int | str | None, sucursales: list[dict]) -> str:
     if sucursal_id is not None:
         for sucursal in sucursales:
-            if sucursal["id"] == int(sucursal_id):
+            if str(sucursal["id"]) == str(sucursal_id):
                 return sucursal["nombre"]
     if len(sucursales) == 1:
         return sucursales[0]["nombre"]
     return "Todas las sucursales"
 
 
-def _ventas(sucursal_id: int | None = None, desde: str | None = None, hasta: str | None = None):
-    columnas, filas = filas_de("ventas", sucursal_id, desde=desde, hasta=hasta)
-    if not columnas:
-        return [], {}
-    idx = _indice(columnas)
+def _ventas(sucursal_id: int | str | None = None, desde: str | None = None, hasta: str | None = None):
+    es_web = str(sucursal_id or "").strip().lower() == "web"
+    if es_web:
+        columnas, filas = [], []
+        idx = {}
+    else:
+        columnas, filas = filas_de("ventas", sucursal_id, desde=desde, hasta=hasta)
+        idx = _indice(columnas) if columnas else {}
+
     vivas = []
-    for fila in filas:
-        if not _viva(_valor(fila, idx, "estado")):
-            continue
-        dia = _dia(_valor(fila, idx, "fecha"))
-        if not dia:
-            continue
-        vivas.append(
-            {
-                "id": _valor(fila, idx, "id"),
-                "fecha": str(_valor(fila, idx, "fecha") or "").split(".")[0],
-                "dia": dia,
-                "total": _numero(_valor(fila, idx, "total")),
-                "pago": str(_valor(fila, idx, "metodo_pago", "medio_pago") or "Efectivo"),
-                "sucursal_id": _valor(fila, idx, "sucursal_id"),
-            }
-        )
+    if columnas and filas:
+        for fila in filas:
+            if not _viva(_valor(fila, idx, "estado")):
+                continue
+            dia = _dia(_valor(fila, idx, "fecha"))
+            if not dia:
+                continue
+            vivas.append(
+                {
+                    "id": _valor(fila, idx, "id"),
+                    "fecha": str(_valor(fila, idx, "fecha") or "").split(".")[0],
+                    "dia": dia,
+                    "total": _numero(_valor(fila, idx, "total")),
+                    "pago": str(_valor(fila, idx, "metodo_pago", "medio_pago") or "Efectivo"),
+                    "sucursal_id": _valor(fila, idx, "sucursal_id"),
+                }
+            )
+
+    # Si es 'web' o consolidado (None), sumar ventas de pedidos web (Reparto Fácil)
+    if sucursal_id is None or es_web:
+        try:
+            from app.database import get_db
+            from app.services.pos_base import _empresa_activa
+            eid_actual = _empresa_activa()
+            with get_db() as conn:
+                q_web = """
+                    SELECT id, ticket_id, total, metodo_pago, estado, created_at
+                    FROM public.repartofacil_pedidos
+                    WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
+                """
+                params = [eid_actual]
+                if desde and hasta:
+                    q_web += " AND created_at >= %s AND created_at <= %s"
+                    params.extend([str(desde)[:10] + " 00:00:00", str(hasta)[:10] + " 23:59:59"])
+                q_web += " ORDER BY created_at DESC"
+                web_rows = conn.execute(q_web, tuple(params)).fetchall()
+                for wr in web_rows:
+                    f_str = str(wr["created_at"] or "")
+                    dia = f_str[:10]
+                    vivas.append({
+                        "id": str(wr["ticket_id"] or wr["id"]),
+                        "fecha": f_str.split(".")[0],
+                        "dia": dia,
+                        "total": float(wr["total"] or 0.0),
+                        "pago": "Web",
+                        "sucursal_id": "web",
+                    })
+        except Exception as e:
+            logger.warning("Error sumando pedidos web a _ventas: %s", e)
+
     return vivas, idx
 
 
@@ -175,21 +213,21 @@ def _desglose_sucursales(ventas: list[dict], dia: str, hasta: str | None = None)
     fin = (hasta or dia or "")[:10]
     del_rango = [v for v in ventas if ini <= v["dia"] <= fin]
     sucursales = listar_sucursales()
-    nombres_suc = {s["id"]: s["nombre"] for s in sucursales}
+    nombres_suc = {str(s["id"]): s["nombre"] for s in sucursales}
 
-    agrupado: dict[int, dict] = {}
+    agrupado: dict[str, dict] = {}
     for v in del_rango:
         sid = v.get("sucursal_id")
-        sid_val = int(sid) if sid is not None else 1
-        if sid_val not in agrupado:
-            agrupado[sid_val] = {
-                "sucursal_id": sid_val,
-                "nombre": nombres_suc.get(sid_val, f"Sucursal {sid_val}"),
+        sid_str = str(sid) if sid is not None else "1"
+        if sid_str not in agrupado:
+            agrupado[sid_str] = {
+                "sucursal_id": sid_str if sid_str == "web" else int(sid_str),
+                "nombre": nombres_suc.get(sid_str, f"Sucursal {sid_str}"),
                 "ventas": 0.0,
                 "tickets": 0,
             }
-        agrupado[sid_val]["ventas"] += v["total"]
-        agrupado[sid_val]["tickets"] += 1
+        agrupado[sid_str]["ventas"] += v["total"]
+        agrupado[sid_str]["tickets"] += 1
 
     lista = []
     for item in agrupado.values():
@@ -659,64 +697,69 @@ def _nombres_en_crm() -> dict[str, dict]:
     return {_clave(fila["pos_id"]): dict(fila) for fila in rows if _clave(fila["pos_id"])}
 
 
-def _filas_clientes(sucursal_id: int | None) -> tuple[list[str], list[list]]:
-    columnas, filas = filas_de("clientes", sucursal_id)
+def _filas_clientes(sucursal_id: int | str | None) -> tuple[list[str], list[list]]:
+    es_web = str(sucursal_id or "").strip().lower() == "web"
+    if es_web:
+        columnas, filas = [], []
+    else:
+        columnas, filas = filas_de("clientes", sucursal_id)
     if not columnas:
         columnas = ['id', 'nombre', 'telefono', 'limite_credito', 'deuda_actual', 'fecha_registro', 'dni', 'tipo_cliente', 'direccion', 'uid', 'origen_pc', 'creado_por', 'creado_en', 'actualizado_en', 'plazo_dias', 'estado_cuenta', 'promesa_fecha', 'promesa_nota', 'sucursal_id', 'sucursal_nombre']
         filas = []
 
-    # Convivencia e-commerce y cartera física: integrar clientes de Reparto Fácil web SOLO de la empresa activa
-    try:
-        from app.database import get_db
-        from app.services.pos_base import _empresa_activa
-        eid_actual = _empresa_activa()
-        with get_db() as conn:
-            web_rows = conn.execute(
-                """
-                SELECT DISTINCT ON (LOWER(TRIM(cliente_nombre)))
-                    cliente_nombre, cliente_telefono, direccion_entrega, created_at
-                FROM public.repartofacil_pedidos
-                WHERE empresa_id = %s AND cliente_nombre IS NOT NULL AND cliente_nombre != ''
-                ORDER BY LOWER(TRIM(cliente_nombre)), created_at DESC
-                """,
-                (eid_actual,)
-            ).fetchall()
-            
-            idx = _indice(columnas)
-            nom_idx = idx.get("nombre")
-            nombres_existentes = set()
-            if nom_idx is not None:
-                for f in filas:
-                    if nom_idx < len(f) and f[nom_idx]:
-                        nombres_existentes.add(str(f[nom_idx]).strip().casefold())
-            
-            for wr in web_rows:
-                c_nom = str(wr["cliente_nombre"] or "").strip()
-                if not c_nom or c_nom.casefold() in nombres_existentes:
-                    continue
-                nueva = [None] * len(columnas)
-                for cname, cval in [
-                    ("id", f"web-{len(filas) + 1}"),
-                    ("nombre", c_nom),
-                    ("telefono", str(wr["cliente_telefono"] or "")),
-                    ("direccion", str(wr["direccion_entrega"] or "")),
-                    ("tipo_cliente", "Web"),
-                    ("deuda_actual", 0.0),
-                    ("limite_credito", 0.0),
-                    ("estado_cuenta", "activo"),
-                    ("fecha_registro", str(wr["created_at"] or "")[:19]),
-                ]:
-                    pos = idx.get(cname)
-                    if pos is not None and pos < len(nueva):
-                        nueva[pos] = cval
-                filas.append(nueva)
-                nombres_existentes.add(c_nom.casefold())
-    except Exception as e:
-        logger.warning("Error combinando clientes web en cartera: %s", e)
+    # Convivencia e-commerce y cartera física: integrar clientes de Reparto Fácil web SOLO si es consolidado o Tienda Web
+    if sucursal_id is None or es_web:
+        try:
+            from app.database import get_db
+            from app.services.pos_base import _empresa_activa
+            eid_actual = _empresa_activa()
+            with get_db() as conn:
+                web_rows = conn.execute(
+                    """
+                    SELECT DISTINCT ON (LOWER(TRIM(cliente_nombre)))
+                        cliente_nombre, cliente_telefono, direccion_entrega, created_at
+                    FROM public.repartofacil_pedidos
+                    WHERE empresa_id = %s AND cliente_nombre IS NOT NULL AND cliente_nombre != ''
+                    ORDER BY LOWER(TRIM(cliente_nombre)), created_at DESC
+                    """,
+                    (eid_actual,)
+                ).fetchall()
+                
+                idx = _indice(columnas)
+                nom_idx = idx.get("nombre")
+                nombres_existentes = set()
+                if nom_idx is not None:
+                    for f in filas:
+                        if nom_idx < len(f) and f[nom_idx]:
+                            nombres_existentes.add(str(f[nom_idx]).strip().casefold())
+                
+                for wr in web_rows:
+                    c_nom = str(wr["cliente_nombre"] or "").strip()
+                    if not c_nom or c_nom.casefold() in nombres_existentes:
+                        continue
+                    nueva = [None] * len(columnas)
+                    for cname, cval in [
+                        ("id", f"web-{len(filas) + 1}"),
+                        ("nombre", c_nom),
+                        ("telefono", str(wr["cliente_telefono"] or "")),
+                        ("direccion", str(wr["direccion_entrega"] or "")),
+                        ("tipo_cliente", "Web"),
+                        ("deuda_actual", 0.0),
+                        ("limite_credito", 0.0),
+                        ("estado_cuenta", "activo"),
+                        ("fecha_registro", str(wr["created_at"] or "")[:19]),
+                    ]:
+                        pos = idx.get(cname)
+                        if pos is not None and pos < len(nueva):
+                            nueva[pos] = cval
+                    filas.append(nueva)
+                    nombres_existentes.add(c_nom.casefold())
+        except Exception as e:
+            logger.warning("Error combinando clientes web en cartera: %s", e)
 
     if filas:
         if sucursal_id is None:
-            sucs_activas = {int(s["id"]) for s in listar_sucursales() if s.get("id") is not None}
+            sucs_activas = {int(s["id"]) for s in listar_sucursales() if s.get("id") is not None and str(s["id"]).isdigit()}
             if sucs_activas:
                 idx = _indice(columnas)
                 idx_suc = idx.get("sucursal_id")
@@ -1526,13 +1569,13 @@ def _clave_panel(nombre: str, sid: int | None, periodo: str, desde: str | None, 
 
 def panel(
     nombre: str,
-    sucursal_id: int | None = None,
+    sucursal_id: int | str | None = None,
     periodo: str = "Hoy",
     desde: str | None = None,
     hasta: str | None = None,
     filtro: dict | None = None,
 ) -> dict:
-    sid = int(sucursal_id) if sucursal_id is not None else None
+    sid = "web" if str(sucursal_id or "").strip().lower() == "web" else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
     clave = _clave_panel(nombre, sid, periodo, desde, hasta, filtro)
     with _panel_lock:
         guardado = _panel_cache.get(clave)

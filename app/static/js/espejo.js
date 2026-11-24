@@ -177,7 +177,10 @@
 
     function fijarSucursales(lista) {
         if (!Array.isArray(lista)) return;
-        const sids = new Set(lista.map((s) => Number(s.id != null ? s.id : s.sucursal_id)).filter((id) => !isNaN(id) && id > 0));
+        const sids = new Set(lista.map((s) => {
+            const sid = s.id != null ? s.id : s.sucursal_id;
+            return String(sid).toLowerCase();
+        }).filter((id) => id && id !== 'null' && id !== 'undefined'));
         sucursalesValidas = sids;
         void purgarSucursalesObsoletas(sids);
     }
@@ -191,8 +194,8 @@
             if (libro && Array.isArray(libro.sucursales)) {
                 const prevCount = libro.sucursales.length;
                 libro.sucursales = libro.sucursales.filter((s) => {
-                    const sid = Number(s.sucursal_id);
-                    return isNaN(sid) || sid <= 0 || sids.has(sid);
+                    const sidStr = String(s.sucursal_id).toLowerCase();
+                    return sidStr === 'web' || sids.has(sidStr);
                 });
                 if (libro.sucursales.length !== prevCount) {
                     cambio = true;
@@ -204,14 +207,21 @@
     }
 
     function coincideSucursal(sucId, filtro) {
-        const sid = Number(sucId);
-        if (sucursalesValidas && sucursalesValidas.size && !isNaN(sid) && sid > 0 && !sucursalesValidas.has(sid)) {
-            return false;
-        }
         if (filtro === null || filtro === undefined) return true;
         const f = String(filtro).trim().toLowerCase();
         if (!f || f === 'todas' || f === 'todos' || f === 'todas las sucursales') return true;
-        return String(sucId).trim() === String(filtro).trim();
+        const s = String(sucId != null ? sucId : '').trim().toLowerCase();
+        if (f === 'web') {
+            return s === 'web';
+        }
+        if (s === 'web') {
+            return false;
+        }
+        if (sucursalesValidas && sucursalesValidas.size && !sucursalesValidas.has(s)) {
+            const num = Number(s);
+            if (!isNaN(num) && num > 0) return false;
+        }
+        return s === f;
     }
 
     function diaDe(fecha) {

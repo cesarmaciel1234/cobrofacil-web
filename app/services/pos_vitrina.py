@@ -140,7 +140,7 @@ def resolver_rango(
 
 def calcular_vitrina(
     periodo: str = "Hoy",
-    sucursal_id: int | None = None,
+    sucursal_id: int | str | None = None,
     desde: str | None = None,
     hasta: str | None = None,
 ) -> dict[str, Any]:
@@ -153,8 +153,13 @@ def calcular_vitrina(
     es_hoy = nombre_periodo == "Hoy"
     sufijo_periodo = "del día" if es_hoy else "del período"
 
+    es_web = str(sucursal_id or "").strip().lower() == "web"
+
     # 1. Ventas en el rango
-    col_v, filas_v = filas_de("ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+    if es_web:
+        col_v, filas_v = [], []
+    else:
+        col_v, filas_v = filas_de("ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
     idx_v = _indice(col_v)
 
     cant_tickets = 0
@@ -193,15 +198,44 @@ def calcular_vitrina(
 
         descuento_total += _numero(_valor(fila, idx_v, "descuento"))
 
-    # 2. Detalles ventas y Costo (para ganancia parcial y descuentos de oferta)
-    col_dv, filas_dv = filas_de("detalles_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
-    if not col_dv:
-        col_dv, filas_dv = filas_de("detalle_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
-    idx_dv = _indice(col_dv)
+    # Sumar pedidos web si es consolidado o Tienda Web
+    if sucursal_id is None or es_web:
+        try:
+            from app.database import get_db
+            from app.services.pos_base import _empresa_activa
+            eid_actual = _empresa_activa()
+            with get_db() as conn:
+                q_web = """
+                    SELECT id, ticket_id, total, metodo_pago, estado, created_at
+                    FROM public.repartofacil_pedidos
+                    WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
+                    AND created_at >= %s AND created_at <= %s
+                """
+                web_rows = conn.execute(q_web, (eid_actual, desde_iso, hasta_iso)).fetchall()
+                for wr in web_rows:
+                    tot = float(wr["total"] or 0.0)
+                    cant_tickets += 1
+                    total_tickets += tot
+                    tickets_digitales_monto += tot
+                    cant_tickets_digitales += 1
+                    ventas_vivas_ids.add(str(wr["ticket_id"] or wr["id"]))
+        except Exception as e:
+            logger.warning("Error sumando pedidos web en calcular_vitrina: %s", e)
 
-    col_p, filas_p = filas_de("productos", sucursal_id)
-    if not col_p:
-        col_p, filas_p = filas_de("articulos", sucursal_id)
+    # 2. Detalles ventas y Costo (para ganancia parcial y descuentos de oferta)
+    if es_web:
+        col_dv, filas_dv = [], []
+        col_p, filas_p = filas_de("productos", None)
+        if not col_p:
+            col_p, filas_p = filas_de("articulos", None)
+    else:
+        col_dv, filas_dv = filas_de("detalles_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+        if not col_dv:
+            col_dv, filas_dv = filas_de("detalle_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+        col_p, filas_p = filas_de("productos", sucursal_id)
+        if not col_p:
+            col_p, filas_p = filas_de("articulos", sucursal_id)
+    idx_dv = _indice(col_dv)
     idx_p = _indice(col_p)
 
     # El mostrador deja cerca de un millón de kilos para no cortar la venta.
@@ -509,14 +543,19 @@ def calcular_reporte_financiero(
 
     prev_desde_iso, prev_hasta_iso = _rango_anterior(desde_iso, hasta_iso, periodo, hoy_date)
 
+    es_web = str(sucursal_id or "").strip().lower() == "web"
+
     # 1. Ventas actuales
-    col_v, filas_v = filas_de("ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+    if es_web:
+        col_v, filas_v = [], []
+    else:
+        col_v, filas_v = filas_de("ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
     idx_v = _indice(col_v)
 
     # 2. Productos (costo, depto, categoria)
-    col_p, filas_p = filas_de("productos", sucursal_id)
+    col_p, filas_p = filas_de("productos", None if es_web else sucursal_id)
     if not col_p:
-        col_p, filas_p = filas_de("articulos", sucursal_id)
+        col_p, filas_p = filas_de("articulos", None if es_web else sucursal_id)
     idx_p = _indice(col_p)
 
     mapa_costos: dict[str, float] = {}
@@ -531,9 +570,12 @@ def calcular_reporte_financiero(
             mapa_deptos[pid] = depto
 
     # 3. Detalles de ventas
-    col_dv, filas_dv = filas_de("detalles_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
-    if not col_dv:
-        col_dv, filas_dv = filas_de("detalle_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+    if es_web:
+        col_dv, filas_dv = [], []
+    else:
+        col_dv, filas_dv = filas_de("detalles_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
+        if not col_dv:
+            col_dv, filas_dv = filas_de("detalle_ventas", sucursal_id, desde=desde_iso[:10], hasta=hasta_iso[:10])
     idx_dv = _indice(col_dv)
 
     items_por_venta: dict[str, list[dict]] = {}
@@ -605,79 +647,80 @@ def calcular_reporte_financiero(
     pagos_map: dict[str, float] = {}
     deptos_map: dict[str, float] = {}
 
-    # Integrar pedidos web (Reparto Fácil) en el reporte financiero
-    try:
-        from app.database import get_db
-        from app.services.pos_base import _empresa_activa
-        eid_actual = _empresa_activa()
-        with get_db() as conn:
-            web_rows = conn.execute(
-                """
-                SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
-                FROM public.repartofacil_pedidos
-                WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
-                AND created_at >= %s AND created_at <= %s
-                ORDER BY created_at DESC
-                """,
-                (eid_actual, desde_iso, hasta_iso)
-            ).fetchall()
-            for wr in web_rows:
-                fecha_str = str(wr["created_at"] or "").replace("T", " ")
-                if not (desde_iso <= fecha_str <= hasta_iso):
-                    continue
+    # Integrar pedidos web (Reparto Fácil) si es consolidado o Tienda Web
+    if sucursal_id is None or es_web:
+        try:
+            from app.database import get_db
+            from app.services.pos_base import _empresa_activa
+            eid_actual = _empresa_activa()
+            with get_db() as conn:
+                web_rows = conn.execute(
+                    """
+                    SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
+                    FROM public.repartofacil_pedidos
+                    WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
+                    AND created_at >= %s AND created_at <= %s
+                    ORDER BY created_at DESC
+                    """,
+                    (eid_actual, desde_iso, hasta_iso)
+                ).fetchall()
+                for wr in web_rows:
+                    fecha_str = str(wr["created_at"] or "").replace("T", " ")
+                    if not (desde_iso <= fecha_str <= hasta_iso):
+                        continue
 
-                tid = str(wr["ticket_id"] or wr["id"])
-                tot = float(wr["total"] or 0.0)
-                pago = "Web"  # Pedidos web siempre son pago Web
+                    tid = str(wr["ticket_id"] or wr["id"])
+                    tot = float(wr["total"] or 0.0)
+                    pago = "Web"  # Pedidos web siempre son pago Web
 
-                total_ventas += tot
-                total_tickets += 1
-                pagos_map[pago] = pagos_map.get(pago, 0.0) + tot
+                    total_ventas += tot
+                    total_tickets += 1
+                    pagos_map[pago] = pagos_map.get(pago, 0.0) + tot
 
-                # Calcular costo y departamento para items web
-                w_items = []
-                if isinstance(wr.get("items"), str):
-                    try:
-                        import json
-                        w_items = json.loads(wr["items"])
-                    except Exception:
-                        pass
-                elif isinstance(wr.get("items"), list):
-                    w_items = wr["items"]
+                    # Calcular costo y departamento para items web
+                    w_items = []
+                    if isinstance(wr.get("items"), str):
+                        try:
+                            import json
+                            w_items = json.loads(wr["items"])
+                        except Exception:
+                            pass
+                    elif isinstance(wr.get("items"), list):
+                        w_items = wr["items"]
 
-                v_costo = 0.0
-                for item in w_items:
-                    pid = str(item.get("id") or item.get("product_id") or "")
-                    c_u = mapa_costos.get(pid, 0.0)
-                    st = float(item.get("price") or item.get("precio") or 0.0) * float(item.get("quantity") or item.get("cantidad") or 1)
-                    depto = mapa_deptos.get(pid, "CARNE")
-                    deptos_map[depto] = deptos_map.get(depto, 0.0) + st
-                    if c_u > 0.009:
-                        hay_costo_cargado = True
-                        v_costo += float(item.get("quantity") or item.get("cantidad") or 1) * c_u
-                        venta_con_costo += st
+                    v_costo = 0.0
+                    for item in w_items:
+                        pid = str(item.get("id") or item.get("product_id") or "")
+                        c_u = mapa_costos.get(pid, 0.0)
+                        st = float(item.get("price") or item.get("precio") or 0.0) * float(item.get("quantity") or item.get("cantidad") or 1)
+                        depto = mapa_deptos.get(pid, "CARNE")
+                        deptos_map[depto] = deptos_map.get(depto, 0.0) + st
+                        if c_u > 0.009:
+                            hay_costo_cargado = True
+                            v_costo += float(item.get("quantity") or item.get("cantidad") or 1) * c_u
+                            venta_con_costo += st
 
-                total_costo += v_costo
+                    total_costo += v_costo
 
-                # Agregar al slot correspondiente
-                k = ""
-                if p_norm in ("hoy", "dia", "diario"):
-                    k = fecha_str[11:13] if len(fecha_str) >= 13 else "12"
-                elif p_norm in ("año", "anio", "año actual"):
-                    k = fecha_str[5:7] if len(fecha_str) >= 7 else "01"
-                else:
-                    k = fecha_str[:10]
-
-                target_slot = slot_map.get(k)
-                if target_slot:
-                    target_slot["ventas"] += tot
-                    target_slot["tickets"] += 1
-                    if hay_costo_cargado:
-                        target_slot["ganancia"] += (tot - v_costo)
+                    # Agregar al slot correspondiente
+                    k = ""
+                    if p_norm in ("hoy", "dia", "diario"):
+                        k = fecha_str[11:13] if len(fecha_str) >= 13 else "12"
+                    elif p_norm in ("año", "anio", "año actual"):
+                        k = fecha_str[5:7] if len(fecha_str) >= 7 else "01"
                     else:
-                        target_slot["ganancia"] += tot
-    except Exception as e:
-        logger.warning("Error integrando pedidos web en vitrina: %s", e)
+                        k = fecha_str[:10]
+
+                    target_slot = slot_map.get(k)
+                    if target_slot:
+                        target_slot["ventas"] += tot
+                        target_slot["tickets"] += 1
+                        if hay_costo_cargado:
+                            target_slot["ganancia"] += (tot - v_costo)
+                        else:
+                            target_slot["ganancia"] += tot
+        except Exception as e:
+            logger.warning("Error integrando pedidos web en vitrina: %s", e)
 
     for fila in filas_v:
         fecha_str = str(_valor(fila, idx_v, "fecha") or "").replace("T", " ")
@@ -738,24 +781,31 @@ def calcular_reporte_financiero(
 
     # Siempre calculamos el período previo para benchmark día a día y proyección de cierre
     if prev_desde_iso and prev_hasta_iso:
-        col_vp, filas_vp = filas_de("ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
-        idx_vp = _indice(col_vp)
-        col_dvp, filas_dvp = filas_de("detalles_ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
-        if not col_dvp:
-            col_dvp, filas_dvp = filas_de("detalle_ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
-        idx_dvp = _indice(col_dvp)
+        if es_web:
+            col_vp, filas_vp = [], []
+            col_dvp, filas_dvp = [], []
+            idx_vp = {}
+            idx_dvp = {}
+            items_prev_map = {}
+        else:
+            col_vp, filas_vp = filas_de("ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
+            idx_vp = _indice(col_vp)
+            col_dvp, filas_dvp = filas_de("detalles_ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
+            if not col_dvp:
+                col_dvp, filas_dvp = filas_de("detalle_ventas", sucursal_id, desde=prev_desde_iso[:10], hasta=prev_hasta_iso[:10])
+            idx_dvp = _indice(col_dvp)
 
-        items_prev_map: dict[str, list[dict]] = {}
-        for f in filas_dvp:
-            vid = str(_valor(f, idx_dvp, "id_venta", "venta_id") or "")
-            if not vid:
-                continue
-            pid = str(_valor(f, idx_dvp, "id_producto", "producto_id") or "")
-            cant = _numero(_valor(f, idx_dvp, "cantidad", "cant"))
-            subtotal = _numero(_valor(f, idx_dvp, "subtotal", "total"))
-            if vid not in items_prev_map:
-                items_prev_map[vid] = []
-            items_prev_map[vid].append({"pid": pid, "cant": cant, "subtotal": subtotal})
+            items_prev_map: dict[str, list[dict]] = {}
+            for f in filas_dvp:
+                vid = str(_valor(f, idx_dvp, "id_venta", "venta_id") or "")
+                if not vid:
+                    continue
+                pid = str(_valor(f, idx_dvp, "id_producto", "producto_id") or "")
+                cant = _numero(_valor(f, idx_dvp, "cantidad", "cant"))
+                subtotal = _numero(_valor(f, idx_dvp, "subtotal", "total"))
+                if vid not in items_prev_map:
+                    items_prev_map[vid] = []
+                items_prev_map[vid].append({"pid": pid, "cant": cant, "subtotal": subtotal})
 
         d0_prev = datetime.fromisoformat(prev_desde_iso[:10])
         for fila in filas_vp:
@@ -805,6 +855,38 @@ def calcular_reporte_financiero(
                         slots[delta_dias]["tickets_prev"] += 1
                 except Exception:
                     pass
+
+        # Integrar pedidos web en período previo si es consolidado o Tienda Web
+        if sucursal_id is None or es_web:
+            try:
+                from app.database import get_db
+                from app.services.pos_base import _empresa_activa
+                eid_actual = _empresa_activa()
+                with get_db() as conn:
+                    web_prev = conn.execute(
+                        """
+                        SELECT id, ticket_id, total, created_at
+                        FROM public.repartofacil_pedidos
+                        WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
+                        AND created_at >= %s AND created_at <= %s
+                        """,
+                        (eid_actual, prev_desde_iso, prev_hasta_iso)
+                    ).fetchall()
+                    for wr in web_prev:
+                        tot = float(wr["total"] or 0.0)
+                        total_ventas_prev += tot
+                        total_tickets_prev += 1
+                        fecha_str = str(wr["created_at"] or "")
+                        try:
+                            f_d = datetime.fromisoformat(fecha_str[:10]).date()
+                            delta_dias = (f_d - d0_prev.date()).days
+                            if 0 <= delta_dias < len(slots):
+                                slots[delta_dias]["ventas_prev"] += tot
+                                slots[delta_dias]["tickets_prev"] += 1
+                        except Exception:
+                            pass
+            except Exception as e:
+                logger.warning("Error sumando pedidos web previos en reporte: %s", e)
 
     ticket_medio = round(total_ventas / total_tickets, 2) if total_tickets else 0.0
     ganancia_neta = round(total_ventas - total_costo, 2) if hay_costo_cargado else None

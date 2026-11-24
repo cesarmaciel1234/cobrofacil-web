@@ -3219,7 +3219,9 @@ const $ = id => document.getElementById(id);
         let activeSucursalId = null;
         try {
             const guardado = localStorage.getItem('crm_active_sucursal_id');
-            if (guardado !== null && guardado !== '') activeSucursalId = parseInt(guardado, 10);
+            if (guardado !== null && guardado !== '') {
+                activeSucursalId = guardado === 'web' ? 'web' : parseInt(guardado, 10);
+            }
         } catch (_) {}
         let sucursalesConocidas = [];
         try {
@@ -3254,15 +3256,15 @@ const $ = id => document.getElementById(id);
         actualizarNombreEmpresaTopbar();
 
         function aplicarSucursal(id) {
-            activeSucursalId = id;
+            activeSucursalId = id === 'web' ? 'web' : (id != null && !isNaN(id) ? Number(id) : null);
             try {
-                if (id == null) localStorage.removeItem('crm_active_sucursal_id');
-                else localStorage.setItem('crm_active_sucursal_id', String(id));
+                if (activeSucursalId == null) localStorage.removeItem('crm_active_sucursal_id');
+                else localStorage.setItem('crm_active_sucursal_id', String(activeSucursalId));
             } catch (_) {}
             const icono = $('topbarIcon');
-            const elegida = sucursalesConocidas.find((s) => String(s.id) === String(id));
+            const elegida = sucursalesConocidas.find((s) => String(s.id) === String(activeSucursalId));
             if (icono) {
-                icono.classList.toggle('activa', id != null);
+                icono.classList.toggle('activa', activeSucursalId != null);
                 icono.setAttribute('aria-label', elegida ? elegida.nombre : 'Todas las sucursales');
             }
             actualizarNombreEmpresaTopbar();
@@ -3270,10 +3272,10 @@ const $ = id => document.getElementById(id);
             if (grid) grid.style.opacity = '0.5';
 
             if (window.CarteraLibro) {
-                void window.CarteraLibro.sucursal(id);
+                void window.CarteraLibro.sucursal(activeSucursalId);
             }
             if (window.ReporteJefe && window.ReporteJefe.setSucursal) {
-                window.ReporteJefe.setSucursal(id);
+                window.ReporteJefe.setSucursal(activeSucursalId);
             }
             const activeView = document.querySelector('.view.active');
             const vName = activeView ? activeView.id.replace('view-', '') : 'reporte';
@@ -3306,14 +3308,14 @@ const $ = id => document.getElementById(id);
             fondo.className = 'pedido-sheet-back';
             fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Sucursales">
                 <strong class="pedido-sheet-titulo">Sucursales</strong>
-                ${opciones.map((op) => `<button type="button" class="pedido-opcion${op.id === actual ? ' active' : ''}" data-sucursal="${textoJefe(op.id)}">${textoJefe(op.nombre)}</button>`).join('')}
+                ${opciones.map((op) => `<button type="button" class="pedido-opcion${op.id === actual ? ' active' : ''}" data-sucursal="${textoJefe(op.id)}">${op.id === 'web' ? '🌐 ' : ''}${textoJefe(op.nombre)}</button>`).join('')}
             </div>`;
             fondo.addEventListener('click', (ev) => {
                 const opcion = ev.target.closest('[data-sucursal]');
                 if (opcion) {
                     const valor = opcion.dataset.sucursal;
                     fondo.remove();
-                    aplicarSucursal(valor ? parseInt(valor, 10) : null);
+                    aplicarSucursal(valor === 'web' ? 'web' : (valor ? parseInt(valor, 10) : null));
                     cargarSucursalesSelector();
                     return;
                 }
@@ -3347,7 +3349,8 @@ const $ = id => document.getElementById(id);
                     if (vistas.has(idStr)) return;
                     vistas.add(idStr);
                     const isAct = String(activeSucursalId) === idStr;
-                    html += `<button type="button" class="btn btn-sm ${isAct ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="${s.id}" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">📍 ${textoJefe(s.nombre)}</button>`;
+                    const icono = idStr === 'web' ? '🌐' : '📍';
+                    html += `<button type="button" class="btn btn-sm ${isAct ? 'btn-primary' : 'btn-ghost'} sucursal-pill" data-sucursal="${s.id}" style="border-radius:20px; font-size:12px; font-weight:700; padding:4px 14px;">${icono} ${textoJefe(s.nombre)}</button>`;
                 });
                 cont.innerHTML = html;
 
@@ -3355,7 +3358,7 @@ const $ = id => document.getElementById(id);
                     btn.onclick = (ev) => {
                         ev.stopPropagation();
                         const val = btn.dataset.sucursal;
-                        aplicarSucursal(val === 'todas' ? null : parseInt(val, 10));
+                        aplicarSucursal(val === 'todas' ? null : (val === 'web' ? 'web' : parseInt(val, 10)));
                         cargarSucursalesSelector();
                     };
                 });

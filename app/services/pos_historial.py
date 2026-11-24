@@ -27,7 +27,7 @@ def _activacion(configs: list[dict], sucursal_id: int | None = None) -> str:
         clave = str(fila.get("clave") or fila.get("key") or "").strip()
         if clave == "interes_ticket_activado_en" and fila.get("valor") not in (None, ""):
             sid = fila.get("sucursal_id")
-            if sucursal_id is not None and sid not in (None, "") and int(sid) != int(sucursal_id):
+            if sucursal_id is not None and sid not in (None, "") and str(sid).strip() != str(sucursal_id).strip():
                 continue
             fechas.append(str(fila["valor"]).strip())
     if fechas:
@@ -578,7 +578,10 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             bool(pedido.get("historico")),
             hoy,
         )
-    if ini and fin:
+    es_web = str(sucursal_id or "").strip().lower() == "web"
+    if es_web:
+        columnas, filas = [], []
+    elif ini and fin:
         columnas, filas = filas_de("ventas", sucursal_id, desde=ini, hasta=fin)
     else:
         columnas, filas = filas_de("ventas", sucursal_id)
@@ -646,21 +649,24 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             slot["tickets"] += 1
         elegidas.append(venta)
 
-    # Convivencia e-commerce y venta física: incluir pedidos web con ticket SOLO de la empresa activa
-    try:
-        from app.database import get_db
-        from app.services.pos_base import _empresa_activa
-        eid_actual = _empresa_activa()
-        with get_db() as conn:
-            web_rows = conn.execute(
+    # Convivencia e-commerce y venta física: incluir pedidos web si es consolidado o Tienda Web
+    if sucursal_id is None or es_web:
+        try:
+            from app.database import get_db
+            from app.services.pos_base import _empresa_activa
+            eid_actual = _empresa_activa()
+            with get_db() as conn:
+                q_web = """
+                    SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
+                    FROM public.repartofacil_pedidos
+                    WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
                 """
-                SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
-                FROM public.repartofacil_pedidos
-                WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
-                ORDER BY created_at DESC LIMIT 100
-                """,
-                (eid_actual,)
-            ).fetchall()
+                params = [eid_actual]
+                if ini and fin:
+                    q_web += " AND created_at >= %s AND created_at <= %s"
+                    params.extend([str(ini)[:10] + " 00:00:00", str(fin)[:10] + " 23:59:59"])
+                q_web += " ORDER BY created_at DESC LIMIT 200"
+                web_rows = conn.execute(q_web, tuple(params)).fetchall()
             for wr in web_rows:
                 tid = str(wr["ticket_id"] or wr["id"])
                 if any(str(v.get("id")) == tid for v in elegidas):
@@ -710,8 +716,8 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
                     slot["monto"] += float(aporte or 0)
                     slot["tickets"] += 1
                     elegidas.append(w_venta)
-    except Exception as e:
-        logger.warning("Error combinando pedidos web en historial: %s", e)
+        except Exception as e:
+            logger.warning("Error combinando pedidos web en historial: %s", e)
 
     elegidas.sort(key=lambda item: (item["fecha"], item["id"]), reverse=True)
     offset = max(0, int(pedido.get("offset") or 0))
