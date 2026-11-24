@@ -499,6 +499,7 @@ def aceptar_repartofacil_pedido(order_id):
 
             # 2. Registrar/vincular cliente en la Cartera de Clientes local y web compartida
             try:
+                conn.execute("SAVEPOINT sp_cartera")
                 existente = conn.execute(
                     "SELECT id FROM clientes WHERE LOWER(TRIM(nombre)) = LOWER(TRIM(%s)) OR (telefono IS NOT NULL AND telefono != '' AND telefono = %s) LIMIT 1",
                     (nombre_cliente, tel_cliente)
@@ -521,11 +522,17 @@ def aceptar_repartofacil_pedido(order_id):
                         """,
                         (dir_cliente, tel_cliente, existente["id"])
                     )
+                conn.execute("RELEASE SAVEPOINT sp_cartera")
             except Exception as cli_err:
+                try:
+                    conn.execute("ROLLBACK TO SAVEPOINT sp_cartera")
+                except Exception:
+                    pass
                 print(f"[Cartera] Aviso no bloqueante al sincronizar cliente web: {cli_err}")
 
             # 3. Registrar venta en ventas_mostrador para el Arqueo Diario y Libro Omnicanal
             try:
+                conn.execute("SAVEPOINT sp_vm")
                 total_val = float(order_row["total"] or 0.0) if order_row else 0.0
                 summary_items = ", ".join([
                     f"{it.get('quantity', 1)} {it.get('unit', 'KG')} {it.get('name', 'Corte')}"
@@ -536,11 +543,16 @@ def aceptar_repartofacil_pedido(order_id):
                 conn.execute(
                     """
                     INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at)
-                    VALUES (%s, %s, %s, 'Web (Reparto Fácil)', %s, NOW())
+                    VALUES (%s, %s, %s, 'CONTADO', %s, NOW())
                     """,
-                    (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:200]}", total_val, fecha_hoy)
+                    (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:200]} (Web)", total_val, fecha_hoy)
                 )
+                conn.execute("RELEASE SAVEPOINT sp_vm")
             except Exception as vm_err:
+                try:
+                    conn.execute("ROLLBACK TO SAVEPOINT sp_vm")
+                except Exception:
+                    pass
                 print(f"[VentasMostrador] Error no bloqueante al asentar venta web: {vm_err}")
 
             # 4. Notificar en chat tripartito
