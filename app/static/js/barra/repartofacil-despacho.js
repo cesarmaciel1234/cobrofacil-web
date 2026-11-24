@@ -278,6 +278,12 @@
             const puedeReasignar = Boolean(p.repartidor_id) && (estadoLower === 'assigned' || esEmbalado);
             const repartidorAsignado = p.repartidor_nombre || (p.repartidor_id ? 'Lucas Motomensajero' : null);
 
+            const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
+            const esRetiroEnTienda = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+            const badgeTipoEntrega = esRetiroEnTienda
+                ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🏪 En Tienda</span>`
+                : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🛵 Con Delivery</span>`;
+
             let badgeEstadoHtml = '';
             if (esCanceladoCliente) {
                 badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✕ CANCELADO</span>`;
@@ -286,7 +292,15 @@
             } else if (esTimeout) {
                 badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">⏰ CANCELADO (1H)</span>`;
             } else if (esEntregado) {
-                badgeEstadoHtml = `<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✓ ENTREGADO</span>`;
+                badgeEstadoHtml = `<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✓ ${esRetiroEnTienda ? 'RETIRADO' : 'ENTREGADO'}</span>`;
+            } else if (esRetiroEnTienda) {
+                if (esEmbalado) {
+                    badgeEstadoHtml = `<span style="background:#ecfdf5; color:#065f46; border:1.5px solid #10b981; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 1px 4px rgba(16,185,129,0.2);">🛍️ LISTO PARA RETIRAR</span>`;
+                } else if (esConfirmado) {
+                    badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">👨‍🍳 EN PREPARACIÓN</span>`;
+                } else {
+                    badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 0 10px rgba(255,230,0,0.6); animation:pulse 2s infinite;">🔔 NUEVO (RETIRO)</span>`;
+                }
             } else if (esEmbalado) {
                 badgeEstadoHtml = `<span style="background:#fef9c3; color:#713f12; border:1px solid #facc15; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">📦 EMBALADO</span>`;
             } else if (repartidorAsignado) {
@@ -330,8 +344,32 @@
             }
 
             // Indicador de ETA visual y Prueba de Vida dentro del ticket (Estilo Blanco y Amarillo)
+            // Indicador de ETA visual y Estado dentro del ticket (Estilo Blanco y Amarillo)
             let indicadorEtaHtml = '';
-            if (repartidorAsignado && !esEntregado && !esRechazado) {
+            if (esRetiroEnTienda) {
+                if (esEmbalado && !esEntregado && !esRechazado) {
+                    indicadorEtaHtml = `
+                        <div style="background:#ecfdf5; border:1.5px solid #10b981; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; align-items:center; justify-content:space-between; box-shadow:0 1px 3px rgba(16,185,129,0.1);">
+                            <span style="font-weight:900;">🛍️ Pedido listo para retirar</span>
+                            <span style="font-weight:900; background:#10b981; color:#ffffff; padding:2px 8px; border-radius:6px;">Esperando al cliente</span>
+                        </div>
+                    `;
+                } else if (esConfirmado && !esEntregado && !esRechazado) {
+                    indicadorEtaHtml = `
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#2D3277; display:flex; align-items:center; justify-content:space-between;">
+                            <span style="font-weight:800;">👨‍🍳 Pedido en preparación en el mostrador</span>
+                            <span style="font-weight:900; background:#FFE600; color:#2D3277; padding:2px 8px; border-radius:6px; border:1px solid #eab308;">Avisale al estar listo</span>
+                        </div>
+                    `;
+                } else if (esNuevoPendiente) {
+                    indicadorEtaHtml = `
+                        <div style="background:#ecfdf5; border:1.5px solid #a7f3d0; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; align-items:center; justify-content:space-between;">
+                            <span style="font-weight:800;">🏪 Modalidad: Retiro en Mostrador</span>
+                            <span style="font-weight:900; background:#d1fae5; color:#065f46; padding:2px 8px; border-radius:6px; border:1px solid #6ee7b7;">Sin Chofer · Retira Cliente</span>
+                        </div>
+                    `;
+                }
+            } else if (repartidorAsignado && !esEntregado && !esRechazado) {
                 const pruebaDeVida = obtenerPruebaDeVida(p.driver_last_ping);
                 if (minutosRestantesChofer > 0) {
                     indicadorEtaHtml = `
@@ -369,35 +407,67 @@
                 `;
             }
 
-            // Estado dinámico del botón de Embalar (Blanco con Amarillo y Navy)
+            // Estado dinámico del botón de Acción (Embalar en delivery / Retiro en mostrador)
             let textoBotonEmbalar = 'Embalar';
             let iconoBotonEmbalar = '📦';
             let bgBotonEmbalar = puedeEmbalar ? '#FFE600' : '#f1f5f9';
             let colorBotonEmbalar = puedeEmbalar ? '#2D3277' : '#94a3b8';
             let borderBotonEmbalar = puedeEmbalar ? '1.5px solid #eab308' : '1px solid #cbd5e1';
+            let accionBotonEmbalar = `window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, ${recargoEsperaChofer}, ${minutosDemoraChofer})`;
 
-            if (esEmbalado) {
-                textoBotonEmbalar = 'Embalado';
-                iconoBotonEmbalar = '✓';
-                bgBotonEmbalar = '#fef08a';
-                colorBotonEmbalar = '#713f12';
-                borderBotonEmbalar = '1.5px solid #facc15';
-            } else if (repartidorAsignado) {
-                if (minutosRestantesChofer > 0) {
-                    textoBotonEmbalar = `Embalar (~${minutosRestantesChofer}m)`;
-                    iconoBotonEmbalar = '📦';
+            if (esRetiroEnTienda) {
+                if (esEntregado) {
+                    textoBotonEmbalar = 'Retirado';
+                    iconoBotonEmbalar = '✓';
+                    bgBotonEmbalar = '#f1f5f9';
+                    colorBotonEmbalar = '#475569';
+                    borderBotonEmbalar = '1px solid #cbd5e1';
+                    accionBotonEmbalar = '';
+                } else if (esEmbalado) {
+                    textoBotonEmbalar = 'Entregar al Cliente';
+                    iconoBotonEmbalar = '✓';
+                    bgBotonEmbalar = '#10b981';
+                    colorBotonEmbalar = '#ffffff';
+                    borderBotonEmbalar = '1.5px solid #059669';
+                    accionBotonEmbalar = `window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})`;
+                } else if (esConfirmado) {
+                    textoBotonEmbalar = 'Listo p/ Retirar';
+                    iconoBotonEmbalar = '🛍️';
                     bgBotonEmbalar = '#FFE600';
                     colorBotonEmbalar = '#2D3277';
                     borderBotonEmbalar = '1.5px solid #eab308';
+                    accionBotonEmbalar = `window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)`;
                 } else {
-                    textoBotonEmbalar = `Embalar (+⏱️$${recargoEsperaChofer})`;
-                    iconoBotonEmbalar = '⚠️';
-                    bgBotonEmbalar = '#f59e0b';
-                    colorBotonEmbalar = '#ffffff';
-                    borderBotonEmbalar = '1.5px solid #d97706';
+                    textoBotonEmbalar = 'Retiro';
+                    iconoBotonEmbalar = '🏪';
+                    bgBotonEmbalar = '#f1f5f9';
+                    colorBotonEmbalar = '#94a3b8';
+                    borderBotonEmbalar = '1px solid #cbd5e1';
+                    accionBotonEmbalar = '';
+                }
+            } else {
+                if (esEmbalado) {
+                    textoBotonEmbalar = 'Embalado';
+                    iconoBotonEmbalar = '✓';
+                    bgBotonEmbalar = '#fef08a';
+                    colorBotonEmbalar = '#713f12';
+                    borderBotonEmbalar = '1.5px solid #facc15';
+                } else if (repartidorAsignado) {
+                    if (minutosRestantesChofer > 0) {
+                        textoBotonEmbalar = `Embalar (~${minutosRestantesChofer}m)`;
+                        iconoBotonEmbalar = '📦';
+                        bgBotonEmbalar = '#FFE600';
+                        colorBotonEmbalar = '#2D3277';
+                        borderBotonEmbalar = '1.5px solid #eab308';
+                    } else {
+                        textoBotonEmbalar = `Embalar (+⏱️ $${recargoEsperaChofer})`;
+                        iconoBotonEmbalar = '⚠️';
+                        bgBotonEmbalar = '#f59e0b';
+                        colorBotonEmbalar = '#ffffff';
+                        borderBotonEmbalar = '1.5px solid #d97706';
+                    }
                 }
             }
-
             // Tema cromático Reparto Fácil Oficial: Blanco con Amarillo (#FFE600) y Navy (#2D3277)
             let cardBg = '#ffffff';
             let cardBorder = '#fde047';
@@ -469,11 +539,7 @@
                 pillBorder = alertaStock ? '#fca5a5' : '#fde047';
             }
 
-            const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
-            const esRetiroEnTienda = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
-            const badgeTipoEntrega = esRetiroEnTienda
-                ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🏪 En Tienda</span>`
-                : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🛵 Con Delivery</span>`;
+            // Modalidad ya resuelta arriba
 
             const resumenLinea = esRechazado
                 ? `<span style="color:#b91c1c; font-weight:700;">${esCanceladoCliente ? 'Cancelado por el cliente' : (esRechazadoComercio ? 'Rechazado por el comercio' : 'Cancelado por tiempo de espera')} · ${cantItems} ítems</span>`
@@ -657,20 +723,24 @@
                             <!-- DECISIÓN DE COBRO FÁCIL: ACEPTAR O RECHAZAR -->
                             <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:12px; margin-bottom:8px; box-shadow:0 2px 6px rgba(234,179,8,0.08);">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-size:11px; font-weight:900; color:#2D3277; text-transform:uppercase;">¿Aceptar pedido para despacho?</span>
-                                    <span style="background:#fef9c3; color:#2D3277; border:1px solid #fde047; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">
-                                        ⏱️ Chofer a sucursal: ~${etaBaseMinutos}m
+                                    <span style="font-size:11px; font-weight:900; color:#2D3277; text-transform:uppercase;">
+                                        ${esRetiroEnTienda ? '¿Aceptar pedido para retiro en tienda?' : '¿Aceptar pedido para despacho?'}
+                                    </span>
+                                    <span style="background:${esRetiroEnTienda ? '#ecfdf5' : '#fef9c3'}; color:${esRetiroEnTienda ? '#065f46' : '#2D3277'}; border:1px solid ${esRetiroEnTienda ? '#a7f3d0' : '#fde047'}; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">
+                                        ${esRetiroEnTienda ? '🏪 En Mostrador' : `⏱️ Chofer a sucursal: ~${etaBaseMinutos}m`}
                                     </span>
                                 </div>
                                 <div style="font-size:10.5px; color:#64748b; line-height:1.4; margin-bottom:10px;">
-                                    💬 <i>Podés usar el <b>Chat con el cliente</b> para pulir el pedido antes de aceptar o embalar si necesitás unos minutos extra sin apurar al cliente.</i>
+                                    ${esRetiroEnTienda 
+                                        ? '💬 <i>El comprador retira directamente en tu local. Al aceptar, se emite el ticket y le avisamos que estás preparando su pedido.</i>'
+                                        : '💬 <i>Podés usar el <b>Chat con el cliente</b> para pulir el pedido antes de aceptar o embalar si necesitás unos minutos extra sin apurar al cliente.</i>'}
                                 </div>
                                 <div style="display:flex; gap:8px;">
                                     <button type="button" class="btn" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})" style="flex:1; background:#ffffff; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:11px; font-weight:800; padding:8px 6px !important; cursor:pointer;">
                                         ✕ Rechazar
                                     </button>
                                     <button type="button" class="btn" onclick="window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})" style="flex:1.5; background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:12px; font-weight:900; padding:8px 8px !important; cursor:pointer; box-shadow:0 3px 10px rgba(255,230,0,0.35);">
-                                        ✓ Aceptar y Publicar
+                                        ${esRetiroEnTienda ? '✓ Aceptar y Preparar' : '✓ Aceptar y Publicar'}
                                     </button>
                                 </div>
                             </div>
@@ -688,7 +758,7 @@
                                 <span>Chat</span>
                             </button>
 
-                            <button type="button" class="btn btn-embalar-pedido" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, ${recargoEsperaChofer}, ${minutosDemoraChofer})" ${puedeEmbalar ? '' : 'disabled'} style="flex:1.4; min-width:0; background:${bgBotonEmbalar}; color:${colorBotonEmbalar}; border:${borderBotonEmbalar}; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; box-shadow:0 2px 8px rgba(234,179,8,0.25); white-space:nowrap; transition:all 0.15s ease;">
+                            <button type="button" class="btn btn-embalar-pedido" onclick="${accionBotonEmbalar}" ${(!accionBotonEmbalar || esRechazado) ? 'disabled' : ''} style="flex:1.4; min-width:0; background:${bgBotonEmbalar}; color:${colorBotonEmbalar}; border:${borderBotonEmbalar}; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:${accionBotonEmbalar ? 'pointer' : 'default'}; box-shadow:${accionBotonEmbalar ? '0 2px 8px rgba(234,179,8,0.25)' : 'none'}; white-space:nowrap; transition:all 0.15s ease;">
                                 <span>${iconoBotonEmbalar}</span>
                                 <span>${textoBotonEmbalar}</span>
                             </button>
@@ -703,6 +773,29 @@
     }
 
     // Toggle para desplegar/ocultar detalles al click en la fila compacta
+    // Acción: Entregar pedido en mostrador al cliente
+    async function entregarPedidoMostrador(orderId) {
+        if (!confirm(`¿Confirmás que el cliente retiró el pedido #${escaparTextoChat(orderId)} en el mostrador?`)) {
+            return;
+        }
+        try {
+            mostrarToast(`🏪 Entregando pedido #${escaparTextoChat(orderId)} en mostrador…`);
+            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/entregar-mostrador`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await resp.json();
+            if (data.success) {
+                mostrarToast(`✓ Pedido #${escaparTextoChat(orderId)} entregado en mostrador.`);
+                cargarPedidos();
+            } else {
+                mostrarToast(`❌ Error: ${data.error || 'No se pudo entregar el pedido'}`);
+            }
+        } catch (e) {
+            mostrarToast(`❌ Error de conexión: ${e.message}`);
+        }
+    }
+
     function toggleDetalle(orderId) {
         const d = $('detalle-pedido-' + orderId);
         const chev = $('chevron-pedido-' + orderId);
@@ -1395,6 +1488,7 @@
         aceptarPedido,
         rechazarPedido,
         marcarEmbalado,
+        entregarPedidoMostrador,
         liberarPorCustodio,
         verTicket,
         cerrarTicketModal,

@@ -489,7 +489,12 @@ def aceptar_repartofacil_pedido(order_id):
             if validacion["items_con_stock"]:
                 _deducir_stock_items(validacion["items_con_stock"], empresa_id)
 
-            texto = f"{nombre_sucursal} aceptó el pedido. Ticket #{ticket_id} emitido. Buscando repartidor en zona..."
+            tipo_entrega = str(order_row.get("tipo_entrega") or "").strip().lower()
+            es_retiro = tipo_entrega in ("pickup", "takeaway", "retiro", "tienda", "mostrador")
+            if es_retiro:
+                texto = f"{nombre_sucursal} aceptó tu pedido (Retiro en mostrador). Ticket #{ticket_id} emitido. ¡Lo estamos preparando!"
+            else:
+                texto = f"{nombre_sucursal} aceptó el pedido. Ticket #{ticket_id} emitido. Buscando repartidor en zona..."
             if items_aceptados:
                 texto += f" (Aceptación parcial: {len(items_aceptados)} de {len(items_pedido)} items)"
 
@@ -764,10 +769,6 @@ def marcar_pedido_embalado(order_id):
 
         msg_id = f"msg-store-{uuid.uuid4()}"
         hora_str = datetime.now().strftime("%H:%M")
-        if recargo_espera > 0:
-            texto = f"Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅ (Demora de mostrador: se acreditó +${recargo_espera:,} extra de compensación por espera al repartidor ⏱️)"
-        else:
-            texto = "Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅"
 
         with get_db(empresa_id=empresa_id) as conn:
             pedido, error = _pedido_repartofacil_bloqueado(
@@ -778,6 +779,15 @@ def marcar_pedido_embalado(order_id):
             if str(pedido["estado"]).strip().lower() in {"ready", "embalado"}:
                 return jsonify({"success": True, "order_id": order_id, "estado": pedido["estado"]})
             
+            tipo_entrega = str(pedido.get("tipo_entrega") or "").strip().lower()
+            es_retiro = tipo_entrega in ("pickup", "takeaway", "retiro", "tienda", "mostrador")
+            if es_retiro:
+                texto = "¡Tu pedido ya está listo para retirar en el mostrador! 🛍️🏪 Te esperamos."
+            elif recargo_espera > 0:
+                texto = f"Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅ (Demora de mostrador: se acreditó +${recargo_espera:,} extra de compensación por espera al repartidor ⏱️)"
+            else:
+                texto = "Pedido a Frigorífico Maciel: Pedido listo y embalado 📦✅"
+
             if recargo_espera > 0 and pedido.get("repartidor_id"):
                 ganancia_actual = float(pedido.get("ganancia_repartidor") or 0)
                 nueva_ganancia = ganancia_actual + float(recargo_espera)
@@ -792,7 +802,7 @@ def marcar_pedido_embalado(order_id):
                 (id, order_id, author_role, author_name, content, timestamp_str, created_at)
                 VALUES (%s, %s, %s, %s, %s, %s, NOW())
             """
-            conn.execute(chat_sql, (msg_id, order_id, "store", "Frigorífico Maciel", texto, hora_str))
+            conn.execute(chat_sql, (msg_id, order_id, "store", "Comercio", texto, hora_str))
             
             if hasattr(conn, "commit"):
                 conn.commit()
@@ -802,6 +812,53 @@ def marcar_pedido_embalado(order_id):
             "order_id": order_id,
             "estado": "ready",
             "recargo_espera": recargo_espera,
+            "mensaje": texto,
+            "timestamp": hora_str
+        })
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/repartofacil/pedidos/<order_id>/entregar-mostrador", methods=["POST"])
+def entregar_pedido_mostrador(order_id):
+    """
+    Cobro Fácil confirma que el cliente retiró su compra en el mostrador:
+    Cambia estado a 'delivered' y notifica en el chat tripartito.
+    """
+    empresa_id, error = _sesion_empresa_repartofacil(escritura=True)
+    if error:
+        return error
+    try:
+        msg_id = f"msg-store-{uuid.uuid4()}"
+        hora_str = datetime.now().strftime("%H:%M")
+        texto = "Pedido entregado con éxito en el mostrador 🏪✅ ¡Muchas gracias por tu compra!"
+
+        with get_db(empresa_id=empresa_id) as conn:
+            pedido, error = _pedido_repartofacil_bloqueado(
+                conn, order_id, empresa_id, {"confirmed", "accepted", "ready", "embalado", "delivered"}
+            )
+            if error:
+                return error
+            if str(pedido["estado"]).strip().lower() == "delivered":
+                return jsonify({"success": True, "order_id": order_id, "estado": "delivered"})
+
+            conn.execute(
+                "UPDATE public.repartofacil_pedidos SET estado = 'delivered', updated_at = NOW() WHERE id = %s",
+                (order_id,)
+            )
+            conn.execute(
+                """INSERT INTO public.repartofacil_chat_mensajes 
+                (id, order_id, author_role, author_name, content, timestamp_str, created_at)
+                VALUES (%s, %s, %s, %s, %s, %s, NOW())""",
+                (msg_id, order_id, "store", "Comercio", texto, hora_str)
+            )
+            if hasattr(conn, "commit"):
+                conn.commit()
+
+        return jsonify({
+            "success": True,
+            "order_id": order_id,
+            "estado": "delivered",
             "mensaje": texto,
             "timestamp": hora_str
         })
