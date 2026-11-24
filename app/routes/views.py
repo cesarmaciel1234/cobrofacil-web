@@ -79,12 +79,16 @@ def login():
     if request.method == "POST":
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
+        empresa = (request.form.get("empresa") or "").strip()
+        es_colaborador = request.form.get("es_colaborador") in ("1", "on", "true", True)
         if username and password:
             ok, limit_msg = check_login_rate_limit(username)
             if not ok:
                 return render_template("login.html", error=limit_msg, next=next_url), 429
+            if es_colaborador and not empresa:
+                return render_template("login.html", error="Por favor ingresá el nombre o código de la empresa.", next=next_url), 400
             try:
-                user = authenticate_user(username, password)
+                user = authenticate_user(username, password, empresa=empresa if es_colaborador else (empresa or None))
             except Exception as exc:
                 current_app.logger.warning("login sin base: %s", type(exc).__name__)
                 return render_template("login.html", error="La base no responde en este momento.", next=next_url), 503
@@ -93,7 +97,8 @@ def login():
                 set_session_user(user)
                 return redirect(next_url if next_url.startswith("/") else "/")
             record_login_failure(username)
-            return render_template("login.html", error="Usuario o contraseña incorrectos", next=next_url), 401
+            error_texto = "Usuario, empresa o contraseña incorrectos" if es_colaborador else "Usuario o contraseña incorrectos"
+            return render_template("login.html", error=error_texto, next=next_url), 401
         key = (request.form.get("api_key") or password or "").strip()
         if verify_api_key(key):
             set_session_api_key()
@@ -107,12 +112,16 @@ def auth_login_json():
     data = request.get_json(silent=True) or {}
     username = (data.get("username") or "").strip()
     password = data.get("password") or ""
+    empresa = (data.get("empresa") or "").strip()
+    es_colaborador = data.get("es_colaborador") in ("1", "on", "true", True)
     if username and password:
         ok, limit_msg = check_login_rate_limit(username)
         if not ok:
             return jsonify({"error": limit_msg}), 429
+        if es_colaborador and not empresa:
+            return jsonify({"error": "Por favor ingresá el nombre o código de la empresa."}), 400
         try:
-            user = authenticate_user(username, password)
+            user = authenticate_user(username, password, empresa=empresa if es_colaborador else (empresa or None))
         except Exception as exc:
             current_app.logger.warning("login sin base: %s", type(exc).__name__)
             return jsonify({"error": "La base no responde en este momento."}), 503
@@ -121,7 +130,8 @@ def auth_login_json():
             set_session_user(user)
             return jsonify({"ok": True, "user": user})
         record_login_failure(username)
-        return jsonify({"error": "Usuario o contraseña incorrectos"}), 401
+        error_texto = "Usuario, empresa o contraseña incorrectos" if es_colaborador else "Usuario o contraseña incorrectos"
+        return jsonify({"error": error_texto}), 401
     key = (data.get("api_key") or request.form.get("api_key") or "").strip()
     if verify_api_key(key):
         set_session_api_key()

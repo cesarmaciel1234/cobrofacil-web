@@ -93,20 +93,61 @@ def ensure_default_admin() -> None:
 
 
 
-def authenticate_user(username: str, password: str) -> dict[str, Any] | None:
+def resolver_empresa_id(empresa_query: str) -> int | None:
+    if not empresa_query:
+        return None
+    eq = str(empresa_query).strip()
+    if eq.isdigit():
+        return int(eq)
+    with get_db(empresa_id=0) as conn:
+        row = conn.execute("SELECT id FROM empresas WHERE LOWER(slug) = LOWER(?) AND activo = 1", (eq,)).fetchone()
+        if row:
+            return int(row["id"])
+        row = conn.execute("SELECT id FROM empresas WHERE LOWER(nombre) = LOWER(?) AND activo = 1", (eq,)).fetchone()
+        if row:
+            return int(row["id"])
+        row = conn.execute("SELECT id FROM empresas WHERE LOWER(nombre) LIKE LOWER(?) AND activo = 1 LIMIT 1", (f"%{eq}%",)).fetchone()
+        if row:
+            return int(row["id"])
+    return None
+
+
+def authenticate_user(username: str, password: str, empresa: str | None = None) -> dict[str, Any] | None:
     import re
     raw_username = username.strip().lower()
-    # Generar el slug de la misma manera que al registrar para permitir ingresar con el nombre de la empresa
     slug_username = re.sub(r'[^a-zA-Z0-9]', '', raw_username)
-    
+
+    if empresa:
+        target_empresa_id = resolver_empresa_id(empresa)
+        if not target_empresa_id:
+            return None
+    else:
+        target_empresa_id = None
+
     with get_db(empresa_id=0) as conn:
-        row = conn.execute(
-            "SELECT * FROM usuarios WHERE (username = ? OR username = ?) AND activo = 1",
-            (raw_username, slug_username),
-        ).fetchone()
+        if target_empresa_id:
+            row = conn.execute(
+                """SELECT u.id, u.username, u.nombre, u.password_hash, u.role, u.activo, u.empresa_id, u.sucursal_id, u.created_at,
+                          s.nombre as sucursal_nombre
+                   FROM usuarios u
+                   LEFT JOIN sucursales s ON s.id = u.sucursal_id
+                   WHERE (u.username = ? OR u.username = ?) AND u.empresa_id = ? AND u.activo = 1""",
+                (raw_username, slug_username, target_empresa_id),
+            ).fetchone()
+        else:
+            row = conn.execute(
+                """SELECT u.id, u.username, u.nombre, u.password_hash, u.role, u.activo, u.empresa_id, u.sucursal_id, u.created_at,
+                          s.nombre as sucursal_nombre
+                   FROM usuarios u
+                   LEFT JOIN sucursales s ON s.id = u.sucursal_id
+                   WHERE (u.username = ? OR u.username = ?) AND u.activo = 1""",
+                (raw_username, slug_username),
+            ).fetchone()
     if not row or not check_password_hash(row["password_hash"], password):
         return None
-    return _row_to_user(row)
+    d = _row_to_user(row)
+    d["sucursal_nombre"] = row["sucursal_nombre"]
+    return d
 
 
 def get_user(user_id: int) -> dict[str, Any] | None:

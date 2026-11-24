@@ -355,6 +355,19 @@
                     </div>
                 </div>
 
+                <div class="field-colaborador-toggle" style="margin: 12px 0 6px;">
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 13px; font-weight: 700; color: #cbd5e1; user-select: none;">
+                        <input type="checkbox" id="check-es-colaborador" name="es_colaborador" value="1" style="width: 17px; height: 17px; accent-color: #FFE600; cursor: pointer;">
+                        <span>🏢 Ingresar como colaborador de sucursal</span>
+                    </label>
+                </div>
+
+                <div class="field" id="grupo-empresa-colaborador" style="display: none; margin-top: 8px;">
+                    <label for="empresa" style="color: #FFE600; font-weight: 800;">Empresa o Comercio *</label>
+                    <input type="text" id="empresa" name="empresa" placeholder="Ej: maciel o Frigorífico Maciel" autocapitalize="none" autocorrect="off" spellcheck="false">
+                    <small style="color: #94a3b8; font-size: 11px; margin-top: 4px; display: block;">Ingresá el nombre o código del comercio al que pertenecés.</small>
+                </div>
+
                 {% if error %}
                 <div class="error-box">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
@@ -428,6 +441,36 @@
                 const isPass = pass.type === 'password';
                 pass.type = isPass ? 'text' : 'password';
                 toggleBtn.style.color = isPass ? '#818cf8' : '#94a3b8';
+            });
+        }
+
+        const checkColab = document.getElementById('check-es-colaborador');
+        const grupoEmpresa = document.getElementById('grupo-empresa-colaborador');
+        const inputEmpresa = document.getElementById('empresa');
+
+        if (checkColab && grupoEmpresa) {
+            const guardada = localStorage.getItem('cf_login_colab_empresa');
+            if (guardada) {
+                checkColab.checked = true;
+                grupoEmpresa.style.display = 'block';
+                if (inputEmpresa) inputEmpresa.value = guardada;
+            }
+
+            checkColab.addEventListener('change', () => {
+                if (checkColab.checked) {
+                    grupoEmpresa.style.display = 'block';
+                    if (inputEmpresa) inputEmpresa.focus();
+                } else {
+                    grupoEmpresa.style.display = 'none';
+                }
+            });
+
+            document.querySelector('#view-login form')?.addEventListener('submit', () => {
+                if (checkColab.checked && inputEmpresa && inputEmpresa.value.trim()) {
+                    localStorage.setItem('cf_login_colab_empresa', inputEmpresa.value.trim());
+                } else if (!checkColab.checked) {
+                    localStorage.removeItem('cf_login_colab_empresa');
+                }
             });
         }
 
