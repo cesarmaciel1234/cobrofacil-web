@@ -14,7 +14,7 @@ def leer_perfil(empresa_id):
         if not empresa:
             raise ValueError("La empresa no existe.")
         perfil = conn.execute(
-            f"""SELECT nombre, descripcion, direccion, latitud, longitud, whatsapp, horario
+            f"""SELECT nombre, descripcion, direccion, latitud, longitud, whatsapp, horario, rubro
                FROM {_tabla('repartofacil_empresa_perfiles')} WHERE empresa_id = ?""",
             (empresa_id,),
         ).fetchone()
@@ -33,6 +33,7 @@ def leer_perfil(empresa_id):
         "perfil": dict(perfil) if perfil else {
             "nombre": empresa["nombre"], "descripcion": "", "direccion": "",
             "latitud": None, "longitud": None, "whatsapp": "", "horario": "",
+            "rubro": "Carnicería",
         },
         "resenas": [dict(row) for row in resenas],
         "cantidad": resumen["cantidad"],
@@ -45,13 +46,17 @@ def guardar_perfil(empresa_id, datos):
         raise ValueError("Los datos de la empresa no son válidos.")
     textos = {}
     for campo, limite in (("nombre", 120), ("descripcion", 500), ("direccion", 250),
-                          ("whatsapp", 20), ("horario", 250)):
+                          ("whatsapp", 20), ("horario", 250), ("rubro", 60)):
         valor = datos.get(campo)
-        if not isinstance(valor, str) or len(valor.strip()) > limite:
+        if valor is None and campo == "rubro":
+            valor = "Carnicería"
+        elif not isinstance(valor, str) or len(valor.strip()) > limite:
             raise ValueError(f"El campo {campo} no es válido.")
         textos[campo] = valor.strip()
     if not textos["nombre"]:
         raise ValueError("Ingresá el nombre del comercio.")
+    if not textos.get("rubro"):
+        textos["rubro"] = "Carnicería"
     telefono = textos["whatsapp"]
     if telefono and (not telefono.isascii() or not telefono.isdigit() or not 7 <= len(telefono) <= 15):
         raise ValueError("Ingresá el WhatsApp con código de país, solo números.")
@@ -81,15 +86,15 @@ def guardar_perfil(empresa_id, datos):
     with get_db(empresa_id=0) as conn:
         conn.execute(
             f"""INSERT INTO {_tabla('repartofacil_empresa_perfiles')}
-               (empresa_id, nombre, descripcion, direccion, latitud, longitud, whatsapp, horario)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               (empresa_id, nombre, descripcion, direccion, latitud, longitud, whatsapp, horario, rubro)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                ON CONFLICT (empresa_id) DO UPDATE SET
                nombre = excluded.nombre, descripcion = excluded.descripcion,
                direccion = excluded.direccion, latitud = excluded.latitud,
                longitud = excluded.longitud, whatsapp = excluded.whatsapp,
-               horario = excluded.horario, updated_at = CURRENT_TIMESTAMP
+               horario = excluded.horario, rubro = excluded.rubro, updated_at = CURRENT_TIMESTAMP
                RETURNING empresa_id""",
             (empresa_id, textos["nombre"], textos["descripcion"], textos["direccion"],
-             coords[0], coords[1], textos["whatsapp"], textos["horario"]),
+             coords[0], coords[1], textos["whatsapp"], textos["horario"], textos["rubro"]),
         )
     return leer_perfil(empresa_id)

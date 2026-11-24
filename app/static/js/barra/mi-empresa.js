@@ -21,7 +21,7 @@
     const inputPiso = document.getElementById('empresaPerfilPiso');
     const inputLocalidad = document.getElementById('empresaPerfilLocalidad');
     const inputMapaAltura = document.getElementById('empresaPerfilMapaAltura');
-    const campos = ['nombre', 'descripcion', 'direccion', 'latitud', 'longitud', 'whatsapp', 'horario'];
+    const campos = ['nombre', 'descripcion', 'direccion', 'latitud', 'longitud', 'whatsapp', 'horario', 'rubro'];
     let version = 0;
     let guardando = false;
     let empresaActiva = null;
@@ -113,10 +113,14 @@
         campos.forEach((campo) => { form.elements[campo].value = perfil[campo] ?? ''; });
         document.getElementById('empresaPerfilInicial').textContent = (perfil.nombre.trim()[0] || 'E').toUpperCase();
         document.getElementById('empresaPerfilNombre').textContent = perfil.nombre;
-        ['direccion', 'whatsapp', 'horario', 'descripcion'].forEach((campo) => {
+        ['direccion', 'rubro', 'whatsapp', 'horario', 'descripcion'].forEach((campo) => {
             const id = 'empresaPerfil' + campo[0].toUpperCase() + campo.slice(1);
-            document.getElementById(id).textContent = perfil[campo] || 'Sin agregar';
+            const el = document.getElementById(id);
+            if (el) el.textContent = perfil[campo] || (campo === 'rubro' ? 'Carnicería' : 'Sin agregar');
         });
+        if (form.elements.rubro) {
+            form.elements.rubro.value = perfil.rubro || 'Carnicería';
+        }
         editar.hidden = role !== 'admin';
         valoracion.textContent = datos.cantidad
             ? `${Number(datos.promedio).toFixed(1)} / 5 · ${datos.cantidad} reseña(s)`
@@ -196,6 +200,8 @@
                 }
             } else if (campo === 'nombre') {
                 if (form.elements.nombre) form.elements.nombre.focus();
+            } else if (campo === 'rubro') {
+                if (form.elements.rubro) form.elements.rubro.focus();
             } else if (campo === 'whatsapp') {
                 if (form.elements.whatsapp) form.elements.whatsapp.focus();
             } else if (campo === 'horario') {

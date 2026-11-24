@@ -165,6 +165,16 @@
                         <div class="perfil-empresa-tarjeta">
                             <h3>Datos del comercio</h3>
                             <div class="perfil-empresa-fila">
+                                <span aria-hidden="true" class="perfil-empresa-icono">🏷️</span>
+                                <div class="perfil-empresa-campo-info">
+                                    <small>Rubro del comercio</small>
+                                    <p id="empresaPerfilRubro"></p>
+                                </div>
+                                <button type="button" class="perfil-empresa-fila-lapiz" data-editar-campo="rubro" aria-label="Editar rubro" title="Editar rubro">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+                                </button>
+                            </div>
+                            <div class="perfil-empresa-fila">
                                 <span aria-hidden="true" class="perfil-empresa-icono">⌂</span>
                                 <div class="perfil-empresa-campo-info">
                                     <small>Dirección</small>
@@ -214,6 +224,20 @@
                     <form id="empresaPerfilForm" class="perfil-empresa-formulario perfil-empresa-tarjeta" hidden>
                         <h3>Editar ficha pública</h3>
                         <label>Nombre del comercio <input name="nombre" required maxlength="120" class="buscar"></label>
+                        <label>Rubro del comercio
+                            <select name="rubro" class="buscar" style="height:44px; border:1.5px solid #fde047; border-radius:12px; font-weight:700; background:#fffef5; color:#2D3277; width:100%; padding:0 12px; font-size:14px; margin-top:4px;">
+                                <option value="Carnicería">🥩 Carnicería / Granja</option>
+                                <option value="Supermercado">🏪 Supermercado</option>
+                                <option value="Minimercado">🧃 Minimercado / Almacén</option>
+                                <option value="Kiosco">🍫 Kiosco / Golosinas</option>
+                                <option value="Bebidas">🍾 Bebidas / Vinos y Cervezas</option>
+                                <option value="Verdulería">🥬 Verdulería / Frutería</option>
+                                <option value="Panadería">🥖 Panadería / Confitería</option>
+                                <option value="Gastronomía">🍕 Gastronomía / Rotisería</option>
+                                <option value="Farmacia">💊 Farmacia / Perfumería</option>
+                                <option value="Pet Shop">🐾 Pet Shop / Mascotas</option>
+                            </select>
+                        </label>
                         <label>Descripción <textarea name="descripcion" maxlength="500" class="buscar"></textarea></label>
                         
                         <div class="perfil-empresa-campos-direccion">
