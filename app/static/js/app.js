@@ -4857,6 +4857,10 @@ const $ = id => document.getElementById(id);
             }
             const refresh = $('btnRefresh');
             if (refresh) {
+                if (name !== 'cartera') {
+                    refresh.classList.remove('es-editar-cliente');
+                    refresh.querySelector('.ico-pencil')?.remove();
+                }
                 const caja = name === 'contabilidad';
                 const digital = caja && cajaPantalla === 'digital';
                 const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja || name === 'cartera';
@@ -4918,6 +4922,18 @@ const $ = id => document.getElementById(id);
 
         function switchView(name) {
             if (name === 'admin') name = 'cartera';
+            if (name !== 'cartera') {
+                if (window.CarteraLibro && window.CarteraLibro.desmontarFicha) {
+                    window.CarteraLibro.desmontarFicha();
+                } else {
+                    document.getElementById('btnFabWa')?.remove();
+                    const refresh = document.getElementById('btnRefresh');
+                    if (refresh) {
+                        refresh.classList.remove('es-editar-cliente');
+                        refresh.querySelector('.ico-pencil')?.remove();
+                    }
+                }
+            }
             if (name === 'usuarios' && sessionUser.role !== 'admin') {
                 toast('Solo administradores pueden gestionar usuarios', true);
                 return;

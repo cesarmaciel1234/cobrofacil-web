@@ -1402,8 +1402,11 @@
                                 </div>
                             </div>
                         </div>
-                        <button type="button" onclick="window.RepartoFacilDespacho.cerrarChatModal()" style="background:transparent; border:none; color:#fde047; font-size:22px; cursor:pointer; line-height:1; font-weight:900; padding:2px 8px;">
-                            ✕
+                        <button type="button" onclick="window.RepartoFacilDespacho.cerrarChatModal()" aria-label="Cerrar chat" style="background:transparent; border:none; cursor:pointer; line-height:1; padding:4px 6px; display:flex; align-items:center; justify-content:center;">
+                            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FFE600" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
                         </button>
                     </div>
 
@@ -1656,9 +1659,9 @@
 
             host.innerHTML = `
                 <div style="background:#ffffff; border:2px solid #FFE600; border-radius:18px; padding:12px 14px; box-shadow:0 3px 12px rgba(234,179,8,0.1); display:flex; flex-direction:column; gap:10px;">
-                    <!-- Fila Superior: Enlace con Servidor de la Tienda Física -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:6px; border-bottom:1px dashed #fde047; padding-bottom:8px;">
-                        <div style="display:flex; align-items:center; gap:6px;">
+                    <!-- Fila Superior: Enlace con Servidor de la Tienda Física + Controles de Pedidos -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px dashed #fde047; padding-bottom:8px;">
+                        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                             <span style="display:inline-block; width:10px; height:10px; border-radius:999px; background:#10b981; box-shadow:0 0 6px rgba(16,185,129,0.8); animation:pulse 2s infinite;"></span>
                             <span style="font-size:11.5px; font-weight:900; color:#2D3277; text-transform:uppercase; letter-spacing:0.3px;">
                                 Servidor Tienda Física En Línea
@@ -1666,46 +1669,57 @@
                             <span style="background:#fefce8; color:#854d0e; border:1px solid #fde047; font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:6px;">
                                 TPV Omnicanal
                             </span>
+                            <span id="repartoFacilCountBadge" style="display:none; background:#ef4444; color:#ffffff; border:1px solid #dc2626; font-size:10px; font-weight:900; padding:1px 7px; border-radius:999px; box-shadow:0 2px 5px rgba(239,68,68,0.4);">0</span>
                         </div>
-                        <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:10px; font-weight:900; padding:5px 11px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(234,179,8,0.25); transition:all 0.15s ease;">
-                            <span>⚡ Sincronizar Stock TPV con Web</span>
-                        </button>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <button type="button" id="btnToggleSonidoReparto" onclick="window.RepartoFacilDespacho.toggleSonido()" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:11px; padding:5px 8px; cursor:pointer; color:#2D3277; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Activar / Silenciar alerta sonora">
+                                <span id="iconoSonidoReparto">${sonidoActivado ? '🔔' : '🔕'}</span>
+                                <span id="lblSonidoReparto" style="font-size:9.5px; font-weight:900;">${sonidoActivado ? 'ON' : 'OFF'}</span>
+                            </button>
+                            <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos(true)" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:13px; font-weight:900; padding:4px 9px; cursor:pointer; color:#2D3277; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Refrescar pedidos">
+                                ↻
+                            </button>
+                            <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:10px; font-weight:900; padding:5px 9px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(234,179,8,0.25);">
+                                <span>⚡ Sincronizar Stock</span>
+                            </button>
+                        </div>
                     </div>
 
-                    <!-- Fila Inferior: Métricas Consolidadas del Día (Físico + E-Commerce) -->
+                    <!-- Fila Inferior: Las 3 tarjetas de Pedidos Web exclusivas -->
                     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center;">
                         <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 4px;">
-                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🏪 Mostrador</span>
+                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🏪 Retiro en Local</span>
                             <b style="font-size:12.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
-                                ${formatMoneyNum(data.ventas_mostrador_hoy)}
+                                ${formatMoneyNum(data.retiro_local_monto || 0)}
                             </b>
-                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;">${data.cant_ventas_mostrador_hoy || 0} venta${data.cant_ventas_mostrador_hoy === 1 ? '' : 's'}</small>
+                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;">
+                                ${data.retiro_local_cant || 0} pedido${data.retiro_local_cant === 1 ? '' : 's'} (${data.retiro_local_activos || 0} act.)
+                            </small>
                         </div>
 
                         <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 4px;">
-                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🌐 E-Commerce</span>
+                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🛵 Con Delivery</span>
                             <b style="font-size:12.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
-                                ${formatMoneyNum(data.monto_web_total || data.ventas_web_hoy)}
+                                ${formatMoneyNum(data.delivery_monto || 0)}
                             </b>
-                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;" title="${data.cant_pendientes_hoy > 0 ? ('Pendiente de aceptar: ' + formatMoneyNum(data.monto_pendientes_hoy)) : ''}">
-                                ${data.cant_pendientes_hoy > 0 && !data.ventas_web_hoy
-                                    ? `Pendiente: ${formatMoneyNum(data.monto_pendientes_hoy)}`
-                                    : `${data.cant_pedidos_web_hoy || 0} pedido${data.cant_pedidos_web_hoy === 1 ? '' : 's'}`}
+                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;">
+                                ${data.delivery_cant || 0} pedido${data.delivery_cant === 1 ? '' : 's'} (${data.delivery_activos || 0} act.)
                             </small>
                         </div>
 
                         <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:14px; padding:8px 4px; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
-                            <span style="font-size:9px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📈 Omnicanal</span>
+                            <span style="font-size:9px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📦 Total Pedidos Web</span>
                             <b style="font-size:13px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
-                                ${formatMoneyNum(data.total_omnicanal_hoy)}
+                                ${formatMoneyNum(data.total_web_monto != null ? data.total_web_monto : data.monto_web_total)}
                             </b>
                             <small style="font-size:9px; color:#2D3277; font-weight:900; white-space:nowrap;">
-                                ${(data.cant_ventas_mostrador_hoy || 0) + (data.pedidos_activos_web || 0)} activos
+                                ${data.total_web_cant != null ? data.total_web_cant : (data.cant_pedidos_web_hoy || 0)} ped. (${data.total_web_activos != null ? data.total_web_activos : (data.pedidos_activos_web || 0)} activos)
                             </small>
                         </div>
                     </div>
                 </div>
             `;
+            actualizarBadge();
         } catch (e) {
             console.warn('[RepartoFacil] No se pudieron cargar métricas omnicanal:', e);
         }

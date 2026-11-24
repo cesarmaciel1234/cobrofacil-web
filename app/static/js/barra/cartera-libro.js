@@ -128,9 +128,22 @@
         actualizarBotonFiltro();
     }
 
+    function desmontarFicha() {
+        nodo('btnFabWa')?.remove();
+        const refresh = nodo('btnRefresh');
+        if (refresh) {
+            refresh.classList.remove('es-editar-cliente');
+            refresh.querySelector('.ico-pencil')?.remove();
+        }
+    }
+
     function actualizarBotonFiltro() {
         const refresh = nodo('btnRefresh');
-        if (!refresh || !vistaActiva()) return;
+        if (!refresh) return;
+        if (!vistaActiva()) {
+            desmontarFicha();
+            return;
+        }
         const enFicha = !!(fichaAbierta || clienteDelHash() || (nodo('ficha') && !nodo('ficha').hidden));
         if (enFicha) {
             refresh.hidden = false;
@@ -146,6 +159,7 @@
         }
         refresh.hidden = false;
         refresh.classList.remove('es-editar-cliente');
+        refresh.querySelector('.ico-pencil')?.remove();
         refresh.classList.add('es-filtro');
         refresh.classList.toggle('filtrando', filtroActivo());
         refresh.setAttribute('aria-label', 'Filtrar cartera');
@@ -180,7 +194,7 @@
     }
 
     function mostrarLista() {
-        nodo('btnFabWa')?.remove();
+        desmontarFicha();
         const lista = nodo('carteraLista');
         const ficha = nodo('ficha');
         const cargos = nodo('carteraCargos');
@@ -258,13 +272,10 @@
 
             nodo('btnVolverFicha')?.addEventListener('click', () => mostrarLista());
 
-            // Botón flotante de WhatsApp en la Ficha del cliente
-            let fab = nodo('btnFabWa');
-            if (!fab) {
-                fab = document.createElement('button');
-                fab.id = 'btnFabWa';
-                document.body.appendChild(fab);
-            }
+            // Botón flotante de WhatsApp en la Ficha del cliente (encapsulado dentro de la vista Cartera)
+            nodo('btnFabWa')?.remove();
+            let fab = document.createElement('button');
+            fab.id = 'btnFabWa';
             fab.className = `fab-whatsapp-cliente${client.telefono ? '' : ' sin-telefono'}`;
             fab.type = 'button';
             fab.title = client.telefono ? 'Enviar saldo por WhatsApp' : 'Agregar teléfono para WhatsApp';
@@ -280,6 +291,7 @@
                     abrirPerfil(client, true);
                 }
             };
+            ficha.appendChild(fab);
         }
         window.scrollTo(0, 0);
     }
@@ -1598,6 +1610,7 @@
     }
 
     window.CarteraLibro = {
+        desmontarFicha() { desmontarFicha(); },
         pantallaActual() { return pantallaActual; },
         cambiarPantalla(id) { cambiarPantalla(id); },
         filtroActual() { return currentFilter; },

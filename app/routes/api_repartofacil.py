@@ -719,16 +719,28 @@ def get_repartofacil_metricas_omnicanal():
                 except Exception:
                     pass
 
-            # 2. Ventas web Reparto Fácil hoy
+            # 2. Ventas web Reparto Fácil hoy (separando Retiro en Local vs Con Delivery)
             rf_rows = conn.execute(
                 """
-                SELECT estado, COUNT(*) as cant, COALESCE(SUM(total), 0) as total
+                SELECT 
+                    LOWER(COALESCE(tipo_entrega, 'delivery')) as tipo_entrega,
+                    estado,
+                    COUNT(*) as cant,
+                    COALESCE(SUM(total), 0) as total
                 FROM public.repartofacil_pedidos
                 WHERE empresa_id = %s AND created_at >= CURRENT_DATE
-                GROUP BY estado
+                GROUP BY LOWER(COALESCE(tipo_entrega, 'delivery')), estado
                 """,
                 (empresa_id,)
             ).fetchall()
+
+            retiro_monto = 0.0
+            retiro_cant = 0
+            retiro_activos = 0
+
+            delivery_monto = 0.0
+            delivery_cant = 0
+            delivery_activos = 0
 
             ventas_web_hoy = 0.0
             pedidos_web_hoy = 0
@@ -738,22 +750,39 @@ def get_repartofacil_metricas_omnicanal():
             cant_pendientes_hoy = 0
 
             for r in rf_rows:
+                tipo = str(r["tipo_entrega"] or "").strip().lower()
                 est = str(r["estado"] or "").strip().lower()
                 c = int(r["cant"] or 0)
                 tot = float(r["total"] or 0.0)
+
                 pedidos_web_hoy += c
+                es_retiro = tipo in ("pickup", "takeaway", "retiro", "tienda", "mostrador")
+                es_activo = est in ("pending", "pending_store", "confirmed", "assigned", "ready", "embalado", "picked up", "in transit")
+
+                if es_retiro:
+                    retiro_cant += c
+                    retiro_monto += tot
+                    if es_activo:
+                        retiro_activos += c
+                else:
+                    delivery_cant += c
+                    delivery_monto += tot
+                    if es_activo:
+                        delivery_activos += c
 
                 if est in ("confirmed", "assigned", "ready", "embalado", "picked up", "in transit", "delivered"):
                     ventas_web_hoy += tot
                 if est in ("pending", "pending_store"):
                     monto_pendientes_hoy += tot
                     cant_pendientes_hoy += c
-                if est in ("pending", "pending_store", "confirmed", "assigned", "ready", "embalado", "picked up", "in transit"):
+                if es_activo:
                     pedidos_activos_web += c
                 if est == "delivered":
                     pedidos_entregados_hoy += c
 
-            monto_web_total = ventas_web_hoy + monto_pendientes_hoy
+            total_web_monto = retiro_monto + delivery_monto
+            total_web_cant = retiro_cant + delivery_cant
+            total_web_activos = retiro_activos + delivery_activos
 
             # 3. Estado de sincronización de catálogo TPV en pos_base
             pos_info = conn.execute(
@@ -771,11 +800,20 @@ def get_repartofacil_metricas_omnicanal():
                 "ventas_web_hoy": ventas_web_hoy,
                 "monto_pendientes_hoy": monto_pendientes_hoy,
                 "cant_pendientes_hoy": cant_pendientes_hoy,
-                "monto_web_total": monto_web_total,
-                "cant_pedidos_web_hoy": pedidos_web_hoy,
-                "pedidos_activos_web": pedidos_activos_web,
+                "monto_web_total": total_web_monto,
+                "cant_pedidos_web_hoy": total_web_cant,
+                "pedidos_activos_web": total_web_activos,
                 "pedidos_entregados_hoy": pedidos_entregados_hoy,
-                "total_omnicanal_hoy": round(total_mostrador + monto_web_total, 2),
+                "retiro_local_monto": retiro_monto,
+                "retiro_local_cant": retiro_cant,
+                "retiro_local_activos": retiro_activos,
+                "delivery_monto": delivery_monto,
+                "delivery_cant": delivery_cant,
+                "delivery_activos": delivery_activos,
+                "total_web_monto": total_web_monto,
+                "total_web_cant": total_web_cant,
+                "total_web_activos": total_web_activos,
+                "total_omnicanal_hoy": round(total_mostrador + total_web_monto, 2),
                 "tpv_conectado": cant_tablas_pos > 0,
                 "ultima_sync_tpv": ult_sync or "Automática en tiempo real"
             })

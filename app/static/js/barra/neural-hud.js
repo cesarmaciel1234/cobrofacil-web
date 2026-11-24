@@ -110,8 +110,8 @@
 
             .neural-orb-btn {
                 position: fixed;
-                bottom: 74px;
-                right: 16px;
+                bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+                right: 14px;
                 width: 58px;
                 height: 58px;
                 border-radius: 999px;
