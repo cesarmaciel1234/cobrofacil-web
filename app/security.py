@@ -185,7 +185,7 @@ def register_security(app):
         path = request.path
         if path.startswith("/static/"):
             return None
-        if path in PUBLIC_PATHS or path.startswith("/api/repartofacil/"):
+        if path in PUBLIC_PATHS or path.startswith("/api/repartofacil/") or path.startswith("/api/sucursales/publicas/"):
             return None
         if is_authenticated():
             return None
