@@ -781,3 +781,33 @@ def api_pos_inventario_historial():
     historial = obtener_historial_auditorias(limite=limite, empresa_id=emp_id)
     return jsonify({"ok": True, "historial": historial})
 
+
+@api_bp.route("/pos/inventario/replicar", methods=["POST"])
+def api_pos_inventario_replicar():
+    """Replicar catálogo base de una sucursal a otra con ajuste opcional de margen % y stock inicial."""
+    from app.services.pos_inventario import replicar_catalogo
+    from app.services.pos_base import _empresa_activa
+
+    data = request.get_json(silent=True) or {}
+    origen_sid = data.get("origen_sid") or 1
+    destino_sid = data.get("destino_sid")
+    if not destino_sid:
+        return jsonify({"ok": False, "error": "Debe indicar la sucursal destino"}), 400
+
+    margen_pct = float(data.get("margen_pct") or 0.0)
+    stock_inicial = float(data.get("stock_inicial") or 0.0)
+    copiar_stock = bool(data.get("copiar_stock", False))
+    eid = _empresa_activa()
+
+    res = replicar_catalogo(
+        origen_sid=origen_sid,
+        destino_sid=destino_sid,
+        margen_pct=margen_pct,
+        stock_inicial=stock_inicial,
+        copiar_stock=copiar_stock,
+        empresa_id=eid,
+    )
+    status_code = 200 if res.get("ok") else 400
+    return jsonify(res), status_code
+
+

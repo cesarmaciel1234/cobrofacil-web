@@ -667,3 +667,108 @@ def obtener_historial_auditorias(limite: int = 50, empresa_id: int = 1) -> List[
         logger.debug("Error leyendo historial local: %s", exc)
 
     return historial
+
+
+def replicar_catalogo(
+    origen_sid: int | str,
+    destino_sid: int | str,
+    margen_pct: float = 0.0,
+    stock_inicial: float = 0.0,
+    copiar_stock: bool = False,
+    empresa_id: int = 1,
+) -> Dict[str, Any]:
+    """Clona y adapta el catálogo completo de productos de una sucursal origen a una sucursal destino.
+    Permite aplicar una regla de margen porcentual y definir si inicia con stock cero o réplica.
+    """
+    from app.services.pos_base import filas_de, _olvidar_tabla, listar_sucursales
+    from app.database import get_db
+
+    try:
+        origen_int = int(origen_sid)
+    except (ValueError, TypeError):
+        origen_int = 1
+
+    try:
+        destino_int = int(destino_sid)
+    except (ValueError, TypeError):
+        return {"ok": False, "error": f"ID de sucursal destino inválido: {destino_sid}"}
+
+    if origen_int == destino_int:
+        return {"ok": False, "error": "La sucursal origen y destino no pueden ser la misma"}
+
+    cols, rows = filas_de("productos", origen_int)
+    if not rows:
+        return {"ok": False, "error": f"La sucursal origen #{origen_int} no tiene productos cargados"}
+
+    idx = {c: i for i, c in enumerate(cols)}
+    pre_idx = idx.get("precio")
+    stk_idx = idx.get("stock")
+    suc_id_idx = idx.get("sucursal_id")
+    suc_nom_idx = idx.get("sucursal_nombre")
+
+    sucs = listar_sucursales()
+    nom_dest = next((s["nombre"] for s in sucs if str(s["id"]) == str(destino_int)), f"Sucursal {destino_int}")
+
+    factor = 1.0 + (float(margen_pct or 0.0) / 100.0)
+    nuevas_filas = []
+    for r in rows:
+        fila = list(r)
+        if pre_idx is not None and fila[pre_idx] is not None:
+            try:
+                fila[pre_idx] = round(float(fila[pre_idx]) * factor, 2)
+            except Exception:
+                pass
+        if stk_idx is not None:
+            if not copiar_stock:
+                fila[stk_idx] = float(stock_inicial)
+        if suc_id_idx is not None:
+            fila[suc_id_idx] = destino_int
+        if suc_nom_idx is not None:
+            fila[suc_nom_idx] = nom_dest
+        nuevas_filas.append(fila)
+
+    try:
+        with get_db(empresa_id) as conn:
+            existente = conn.execute(
+                "SELECT id FROM pos_base WHERE empresa_id = %s AND tabla = 'productos' AND sucursal_id = %s ORDER BY id DESC LIMIT 1",
+                (empresa_id, destino_int)
+            ).fetchone()
+            if existente:
+                conn.execute(
+                    "UPDATE pos_base SET columnas = %s, filas = %s, cantidad = %s, sucursal_nombre = %s, actualizado_en = CURRENT_TIMESTAMP WHERE id = %s",
+                    (json.dumps(cols), json.dumps(nuevas_filas), len(nuevas_filas), nom_dest, existente["id"])
+                )
+            else:
+                conn.execute(
+                    """
+                    INSERT INTO pos_base (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en)
+                    VALUES (%s, %s, %s, 'productos', 1, %s, %s, %s, CURRENT_TIMESTAMP)
+                    """,
+                    (empresa_id, destino_int, nom_dest, json.dumps(cols), json.dumps(nuevas_filas), len(nuevas_filas))
+                )
+            conn.commit()
+    except Exception as exc:
+        logger.error("Error guardando replicación de catálogo: %s", exc)
+        return {"ok": False, "error": f"Error en base de datos: {str(exc)}"}
+
+    try:
+        _olvidar_tabla("productos")
+    except Exception:
+        pass
+
+    try:
+        from app.services.signal_bus import broadcast_refresh
+        broadcast_refresh(empresa_id, reason="inventario")
+    except Exception:
+        pass
+
+    return {
+        "ok": True,
+        "productos_replicados": len(nuevas_filas),
+        "origen_sid": origen_int,
+        "destino_sid": destino_int,
+        "destino_nombre": nom_dest,
+        "margen_pct": float(margen_pct or 0.0),
+        "stock_inicial": "copiado" if copiar_stock else float(stock_inicial),
+    }
+

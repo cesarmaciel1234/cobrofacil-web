@@ -580,7 +580,7 @@
                                 <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     ${esRetiroEnTienda 
                                         ? `🏪 Retira en: ${escaparTextoChat(p.sucursal_origen || 'Local Maciel')}` 
-                                        : `📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')}`}
+                                        : `📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')} · <span style="color:#2563eb; font-weight:700;">Despacha: ${escaparTextoChat(p.sucursal_origen || (p.sucursal_id ? ('Sucursal ' + p.sucursal_id) : 'Alfaro 1964'))}</span>`}
                                 </div>
                                 <div style="font-size:14px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
                                     ${formatMoney(p.total)}

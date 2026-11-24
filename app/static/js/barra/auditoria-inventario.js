@@ -437,8 +437,19 @@
                         <button type="button" id="btnCrearDesdeVacio" style="background:#2563eb; color:#fff; border:none; border-radius:12px; font-size:14px; font-weight:800; padding:11px 18px; cursor:pointer; box-shadow:0 4px 12px rgba(37,99,235,0.3);">
                             + Crear artículo
                         </button>
-                   </div>`
-                : `<div class="pedido-vacio" style="padding:24px; text-align:center; color:#64748b;">
+                    </div>`
+                : (catalogo.length === 0 ? `
+                    <div class="pedido-vacio" style="padding:32px 16px; text-align:center; background:#fff; border:1px dashed #cbd5e1; border-radius:14px; margin:12px 0;">
+                        <div style="font-size:36px; margin-bottom:8px;">📦</div>
+                        <h3 style="font-size:16px; font-weight:800; color:#0f172a; margin:0 0 6px;">Esta sucursal aún no tiene catálogo cargado</h3>
+                        <p style="font-size:12.5px; color:#64748b; margin:0 0 16px; max-width:340px; margin-left:auto; margin-right:auto;">
+                            Podés replicar el catálogo base completo de Casa Central con 1 clic aplicando reglas de margen % o stock inicial en cero.
+                        </p>
+                        <button type="button" id="btnReplicarVacio" style="background:#2563eb; color:#fff; border:none; padding:11px 20px; border-radius:12px; font-size:13.5px; font-weight:800; cursor:pointer; box-shadow:0 3px 10px rgba(37,99,235,0.3);">
+                            ⚡ Replicar Catálogo de Casa Central
+                        </button>
+                    </div>
+                ` : `<div class="pedido-vacio" style="padding:24px; text-align:center; color:#64748b;">
                     <p>No hay artículos con estos filtros.</p>
                     ${(texto || filtroDepto || filtroEstado !== 'todos') ? '<button type="button" id="btnRestablecerFiltros" style="border:0; background:none; color:#2563eb; font-weight:800; cursor:pointer;">Limpiar filtros y búsqueda</button>' : ''}
                    </div>`);
@@ -469,8 +480,11 @@
                     </button>
                 </div>
 
-                <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:14px 0 8px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:14px 0 8px;">
                     <div><strong style="font-size:16px; color:#0f172a;">Inventario</strong><div style="font-size:11px; color:#64748b;">${fuenteConexion === 'mariadb_maestra' ? 'Lectura del TPV local' : 'Datos replicados; sincronización en vivo'} · Sin stock: cero o negativo</div><div style="font-size:11px; color:#2563eb; font-weight:700;">📍 Filtrado por sucursal activa</div></div>
+                    <button type="button" id="btnReplicarCatalogo" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:11.5px; font-weight:800; padding:6px 10px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;">
+                        <span>⚡ Replicar Catálogo</span>
+                    </button>
                 </div>
                 ${errorCatalogo ? `<div role="alert" style="padding:9px 11px; margin-bottom:8px; border-radius:10px; background:#fff7ed; color:#9a3412; font-size:12px; font-weight:700;">${escHtml(errorCatalogo)} <button type="button" id="btnReintentarActualizacionInventario" style="border:0; background:none; color:#9a3412; text-decoration:underline; font-weight:800; cursor:pointer;">Reintentar</button></div>` : ''}
                 <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px;" aria-label="Resumen de inventario">
@@ -574,6 +588,22 @@
             btnCrearVacio.addEventListener('click', (e) => {
                 e.preventDefault();
                 abrirModalCrearProducto(textoBusqueda.trim());
+            });
+        }
+
+        const btnReplicar = $('btnReplicarCatalogo');
+        if (btnReplicar) {
+            btnReplicar.addEventListener('click', (e) => {
+                e.preventDefault();
+                abrirModalReplicarCatalogo();
+            });
+        }
+
+        const btnReplicarVacio = $('btnReplicarVacio');
+        if (btnReplicarVacio) {
+            btnReplicarVacio.addEventListener('click', (e) => {
+                e.preventDefault();
+                abrirModalReplicarCatalogo();
             });
         }
 
@@ -1261,6 +1291,136 @@
             } catch (err) {
                 if (errBox) { errBox.textContent = err.message; errBox.style.display = 'block'; }
                 if (btnSave) { btnSave.disabled = false; btnSave.textContent = '✓ Guardar en Catálogo'; }
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // MODAL: REPLICAR CATÁLOGO BASE DE OTRA SUCURSAL
+    // -------------------------------------------------------------------------
+    function abrirModalReplicarCatalogo() {
+        $('modalReplicarCatalogo')?.remove();
+        const sucursales = (window.sucursalesDisponibles || []).filter((s) => !String(s.id).startsWith('web'));
+        const activeSid = window.crm_active_sucursal_id || (window.activeSucursalId) || 1;
+        const sucursalActual = sucursales.find((s) => String(s.id) === String(activeSid)) || { id: activeSid, nombre: `Sucursal ${activeSid}` };
+        
+        const origenes = sucursales.filter((s) => String(s.id) !== String(activeSid));
+        const origenDefault = origenes.find((s) => s.id === 1) || origenes[0] || { id: 1, nombre: 'Casa Central - Alfaro 1964' };
+
+        const fondo = document.createElement('div');
+        fondo.id = 'modalReplicarCatalogo';
+        fondo.style.cssText = 'position:fixed; inset:0; background:rgba(15,23,42,0.6); z-index:9500; display:flex; align-items:flex-end; justify-content:center; padding:0;';
+        fondo.innerHTML = `
+            <div style="background:#fff; width:100%; max-width:480px; border-radius:22px 22px 0 0; padding:22px 20px 28px; box-shadow:0 -10px 30px rgba(15,23,42,0.2); animation:slideUpSheet 0.2s ease-out;">
+                <div style="width:38px; height:4px; background:#cbd5e1; border-radius:99px; margin:0 auto 12px;"></div>
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:22px;">⚡</span>
+                        <h3 style="margin:0; font-size:17px; font-weight:800; color:#0f172a;">Replicar Catálogo Base</h3>
+                    </div>
+                    <button type="button" id="btnCerrarReplicarCat" style="background:#f1f5f9; border:none; width:30px; height:30px; border-radius:99px; font-size:15px; font-weight:800; color:#475569; cursor:pointer;">✕</button>
+                </div>
+
+                <p style="font-size:12.5px; color:#64748b; margin:0 0 14px; line-height:1.4;">
+                    Clona los productos de Casa Central hacia esta sucursal manteniendo stocks desacoplados y aplicando reglas de precio automáticas.
+                </p>
+
+                <form id="formReplicarCat" style="display:flex; flex-direction:column; gap:12px;">
+                    <div>
+                        <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Sucursal Destino (Receptora)</label>
+                        <div style="padding:10px 12px; background:#f8fafc; border:1.5px solid #e2e8f0; border-radius:12px; font-size:14px; font-weight:800; color:#1e293b;">
+                            📍 ${escHtml(sucursalActual.nombre)}
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Copiar desde (Sucursal Origen) *</label>
+                        <select id="replicarOrigenSid" style="width:100%; box-sizing:border-box; padding:11px 10px; border:1.5px solid #cbd5e1; border-radius:12px; font-size:13.5px; font-weight:700; color:#0f172a; background:#fff;">
+                            ${origenes.map((s) => `<option value="${s.id}" ${s.id === origenDefault.id ? 'selected' : ''}>${escHtml(s.nombre)}</option>`).join('')}
+                            ${!origenes.length ? '<option value="1">Casa Central - Alfaro 1964</option>' : ''}
+                        </select>
+                    </div>
+
+                    <div>
+                        <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Regla de Precios (Margen %)</label>
+                        <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px;">
+                            <label style="display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:8px 10px; font-size:12px; font-weight:700; cursor:pointer;">
+                                <input type="radio" name="margen_opcion" value="0" checked> Mismo (0%)
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:8px 10px; font-size:12px; font-weight:700; cursor:pointer;">
+                                <input type="radio" name="margen_opcion" value="5"> +5% Zona
+                            </label>
+                            <label style="display:flex; align-items:center; gap:6px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:10px; padding:8px 10px; font-size:12px; font-weight:700; cursor:pointer;">
+                                <input type="radio" name="margen_opcion" value="10"> +10% Zona
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label style="display:block; font-size:11.5px; font-weight:800; color:#475569; text-transform:uppercase; margin-bottom:4px;">Inventario Inicial en Destino</label>
+                        <div style="display:flex; flex-direction:column; gap:6px;">
+                            <label style="display:flex; align-items:center; gap:8px; background:#eff6ff; border:1px solid #bfdbfe; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:700; color:#1e40af; cursor:pointer;">
+                                <input type="radio" name="stock_opcion" value="cero" checked> 
+                                <span><b>Iniciar en 0</b> (Para conteo físico del nuevo local)</span>
+                            </label>
+                            <label style="display:flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:8px 12px; font-size:12px; font-weight:600; color:#475569; cursor:pointer;">
+                                <input type="radio" name="stock_opcion" value="copiar"> 
+                                <span>Clonar stock actual de origen</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="errorReplicarCat" style="display:none; color:#dc2626; font-size:12.5px; font-weight:700; background:#fef2f2; padding:8px 12px; border-radius:10px;"></div>
+
+                    <button type="submit" id="btnConfirmarReplicarCat" style="margin-top:6px; background:#2563eb; color:#fff; border:none; padding:13px; border-radius:12px; font-size:14.5px; font-weight:800; cursor:pointer; box-shadow:0 3px 10px rgba(37,99,235,0.3);">
+                        ⚡ Replicar y Activar Catálogo Ahora
+                    </button>
+                </form>
+            </div>
+        `;
+        document.body.appendChild(fondo);
+
+        const cerrar = () => fondo.remove();
+        $('btnCerrarReplicarCat').addEventListener('click', cerrar);
+        fondo.addEventListener('click', (e) => { if (e.target === fondo) cerrar(); });
+
+        $('formReplicarCat').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const btn = $('btnConfirmarReplicarCat');
+            const errBox = $('errorReplicarCat');
+            const origenSid = $('replicarOrigenSid').value;
+            const margenVal = document.querySelector('input[name="margen_opcion"]:checked')?.value || '0';
+            const stockVal = document.querySelector('input[name="stock_opcion"]:checked')?.value || 'cero';
+
+            btn.disabled = true;
+            btn.textContent = '⏳ Replicando productos...';
+            if (errBox) errBox.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/pos/inventario/replicar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        origen_sid: Number(origenSid),
+                        destino_sid: Number(activeSid),
+                        margen_pct: Number(margenVal),
+                        stock_inicial: 0,
+                        copiar_stock: stockVal === 'copiar'
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok || !data.ok) {
+                    throw new Error(data.error || 'No se pudo replicar el catálogo');
+                }
+                cerrar();
+                await cargarCatalogoAuditoria(true);
+                if (global.CrmBus) {
+                    global.CrmBus.emit('toast', `✓ ¡${data.productos_replicados} productos activados para ${data.destino_nombre}!`);
+                }
+            } catch (err) {
+                if (errBox) { errBox.textContent = err.message; errBox.style.display = 'block'; }
+                btn.disabled = false;
+                btn.textContent = '⚡ Replicar y Activar Catálogo Ahora';
             }
         });
     }

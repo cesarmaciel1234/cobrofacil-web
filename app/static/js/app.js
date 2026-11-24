@@ -4674,24 +4674,42 @@ const $ = id => document.getElementById(id);
                     }
 
                     if (des.length > 0) {
-                        const locales = des.length === 1 ? '1 local' : (des.length + ' locales');
+                        const locales = des.length === 1 ? '1 canal/local' : (des.length + ' canales/locales');
                         html += `
-                        <div class="sucursal-rend" data-herramienta="sucursales" data-titulo="Rendimiento por sucursal">
-                            <div class="sucursal-rend-head">
-                                <span>Rendimiento por sucursal</span>
-                                <span>${locales}</span>
+                        <div class="sucursal-rend" data-herramienta="sucursales" data-titulo="Ranking y Rendimiento Multi-Sucursal" style="background:#fff; border:1px solid #e2e8f0; border-radius:14px; padding:18px; margin-bottom:20px;">
+                            <div style="font-size:14px; font-weight:800; color:#1e293b; margin-bottom:14px; display:flex; justify-content:space-between; align-items:center;">
+                                <span>🏆 Ranking & Desglose Omnicanal en Vivo</span>
+                                <span style="font-size:12px; font-weight:700; color:#2563eb; background:#eff6ff; padding:2px 8px; border-radius:999px;">${locales}</span>
                             </div>
-                            ${des.map((s) => {
-                                const pct = Math.round((s.ventas / totalVentas) * 100);
-                                return `<article class="sucursal-rend-fila">
-                                    <div class="sucursal-rend-top"><b>${textoJefe(s.nombre)}</b><span>${pct}%</span></div>
-                                    <div class="sucursal-rend-nums">
-                                        <div><small>Ventas</small><b>${plataJefe(s.ventas)}</b></div>
-                                        <div><small>Tickets</small><b>${s.tickets}</b></div>
-                                        <div><small>Promedio</small><b>${plataJefe(s.promedio)}</b></div>
+                            <div style="display:flex; flex-direction:column; gap:10px;">
+                            ${des.map((s, idx) => {
+                                const pct = s.participacion_pct != null ? s.participacion_pct : Math.round((s.ventas / totalVentas) * 100);
+                                const esWeb = String(s.sucursal_id).startsWith('web') || s.canal === 'web';
+                                const badgeCanal = esWeb 
+                                    ? '<span style="background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">🌐 TIENDA WEB</span>'
+                                    : '<span style="background:#eff6ff; color:#1e40af; border:1px solid #bfdbfe; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">🏢 MOSTRADOR FÍSICO</span>';
+                                const badgeRank = idx === 0 ? '🥇' : (idx === 1 ? '🥈' : (idx === 2 ? '🥉' : `#${idx + 1}`));
+                                const esLider = idx === 0 && s.ventas > 0;
+                                return `<article class="sucursal-rend-fila" style="background:${esLider ? '#fffbeb' : '#f8fafc'}; border:1px solid ${esLider ? '#fde68a' : '#e2e8f0'}; border-radius:12px; padding:12px; cursor:pointer;" onclick="if(window.aplicarSucursal) window.aplicarSucursal('${s.sucursal_id}')" title="Filtrar por esta sucursal">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                                        <div style="display:flex; align-items:center; gap:8px;">
+                                            <span style="font-size:16px;">${badgeRank}</span>
+                                            <b style="font-size:13px; color:#0f172a;">${textoJefe(s.nombre)}</b>
+                                            ${badgeCanal}
+                                        </div>
+                                        <span style="font-size:13px; font-weight:900; color:${esLider ? '#b45309' : '#0f172a'};">${pct}%</span>
+                                    </div>
+                                    <div style="width:100%; height:6px; background:#e2e8f0; border-radius:999px; overflow:hidden; margin-bottom:8px;">
+                                        <div style="width:${Math.min(100, Math.max(2, pct))}%; height:100%; background:${esWeb ? '#10b981' : '#2563eb'}; border-radius:999px;"></div>
+                                    </div>
+                                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px; font-size:11.5px; text-align:center;">
+                                        <div style="background:#fff; padding:4px; border-radius:6px; border:1px solid #e2e8f0;"><small style="color:#64748b; display:block;">Facturación</small><b style="color:#0f172a;">${plataJefe(s.ventas)}</b></div>
+                                        <div style="background:#fff; padding:4px; border-radius:6px; border:1px solid #e2e8f0;"><small style="color:#64748b; display:block;">${esWeb ? 'Pedidos' : 'Tickets'}</small><b style="color:#0f172a;">${s.tickets}</b></div>
+                                        <div style="background:#fff; padding:4px; border-radius:6px; border:1px solid #e2e8f0;"><small style="color:#64748b; display:block;">Promedio</small><b style="color:#0f172a;">${plataJefe(s.promedio)}</b></div>
                                     </div>
                                 </article>`;
                             }).join('')}
+                            </div>
                         </div>`;
                     }
 

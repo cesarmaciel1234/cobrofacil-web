@@ -162,13 +162,14 @@ def _ventas(sucursal_id: int | str | None = None, desde: str | None = None, hast
                 for wr in web_rows:
                     f_str = str(wr["created_at"] or "")
                     dia = f_str[:10]
+                    sub_sid = wr.get("sucursal_id")
                     vivas.append({
                         "id": str(wr["ticket_id"] or wr["id"]),
                         "fecha": f_str.split(".")[0],
                         "dia": dia,
                         "total": float(wr["total"] or 0.0),
                         "pago": "Web",
-                        "sucursal_id": wr.get("sucursal_id") or "web",
+                        "sucursal_id": f"web-{sub_sid}" if sub_sid else "web",
                     })
         except Exception as e:
             logger.warning("Error sumando pedidos web a _ventas: %s", e)
@@ -235,13 +236,17 @@ def _desglose_sucursales(ventas: list[dict], dia: str, hasta: str | None = None)
     nombres_suc = {str(s["id"]): s["nombre"] for s in sucursales}
 
     agrupado: dict[str, dict] = {}
+    total_general = sum(v["total"] for v in del_rango) or 0.0
+
     for v in del_rango:
         sid = v.get("sucursal_id")
         sid_str = str(sid) if sid is not None else "1"
         if sid_str not in agrupado:
+            es_web = sid_str.startswith("web")
             agrupado[sid_str] = {
-                "sucursal_id": sid_str if sid_str == "web" else int(sid_str),
+                "sucursal_id": sid_str if es_web else (int(sid_str) if sid_str.isdigit() else sid_str),
                 "nombre": nombres_suc.get(sid_str, f"Sucursal {sid_str}"),
+                "canal": "web" if es_web else "fisico",
                 "ventas": 0.0,
                 "tickets": 0,
             }
@@ -252,14 +257,19 @@ def _desglose_sucursales(ventas: list[dict], dia: str, hasta: str | None = None)
     for item in agrupado.values():
         t = item["tickets"]
         m = item["ventas"]
+        pct = round((m / total_general * 100), 1) if total_general > 0 else 0.0
         lista.append({
             "sucursal_id": item["sucursal_id"],
             "nombre": item["nombre"],
+            "canal": item["canal"],
             "ventas": round(m, 2),
             "tickets": t,
             "promedio": round(m / t, 2) if t else 0.0,
+            "participacion_pct": pct,
         })
     lista.sort(key=lambda x: x["ventas"], reverse=True)
+    for idx, item in enumerate(lista):
+        item["ranking"] = idx + 1
     return lista
 
 
