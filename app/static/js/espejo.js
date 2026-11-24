@@ -19,7 +19,7 @@
     
     let basePromise = null;
     let memoria = null; // Apunta a copias.ventas para retrocompatibilidad
-    const copias = {};  // { [tabla]: { sello: string, sucursales: [...] } }
+    let copias = {};    // { [tabla]: { sello: string, sucursales: [...] } }
     let selloGlobal = '';
     let avisos = [];
     let bajando = false;
@@ -81,6 +81,7 @@
     }
 
     async function limpiarTodo() {
+        try { for (const k in copias) delete copias[k]; } catch (_) {}
         copias = {};
         memoria = null;
         selloGlobal = '';

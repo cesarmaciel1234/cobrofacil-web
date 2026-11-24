@@ -178,7 +178,7 @@ def register_security(app):
         if not auth_enabled():
             return None
         path = request.path
-        if path.startswith("/static/") or path in PUBLIC_PATHS:
+        if path.startswith("/static/") or path in PUBLIC_PATHS or path == "/api/stream":
             return None
         if not session.get("authenticated"):
             return None
