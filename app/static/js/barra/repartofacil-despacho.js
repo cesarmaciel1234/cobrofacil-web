@@ -490,26 +490,33 @@
 
                         <!-- Centro: Cliente + #RF + Dirección + Resumen -->
                         <div style="flex:1; min-width:0;">
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:2px;">
-                                <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1; overflow:hidden;">
-                                    <span style="font-weight:900; font-size:13.5px; color:${esRechazado ? '#991b1b' : '#2D3277'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:110px;">${escaparTextoChat(p.cliente_nombre || 'Cliente')}</span>
-                                    <span title="#${escaparTextoChat(p.id)}" style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:10px; font-weight:900; padding:1.5px 6px; border-radius:999px; white-space:nowrap; max-width:85px; overflow:hidden; text-overflow:ellipsis; display:inline-block; vertical-align:middle; flex-shrink:0;">#${escaparTextoChat(formatearIdCorto(p.id))}</span>
+                            <!-- Fila 1: Nombre del cliente a la izquierda y Estado a la derecha -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:3px;">
+                                <span style="font-weight:900; font-size:14px; color:${esRechazado ? '#991b1b' : '#2D3277'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                    ${escaparTextoChat(p.cliente_nombre || 'Cliente')}
+                                </span>
+                                <div style="flex-shrink:0;">
                                     ${badgeEstadoHtml}
                                 </div>
-                                <span style="color:#64748b; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;">${formatFecha(p.created_at)}</span>
                             </div>
 
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                            <!-- Fila 2: Dirección a la izquierda y Monto Total a la derecha -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px;">
                                 <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')}
                                 </div>
-                                <div style="font-size:13.5px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
+                                <div style="font-size:14px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
                                     ${formatMoney(p.total)}
                                 </div>
                             </div>
 
-                            <div style="font-size:11px; color:#64748b; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px;">
-                                ${checkIcon} ${resumenLinea}
+                            <!-- Fila 3: Resumen ítems + ID Corto a la izquierda y Hora a la derecha -->
+                            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                                <div style="font-size:11px; color:#64748b; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:4px; min-width:0; flex:1;">
+                                    ${checkIcon} <span style="overflow:hidden; text-overflow:ellipsis;">${resumenLinea}</span>
+                                    <span title="#${escaparTextoChat(p.id)}" style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:9.5px; font-weight:800; padding:1px 5px; border-radius:6px; flex-shrink:0;">#${escaparTextoChat(formatearIdCorto(p.id))}</span>
+                                </div>
+                                <span style="color:#64748b; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;">${formatFecha(p.created_at)}</span>
                             </div>
                         </div>
 
@@ -1015,22 +1022,28 @@
                 <div style="background:#fff; width:100%; max-width:440px; border-radius:24px; box-shadow:0 25px 50px -12px rgba(45,50,119,0.35); display:flex; flex-direction:column; max-height:85vh; overflow:hidden; border:2px solid #FFE600;">
                     
                     <!-- Header Chat con Ticket Digital Integrado (Estilo Reparto Fácil Blanco y Amarillo con Navy) -->
-                    <div style="background:#2D3277; color:#fff; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #FFE600;">
-                        <div style="display:flex; align-items:center; gap:10px;">
-                            <div style="width:36px; height:36px; border-radius:12px; background:#FFE600; color:#2D3277; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:15px; border:1.5px solid #eab308; box-shadow:0 2px 4px rgba(0,0,0,0.15);">
+                    <div style="background:#2D3277; color:#fff; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid #FFE600;">
+                        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+                            <div style="width:36px; height:36px; border-radius:12px; background:#FFE600; color:#2D3277; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:16px; border:1.5px solid #eab308; box-shadow:0 2px 4px rgba(0,0,0,0.15); flex-shrink:0;">
                                 💬
                             </div>
-                            <div>
-                                <h4 id="rfChatTitle" style="margin:0; font-size:13.5px; font-weight:900; color:#fff;">Canal de Pedido</h4>
+                            <div style="min-width:0; flex:1;">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <h4 id="rfChatTitle" style="margin:0; font-size:13.5px; font-weight:900; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Chat con Cliente</h4>
+                                    <span style="position:relative; display:inline-flex; width:8px; height:8px; flex-shrink:0;" title="Canal en vivo">
+                                        <span style="position:absolute; width:100%; height:100%; border-radius:999px; background:#10b981; opacity:0.75; animation:pulse 1.5s infinite;"></span>
+                                        <span style="position:relative; width:8px; height:8px; border-radius:999px; background:#10b981; border:1.5px solid #fff;"></span>
+                                    </span>
+                                </div>
                                 <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
-                                    <small id="rfChatSub" style="color:#fde047; font-size:10.5px; font-weight:700;">Lazo Comercial Permanente</small>
-                                    <button type="button" id="rfChatTicketBtn" style="display:none; background:#FFE600; color:#2D3277; border:1px solid #eab308; border-radius:6px; font-size:10px; font-weight:900; padding:1.5px 7px; cursor:pointer;">
+                                    <small id="rfChatSub" style="color:#fde047; font-size:10.5px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:180px;">📍 Dirección</small>
+                                    <button type="button" id="rfChatTicketBtn" style="display:none; background:#FFE600; color:#2D3277; border:1px solid #eab308; border-radius:6px; font-size:10px; font-weight:900; padding:1.5px 7px; cursor:pointer; flex-shrink:0;">
                                         🧾 Ticket
                                     </button>
                                 </div>
                             </div>
                         </div>
-                        <button type="button" onclick="window.RepartoFacilDespacho.cerrarChatModal()" style="background:transparent; border:none; color:#fde047; font-size:22px; cursor:pointer; line-height:1; font-weight:900;">
+                        <button type="button" onclick="window.RepartoFacilDespacho.cerrarChatModal()" style="background:transparent; border:none; color:#fde047; font-size:22px; cursor:pointer; line-height:1; font-weight:900; padding:2px 8px;">
                             ✕
                         </button>
                     </div>
@@ -1169,7 +1182,13 @@
         } catch (e) {
             console.error('[RepartoFacil] Error al cargar chat:', e);
             if (orderChatActivo === orderId) {
-                box.textContent = e.message || 'No se pudo cargar la conversación.';
+                box.innerHTML = `
+                    <div style="text-align:center; padding:32px 16px; color:#64748b;">
+                        <div style="font-size:26px; margin-bottom:8px;">💬</div>
+                        <div style="font-weight:900; font-size:13px; color:#2D3277; margin-bottom:4px;">Canal de Chat con el Cliente</div>
+                        <div style="font-size:11px; color:#64748b; margin-bottom:12px;">Escribí tu mensaje abajo para comunicarte con el cliente o chofer en tiempo real.</div>
+                    </div>
+                `;
             }
         }
     }

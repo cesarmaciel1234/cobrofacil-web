@@ -1,5 +1,5 @@
 /* Cobro Fácil PWA — network-first for shell updates, offline fallback */
-const CACHE_VERSION = 'crm-frigorifico-v8.2';
+const CACHE_VERSION = 'crm-frigorifico-v8.7';
 const SHELL_ASSETS = [
   '/login',
   '/manifest.json',
@@ -32,6 +32,7 @@ const SHELL_ASSETS = [
   '/static/js/barra/auditoria-inventario.js',
   '/static/js/barra/toque.js',
   '/static/js/barra/pedidos.js',
+  '/static/js/barra/repartofacil-despacho.js',
   '/static/js/barra/armar.js',
   '/static/vendor/dexie.min.js',
   '/static/vendor/zxing.min.js',
