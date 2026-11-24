@@ -90,13 +90,30 @@
 .perfil-empresa-ayuda { margin: 8px 0 12px; }
 .perfil-empresa-acciones, .perfil-empresa-mapa-acciones { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .perfil-empresa-acciones { justify-content: flex-end; }
+.perfil-empresa-buscador-fila { display: flex; gap: 8px; margin-bottom: 10px; }
+.perfil-empresa-buscador-fila input { flex: 1; min-width: 0; }
 #empresaPerfilEstado:not(:empty) { margin: 0 0 12px; color: #475569; }
-#empresaPerfilMapa { height: 280px; border: 1.5px solid #fde047; border-radius: 14px; z-index: 0; }
+#empresaPerfilMapa { height: 300px; border: 1.5px solid #fde047; border-radius: 14px; z-index: 0; }
 .perfil-empresa-pin {
-    width: 20px !important;
-    height: 20px !important;
+    width: 24px !important;
+    height: 24px !important;
     border: 3px solid #2D3277;
     border-radius: 50%;
     background: #FFE600;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, .35);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, .4);
+    animation: pinPulse 1.8s infinite;
+}
+@keyframes pinPulse {
+    0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 230, 0, 0.7); }
+    70% { transform: scale(1.08); box-shadow: 0 0 0 10px rgba(255, 230, 0, 0); }
+    100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 230, 0, 0); }
+}
+.perfil-empresa-mapa-confirmar {
+    background: #2D3277 !important;
+    color: #fff !important;
+    border-color: #1e2255 !important;
+}
+.perfil-empresa-mapa-confirmar:hover {
+    background: #1e2255 !important;
+    color: #FFE600 !important;
 }

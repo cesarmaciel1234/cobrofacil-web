@@ -11,6 +11,9 @@
     const panelMapa = document.getElementById('empresaPerfilMapaPanel');
     const estadoMapa = document.getElementById('empresaPerfilMapaEstado');
     const ubicacion = document.getElementById('empresaPerfilUbicacion');
+    const buscadorInput = document.getElementById('empresaPerfilBuscadorInput');
+    const buscadorBoton = document.getElementById('empresaPerfilBuscadorBoton');
+    const confirmarMapa = document.getElementById('empresaPerfilConfirmarMapa');
     const campos = ['nombre', 'descripcion', 'direccion', 'latitud', 'longitud', 'whatsapp', 'horario'];
     let version = 0;
     let guardando = false;
@@ -30,9 +33,13 @@
     }
 
     function actualizarUbicacion() {
-        ubicacion.textContent = form.elements.latitud.value && form.elements.longitud.value
-            ? 'Ubicación seleccionada en el mapa.'
-            : 'Todavía no seleccionaste una ubicación.';
+        const tieneCoords = form.elements.latitud.value && form.elements.longitud.value;
+        const dir = form.elements.direccion.value.trim();
+        ubicacion.textContent = tieneCoords
+            ? (dir ? '✓ Ubicación GPS precisa vinculada: ' + dir : '✓ Ubicación seleccionada en el mapa.')
+            : '⚠️ Todavía no seleccionaste una ubicación en el mapa (necesaria para mostrar la distancia a los clientes).';
+        ubicacion.style.color = tieneCoords ? '#15803d' : '#b45309';
+        ubicacion.style.fontWeight = '700';
     }
 
     function pintar(datos, role) {
@@ -55,7 +62,7 @@
             tarjeta.textContent = `${resena.estrellas} / 5 · ${resena.comentario || 'Sin comentario'}`;
             lista.appendChild(tarjeta);
         });
-        ubicacionConfirmada = false;
+        ubicacionConfirmada = Boolean(perfil.latitud && perfil.longitud);
         actualizarUbicacion();
     }
 
@@ -112,28 +119,96 @@
     });
     form.elements.direccion.addEventListener('input', () => {
         ubicacionRevision++;
-        form.elements.latitud.value = '';
-        form.elements.longitud.value = '';
-        ubicacionConfirmada = false;
-        if (marcador) {
-            marcador.remove();
-            marcador = null;
-        }
+        // Si el usuario escribe una dirección distinta, actualizamos el buscador
+        if (buscadorInput) buscadorInput.value = form.elements.direccion.value;
         actualizarUbicacion();
     });
 
-    function seleccionar(lat, lng) {
+    async function resolverDireccionInversa(lat, lng, rev) {
+        try {
+            const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}`;
+            const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (rev !== ubicacionRevision || !data || !data.address) return;
+            
+            const addr = data.address;
+            const road = addr.road || addr.pedestrian || addr.street || '';
+            const house = addr.house_number || '';
+            const suburb = addr.suburb || addr.neighbourhood || addr.city_district || '';
+            const city = addr.city || addr.town || addr.village || '';
+            
+            const streetLine = road ? (road + (house ? ' ' + house : '')) : '';
+            const locality = [suburb, city].filter(Boolean).join(', ');
+            const finalAddr = [streetLine, locality].filter(Boolean).join(', ') || data.display_name.split(',').slice(0, 3).join(', ');
+            
+            if (finalAddr) {
+                form.elements.direccion.value = finalAddr;
+                if (buscadorInput) buscadorInput.value = finalAddr;
+                estadoMapa.textContent = `📍 ${finalAddr} (Lat: ${lat.toFixed(5)}, Lng: ${lng.toFixed(5)})`;
+                actualizarUbicacion();
+            }
+        } catch (e) {
+            console.warn('No se pudo resolver la dirección inversa:', e);
+        }
+    }
+
+    function seleccionar(lat, lng, resolverInversa = false) {
         if (!sesionValida() || form.hidden || guardando) return;
-        ubicacionRevision++;
+        const rev = ++ubicacionRevision;
         form.elements.latitud.value = String(lat);
         form.elements.longitud.value = String(lng);
         ubicacionConfirmada = true;
-        if (marcador) marcador.setLatLng([lat, lng]);
-        else marcador = global.L.marker([lat, lng], {
-            icon: global.L.divIcon({ className: 'perfil-empresa-pin', iconSize: [18, 18], iconAnchor: [9, 9] }),
-        }).addTo(mapa);
-        estadoMapa.textContent = 'Ubicación elegida. Guardá la ficha para aplicarla.';
+        
+        if (marcador) {
+            marcador.setLatLng([lat, lng]);
+        } else if (mapa && global.L) {
+            marcador = global.L.marker([lat, lng], {
+                icon: global.L.divIcon({ className: 'perfil-empresa-pin', iconSize: [24, 24], iconAnchor: [12, 12] }),
+            }).addTo(mapa);
+        }
+        
+        estadoMapa.textContent = `Punto fijado: Lat ${lat.toFixed(5)}, Lng ${lng.toFixed(5)}`;
         actualizarUbicacion();
+        
+        if (resolverInversa) {
+            resolverDireccionInversa(lat, lng, rev);
+        }
+    }
+
+    async function buscarDireccionEnMapa(texto) {
+        const query = (texto || '').trim();
+        if (!query) {
+            estadoMapa.textContent = 'Escribí una calle o localidad para buscar.';
+            return;
+        }
+        estadoMapa.textContent = `Buscando "${query}"...`;
+        try {
+            const queryArg = query.toLowerCase().includes('argentina') ? query : `${query}, Argentina`;
+            const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(queryArg)}&limit=1&addressdetails=1`;
+            const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+            if (!res.ok) throw new Error('Error en el servicio de mapas');
+            const results = await res.json();
+            if (!results || results.length === 0) {
+                estadoMapa.textContent = `No encontramos "${query}". Probá tocar el mapa directamente o agregar la localidad.`;
+                return;
+            }
+            const item = results[0];
+            const lat = parseFloat(item.lat);
+            const lng = parseFloat(item.lon);
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+            
+            if (mapa) {
+                mapa.setView([lat, lng], 17);
+                seleccionar(lat, lng, false);
+            }
+            const displayName = item.display_name ? item.display_name.split(',').slice(0, 3).join(', ') : query;
+            form.elements.direccion.value = query;
+            estadoMapa.textContent = `✓ Ubicación encontrada: ${displayName}`;
+            actualizarUbicacion();
+        } catch (err) {
+            estadoMapa.textContent = 'No se pudo buscar la dirección. Podés tocar el mapa directamente.';
+        }
     }
 
     document.getElementById('empresaPerfilAbrirMapa').addEventListener('click', () => {
@@ -146,26 +221,75 @@
             return;
         }
         panelMapa.hidden = false;
-        if (mapa) { mapa.invalidateSize(); return; }
-        const lat = Number(form.elements.latitud.value);
-        const lng = Number(form.elements.longitud.value);
-        const tieneUbicacion = form.elements.latitud.value !== '' && form.elements.longitud.value !== '';
-        mapa = global.L.map('empresaPerfilMapa').setView(tieneUbicacion ? [lat, lng] : [-32.9468, -60.6393], tieneUbicacion ? 16 : 12);
+        
+        const dirPrevia = form.elements.direccion.value.trim();
+        if (buscadorInput) buscadorInput.value = dirPrevia;
+
+        const latVal = form.elements.latitud.value;
+        const lngVal = form.elements.longitud.value;
+        const tieneUbicacion = latVal !== '' && lngVal !== '' && !Number.isNaN(Number(latVal));
+        const lat = tieneUbicacion ? Number(latVal) : -34.5954;
+        const lng = tieneUbicacion ? Number(lngVal) : -58.6275;
+
+        if (mapa) {
+            mapa.invalidateSize();
+            if (tieneUbicacion) {
+                mapa.setView([lat, lng], 17);
+                if (marcador) marcador.setLatLng([lat, lng]);
+            }
+            return;
+        }
+
+        mapa = global.L.map('empresaPerfilMapa').setView([lat, lng], tieneUbicacion ? 17 : 14);
         const tiles = global.L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         }).addTo(mapa);
+        
         tiles.on('tileerror', () => { estadoMapa.textContent = 'No se pudo cargar el mapa. Revisá tu conexión.'; });
-        mapa.on('click', (event) => seleccionar(event.latlng.lat, event.latlng.lng));
+        mapa.on('click', (event) => seleccionar(event.latlng.lat, event.latlng.lng, true));
+
         if (tieneUbicacion) {
             marcador = global.L.marker([lat, lng], {
-                icon: global.L.divIcon({ className: 'perfil-empresa-pin', iconSize: [18, 18], iconAnchor: [9, 9] }),
+                icon: global.L.divIcon({ className: 'perfil-empresa-pin', iconSize: [24, 24], iconAnchor: [12, 12] }),
             }).addTo(mapa);
+            estadoMapa.textContent = `Ubicación actual fijada: ${dirPrevia || 'en el mapa'}`;
+        } else if (dirPrevia) {
+            buscarDireccionEnMapa(dirPrevia);
         } else {
-            estadoMapa.textContent = 'Mové el mapa o usá tu ubicación para encontrar el comercio.';
+            estadoMapa.textContent = 'Buscá tu calle o tocá el mapa para fijar el local.';
         }
-        mapa.invalidateSize();
+        setTimeout(() => mapa && mapa.invalidateSize(), 200);
     });
+
+    if (buscadorBoton) {
+        buscadorBoton.addEventListener('click', () => {
+            if (buscadorInput) buscarDireccionEnMapa(buscadorInput.value);
+        });
+    }
+
+    if (buscadorInput) {
+        buscadorInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                buscarDireccionEnMapa(buscadorInput.value);
+            }
+        });
+    }
+
+    if (confirmarMapa) {
+        confirmarMapa.addEventListener('click', () => {
+            if (!form.elements.latitud.value || !form.elements.longitud.value) {
+                estadoMapa.textContent = 'Primero tocá el mapa o buscá tu dirección para fijar el punto.';
+                return;
+            }
+            ubicacionConfirmada = true;
+            actualizarUbicacion();
+            cerrarMapa();
+        });
+    }
+
     document.getElementById('empresaPerfilCerrarMapa').addEventListener('click', cerrarMapa);
+    
     document.getElementById('empresaPerfilGps').addEventListener('click', () => {
         if (!navigator.geolocation) {
             estadoMapa.textContent = 'Tu navegador no permite usar la ubicación.';
@@ -174,13 +298,15 @@
         const actual = version;
         const mapaSolicitado = mapa;
         const revision = ++ubicacionRevision;
-        estadoMapa.textContent = 'Buscando tu ubicación…';
+        estadoMapa.textContent = 'Detectando ubicación precisa por GPS…';
         navigator.geolocation.getCurrentPosition(({ coords }) => {
             if (actual !== version || revision !== ubicacionRevision || !mapa || mapa !== mapaSolicitado || !sesionValida() || form.hidden) return;
-            seleccionar(coords.latitude, coords.longitude);
-            mapa.setView([coords.latitude, coords.longitude], 16);
+            seleccionar(coords.latitude, coords.longitude, true);
+            mapa.setView([coords.latitude, coords.longitude], 17);
         }, () => {
-            if (actual === version && revision === ubicacionRevision && mapa === mapaSolicitado && mapa) estadoMapa.textContent = 'No pudimos obtener tu ubicación. Podés elegirla en el mapa.';
+            if (actual === version && revision === ubicacionRevision && mapa === mapaSolicitado && mapa) {
+                estadoMapa.textContent = 'No se pudo obtener el GPS del dispositivo. Podés buscar tu calle arriba o tocar el mapa.';
+            }
         }, { enableHighAccuracy: true, timeout: 12000 });
     });
 

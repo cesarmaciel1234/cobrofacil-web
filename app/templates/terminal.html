@@ -174,19 +174,24 @@
                         <h3>Editar ficha pública</h3>
                         <label>Nombre del comercio <input name="nombre" required maxlength="120" class="buscar"></label>
                         <label>Descripción <textarea name="descripcion" maxlength="500" class="buscar"></textarea></label>
-                        <label>Dirección <input name="direccion" maxlength="250" class="buscar"></label>
+                        <label>Dirección física del comercio <input name="direccion" maxlength="250" class="buscar" placeholder="Ej.: Alfaro 1964, Hurlingham"></label>
                         <input name="latitud" type="hidden">
                         <input name="longitud" type="hidden">
-                        <button type="button" id="empresaPerfilAbrirMapa" class="perfil-empresa-mapa-boton">Elegir ubicación en el mapa</button>
+                        <button type="button" id="empresaPerfilAbrirMapa" class="perfil-empresa-mapa-boton">📍 Seleccionar ubicación precisa en el mapa</button>
                         <p id="empresaPerfilUbicacion" class="perfil-empresa-ayuda"></p>
                         <div id="empresaPerfilMapaPanel" hidden>
-                            <p class="perfil-empresa-ayuda">Tocá el lugar de tu comercio en el mapa.</p>
+                            <div class="perfil-empresa-buscador-fila">
+                                <input type="text" id="empresaPerfilBuscadorInput" class="buscar" placeholder="Buscar calle, altura o localidad (ej: Alfaro 1964, Hurlingham)">
+                                <button type="button" id="empresaPerfilBuscadorBoton" class="perfil-empresa-mapa-boton">🔍 Buscar</button>
+                            </div>
+                            <p class="perfil-empresa-ayuda" style="margin-top:2px;">Tocá el mapa para fijar el punto exacto de tu local:</p>
                             <div id="empresaPerfilMapa" aria-label="Mapa para elegir la ubicación del comercio"></div>
                             <div class="perfil-empresa-mapa-acciones">
-                                <button type="button" id="empresaPerfilGps" class="perfil-empresa-mapa-boton">Usar mi ubicación</button>
-                                <button type="button" id="empresaPerfilCerrarMapa" class="perfil-empresa-mapa-boton">Cerrar mapa</button>
+                                <button type="button" id="empresaPerfilGps" class="perfil-empresa-mapa-boton">🎯 Mi ubicación GPS</button>
+                                <button type="button" id="empresaPerfilConfirmarMapa" class="perfil-empresa-mapa-boton perfil-empresa-mapa-confirmar">✓ Confirmar punto</button>
+                                <button type="button" id="empresaPerfilCerrarMapa" class="perfil-empresa-mapa-boton" style="background:#f1f5f9; border-color:#cbd5e1; color:#475569;">Cerrar</button>
                             </div>
-                            <p id="empresaPerfilMapaEstado" class="perfil-empresa-ayuda" role="status" aria-live="polite"></p>
+                            <p id="empresaPerfilMapaEstado" class="perfil-empresa-ayuda" role="status" aria-live="polite" style="font-weight:700; color:#2D3277;"></p>
                         </div>
                         <label>WhatsApp con código de país <input name="whatsapp" inputmode="numeric" maxlength="15" class="buscar"></label>
                         <label>Horario informativo <input name="horario" maxlength="250" class="buscar" placeholder="Ej.: Lunes a sábado, 9 a 20 h"></label>
