@@ -3261,18 +3261,36 @@ const $ = id => document.getElementById(id);
                 if (puesto && puesto.toUpperCase() !== 'JEFE') baseEmpresa = puesto;
             }
             if (!baseEmpresa) return;
-            const elegida = sucursalesConocidas.find((s) => String(s.id) === String(activeSucursalId));
-            if (elegida) {
-                nomEl.textContent = baseEmpresa.toUpperCase() + ' · ' + elegida.nombre.toUpperCase();
+
+            const sidStr = String(activeSucursalId || '');
+            if (sidStr === 'web') {
+                nomEl.textContent = baseEmpresa.toUpperCase() + ' · TIENDA WEB (TODAS)';
+            } else if (sidStr.startsWith('web-')) {
+                const subId = sidStr.replace('web-', '');
+                const subSuc = sucursalesConocidas.find((s) => String(s.id) === subId);
+                const subNom = subSuc ? subSuc.nombre : ('SUCURSAL ' + subId);
+                nomEl.textContent = baseEmpresa.toUpperCase() + ' · TIENDA WEB (' + subNom.toUpperCase() + ')';
             } else {
-                nomEl.textContent = baseEmpresa.toUpperCase();
+                const elegida = sucursalesConocidas.find((s) => String(s.id) === sidStr);
+                if (elegida) {
+                    nomEl.textContent = baseEmpresa.toUpperCase() + ' · ' + elegida.nombre.toUpperCase();
+                } else {
+                    nomEl.textContent = baseEmpresa.toUpperCase();
+                }
             }
         }
         window.actualizarNombreEmpresaTopbar = actualizarNombreEmpresaTopbar;
         actualizarNombreEmpresaTopbar();
 
         function aplicarSucursal(id) {
-            activeSucursalId = id === 'web' ? 'web' : (id != null && !isNaN(id) ? Number(id) : null);
+            const idStr = String(id || '');
+            if (idStr === 'web' || idStr.startsWith('web-')) {
+                activeSucursalId = idStr;
+            } else if (id != null && !isNaN(id) && id !== '') {
+                activeSucursalId = Number(id);
+            } else {
+                activeSucursalId = null;
+            }
             try {
                 if (activeSucursalId == null) localStorage.removeItem('crm_active_sucursal_id');
                 else localStorage.setItem('crm_active_sucursal_id', String(activeSucursalId));
@@ -3310,43 +3328,58 @@ const $ = id => document.getElementById(id);
                 const data = await fetch('/api/pos/sucursales').then((r) => r.json());
                 if (data && Array.isArray(data.sucursales)) {
                     sucursalesConocidas = data.sucursales;
-                    if (!sucursalesConocidas.some((s) => String(s.id) === 'web')) {
-                        sucursalesConocidas.push({ id: 'web', nombre: 'Tienda Web' });
-                    }
                     try { localStorage.setItem('crm_sucursales_cache', JSON.stringify(sucursalesConocidas)); } catch (_) {}
                     if (window.Espejo && Espejo.fijarSucursales) {
                         Espejo.fijarSucursales(sucursalesConocidas);
                     }
-                    if (activeSucursalId != null && !sucursalesConocidas.some((s) => String(s.id) === String(activeSucursalId))) {
-                        aplicarSucursal(null);
-                    }
                 }
             } catch (_) {}
-            if (!sucursalesConocidas.some((s) => String(s.id) === 'web')) {
-                sucursalesConocidas.push({ id: 'web', nombre: 'Tienda Web' });
-            }
+
             document.getElementById('sucursalSheet')?.remove();
             const actual = activeSucursalId == null ? '' : String(activeSucursalId);
-            const opciones = [{ id: '', nombre: '— Todas las Sucursales — (Consolidado Master)', icono: '🏢' }].concat(
-                sucursalesConocidas.map((s) => ({
+            const fisicas = sucursalesConocidas.filter(s => String(s.id) !== 'web' && !String(s.id).startsWith('web-'));
+            const opciones = [
+                { id: '', nombre: '— Todas las Sucursales — (Consolidado Master)', direccion: 'Todas las cajas, locales y ventas web', icono: '🏢' }
+            ];
+            // 1. Locales Físicos (Mostrador / TPV)
+            fisicas.forEach((s) => {
+                opciones.push({
                     id: String(s.id),
                     nombre: s.nombre || ('Sucursal ' + s.id),
-                    direccion: s.direccion || '',
-                    icono: String(s.id) === 'web' ? '🌐' : (s.es_centro_distribucion ? '📦' : '🏪')
-                }))
-            );
+                    direccion: s.direccion || 'Local TPV / Mostrador',
+                    icono: s.es_centro_distribucion ? '📦' : '🏪'
+                });
+            });
+            // 2. Sucursales Web (Online / Reparto Fácil)
+            opciones.push({
+                id: 'web',
+                nombre: 'Tienda Web · Todas',
+                direccion: 'Consolidado de todas las ventas online',
+                icono: '🌐'
+            });
+            if (fisicas.length > 1) {
+                fisicas.forEach((s) => {
+                    opciones.push({
+                        id: 'web-' + s.id,
+                        nombre: 'Tienda Web · ' + s.nombre,
+                        direccion: 'Pedidos online y despacho de ' + s.nombre,
+                        icono: '🌐'
+                    });
+                });
+            }
+
             const fondo = document.createElement('div');
             fondo.id = 'sucursalSheet';
             fondo.className = 'pedido-sheet-back';
-            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Sucursales" style="border-radius:24px 24px 0 0; padding:20px;">
+            fondo.innerHTML = `<div class="pedido-sheet" role="dialog" aria-label="Sucursales" style="border-radius:24px 24px 0 0; padding:20px; max-height:85vh; overflow-y:auto;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
                     <strong class="pedido-sheet-titulo" style="font-size:16px; font-weight:800; color:#2D3277; margin:0;">🏢 Filtro por Sucursal</strong>
-                    <span style="font-size:11px; font-weight:700; color:#64748b;">${sucursalesConocidas.filter(s => s.id !== 'web').length <= 1 ? '⭐ Local Único' : '🏢 Red de Locales'}</span>
+                    <span style="font-size:11px; font-weight:700; color:#64748b;">${fisicas.length <= 1 ? '⭐ Local Único' : '🏢 Red & Canales Web'}</span>
                 </div>
                 <div style="display:flex; flex-direction:column; gap:8px;">
                     ${opciones.map((op) => `
                         <button type="button" class="pedido-opcion${op.id === actual ? ' active' : ''}" data-sucursal="${textoJefe(op.id)}" style="display:flex; flex-direction:column; align-items:flex-start; text-align:left; padding:12px 14px; border-radius:12px; border:1.5px solid ${op.id === actual ? '#2D3277' : '#e2e8f0'}; background:${op.id === actual ? '#eff6ff' : '#ffffff'};">
-                            <span style="font-size:14px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:14px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:6px; width:100%;">
                                 <span>${op.icono}</span>
                                 <span>${textoJefe(op.nombre)}</span>
                                 ${op.id === actual ? '<span style="margin-left:auto; color:#2563eb; font-weight:900;">✓</span>' : ''}
@@ -3361,7 +3394,7 @@ const $ = id => document.getElementById(id);
                 if (opcion) {
                     const valor = opcion.dataset.sucursal;
                     fondo.remove();
-                    aplicarSucursal(valor === 'web' ? 'web' : (valor ? parseInt(valor, 10) : null));
+                    aplicarSucursal(valor);
                     cargarSucursalesSelector();
                     return;
                 }

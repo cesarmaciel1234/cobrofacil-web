@@ -79,9 +79,20 @@ def _candado(clave: tuple) -> threading.Lock:
         return candado
 
 
+def _norm_sid(sid_raw: int | str | None) -> int | str | None:
+    if sid_raw is None:
+        return None
+    s = str(sid_raw).strip().lower()
+    if s == "web" or s.startswith("web-") or s.startswith("web_"):
+        return s
+    if s.isdigit():
+        return int(s)
+    return None
+
+
 def _marca(sucursal_id: int | str | None) -> tuple[str, str]:
-    es_web = str(sucursal_id or "").strip().lower() == "web"
-    sid = "web" if es_web else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
+    sid = _norm_sid(sucursal_id)
+    es_web = isinstance(sid, str) and sid.startswith("web")
     with get_db() as conn:
         if es_web:
             fila = conn.execute("SELECT MAX(created_at) FROM public.repartofacil_pedidos").fetchone()
@@ -105,7 +116,7 @@ def _clave(
     hasta: str | None,
     filtro: dict | None,
 ) -> tuple:
-    sid = "web" if str(sucursal_id or "").strip().lower() == "web" else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
+    sid = _norm_sid(sucursal_id)
     return (
         _ambito_cache(),
         pieza,
@@ -121,7 +132,7 @@ def estado(sucursal_id: int | str | None = None) -> dict[str, Any]:
     """Sello del libro y qué piezas ya están armadas. No calcula los paneles."""
     sello, dia = _marca(sucursal_id)
     ambito = _ambito_cache()
-    sid = "web" if str(sucursal_id or "").strip().lower() == "web" else (int(sucursal_id) if sucursal_id is not None and str(sucursal_id).isdigit() else None)
+    sid = _norm_sid(sucursal_id)
     with _lock:
         piezas = sorted({
             clave[1]

@@ -581,7 +581,13 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             bool(pedido.get("historico")),
             hoy,
         )
-    es_web = str(sucursal_id or "").strip().lower() == "web"
+    sid_str = str(sucursal_id or "").strip().lower()
+    es_web = sid_str.startswith("web")
+    web_sub_id = None
+    if es_web and ("-" in sid_str or "_" in sid_str):
+        partes = sid_str.replace("_", "-").split("-")
+        if len(partes) > 1 and partes[1].isdigit():
+            web_sub_id = int(partes[1])
     if es_web:
         columnas, filas = [], []
     elif ini and fin:
@@ -660,11 +666,14 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
             eid_actual = _empresa_activa()
             with get_db() as conn:
                 q_web = """
-                    SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items
+                    SELECT id, ticket_id, cliente_nombre, total, metodo_pago, estado, created_at, items, sucursal_id, sucursal_origen
                     FROM public.repartofacil_pedidos
                     WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
                 """
                 params = [eid_actual]
+                if web_sub_id is not None:
+                    q_web += " AND (sucursal_id = %s OR sucursal_origen ILIKE %s)"
+                    params.extend([web_sub_id, f"%{web_sub_id}%"])
                 if ini and fin:
                     q_web += " AND created_at >= %s AND created_at <= %s"
                     params.extend([str(ini)[:10] + " 00:00:00", str(fin)[:10] + " 23:59:59"])

@@ -470,7 +470,7 @@
                 </div>
 
                 <div style="display:flex; align-items:baseline; justify-content:space-between; gap:8px; margin:14px 0 8px;">
-                    <div><strong style="font-size:16px; color:#0f172a;">Inventario</strong><div style="font-size:11px; color:#64748b;">${fuenteConexion === 'mariadb_maestra' ? 'Lectura del TPV local' : 'Datos replicados; pueden tener demora'} · Sin stock: cero o negativo</div><div style="font-size:11px; color:#9a3412;">La selección de sucursal no filtra esta vista ni sus conteos.</div></div>
+                    <div><strong style="font-size:16px; color:#0f172a;">Inventario</strong><div style="font-size:11px; color:#64748b;">${fuenteConexion === 'mariadb_maestra' ? 'Lectura del TPV local' : 'Datos replicados; sincronización en vivo'} · Sin stock: cero o negativo</div><div style="font-size:11px; color:#2563eb; font-weight:700;">📍 Filtrado por sucursal activa</div></div>
                 </div>
                 ${errorCatalogo ? `<div role="alert" style="padding:9px 11px; margin-bottom:8px; border-radius:10px; background:#fff7ed; color:#9a3412; font-size:12px; font-weight:700;">${escHtml(errorCatalogo)} <button type="button" id="btnReintentarActualizacionInventario" style="border:0; background:none; color:#9a3412; text-decoration:underline; font-weight:800; cursor:pointer;">Reintentar</button></div>` : ''}
                 <div style="display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-bottom:12px;" aria-label="Resumen de inventario">

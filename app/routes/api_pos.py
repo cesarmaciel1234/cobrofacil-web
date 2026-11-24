@@ -318,6 +318,17 @@ def api_pos_espejo():
     return jsonify(indice_espejo())
 
 
+def _resolver_sid(sid_raw):
+    if sid_raw is None:
+        return None
+    s = str(sid_raw).strip().lower()
+    if s == "web" or s.startswith("web-") or s.startswith("web_"):
+        return s
+    if s.isdigit():
+        return int(s)
+    return None
+
+
 @api_bp.route("/pos/nodo", methods=["GET"])
 def api_pos_nodo():
     """Pieza ya armada del libro. La PWA la pide en segundo plano."""
@@ -330,12 +341,7 @@ def api_pos_nodo():
         sucursal_id = user_sid
     else:
         sid_raw = request.args.get("sucursal_id") or request.args.get("branch_id")
-        if sid_raw is not None and str(sid_raw).strip().lower() == "web":
-            sucursal_id = "web"
-        elif sid_raw is not None and str(sid_raw).strip().isdigit():
-            sucursal_id = int(str(sid_raw).strip())
-        else:
-            sucursal_id = None
+        sucursal_id = _resolver_sid(sid_raw)
     if pieza == "estado":
         return jsonify(estado(sucursal_id))
     filtro = filtro_de(pieza, request.args.to_dict())
@@ -543,12 +549,7 @@ def api_pos_jefe():
         sucursal_id = user_sid
     else:
         suc_raw = request.args.get("sucursal_id") or request.args.get("branch_id")
-        if suc_raw is not None and str(suc_raw).strip().lower() == "web":
-            sucursal_id = "web"
-        elif suc_raw is not None and str(suc_raw).strip().isdigit():
-            sucursal_id = int(str(suc_raw).strip())
-        else:
-            sucursal_id = None
+        sucursal_id = _resolver_sid(suc_raw)
     periodo = (request.args.get("periodo") or "Hoy").strip()
     desde = request.args.get("desde")
     hasta = request.args.get("hasta")
@@ -699,7 +700,7 @@ def api_pos_inventario_auditoria():
         sid = user_sid
     else:
         sid_raw = request.args.get("sucursal_id")
-        sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+        sid = _resolver_sid(sid_raw)
     dato = obtener_catalogo_auditoria(sucursal_id=sid, empresa_id=emp_id)
     return jsonify(dato)
 
@@ -722,7 +723,7 @@ def api_pos_inventario_ajuste():
         sid = user_sid
     else:
         sid_raw = data.get("sucursal_id")
-        sid = int(sid_raw) if sid_raw and str(sid_raw).isdigit() else None
+        sid = _resolver_sid(sid_raw)
 
     if pid is None or stock_fisico is None:
         return jsonify({"ok": False, "error": "producto_id y stock_fisico son obligatorios"}), 400

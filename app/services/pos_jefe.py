@@ -85,6 +85,15 @@ def _es_digital(pago) -> bool:
 
 
 def _comercio(sucursal_id: int | str | None, sucursales: list[dict]) -> str:
+    sid_str = str(sucursal_id or "").strip().lower()
+    if sid_str == "web":
+        return "Tienda Web (Todas)"
+    if sid_str.startswith("web-") or sid_str.startswith("web_"):
+        sub_id = sid_str.replace("_", "-").split("-")[1]
+        for s in sucursales:
+            if str(s.get("id")) == sub_id:
+                return f"Tienda Web · {s.get('nombre')}"
+        return f"Tienda Web (Sucursal {sub_id})"
     if sucursal_id is not None:
         for sucursal in sucursales:
             if str(sucursal["id"]) == str(sucursal_id):
@@ -95,7 +104,14 @@ def _comercio(sucursal_id: int | str | None, sucursales: list[dict]) -> str:
 
 
 def _ventas(sucursal_id: int | str | None = None, desde: str | None = None, hasta: str | None = None):
-    es_web = str(sucursal_id or "").strip().lower() == "web"
+    sid_str = str(sucursal_id or "").strip().lower()
+    es_web = sid_str.startswith("web")
+    web_sub_id = None
+    if es_web and ("-" in sid_str or "_" in sid_str):
+        partes = sid_str.replace("_", "-").split("-")
+        if len(partes) > 1 and partes[1].isdigit():
+            web_sub_id = int(partes[1])
+
     if es_web:
         columnas, filas = [], []
         idx = {}
@@ -130,11 +146,14 @@ def _ventas(sucursal_id: int | str | None = None, desde: str | None = None, hast
             eid_actual = _empresa_activa()
             with get_db() as conn:
                 q_web = """
-                    SELECT id, ticket_id, total, metodo_pago, estado, created_at
+                    SELECT id, ticket_id, total, metodo_pago, estado, created_at, sucursal_id, sucursal_origen
                     FROM public.repartofacil_pedidos
                     WHERE empresa_id = %s AND ticket_id IS NOT NULL AND estado NOT IN ('cancelled', 'rejected', 'cancelled_by_client', 'cancelled_timeout')
                 """
                 params = [eid_actual]
+                if web_sub_id is not None:
+                    q_web += " AND (sucursal_id = %s OR sucursal_origen ILIKE %s)"
+                    params.extend([web_sub_id, f"%{web_sub_id}%"])
                 if desde and hasta:
                     q_web += " AND created_at >= %s AND created_at <= %s"
                     params.extend([str(desde)[:10] + " 00:00:00", str(hasta)[:10] + " 23:59:59"])
@@ -149,7 +168,7 @@ def _ventas(sucursal_id: int | str | None = None, desde: str | None = None, hast
                         "dia": dia,
                         "total": float(wr["total"] or 0.0),
                         "pago": "Web",
-                        "sucursal_id": "web",
+                        "sucursal_id": wr.get("sucursal_id") or "web",
                     })
         except Exception as e:
             logger.warning("Error sumando pedidos web a _ventas: %s", e)
@@ -530,10 +549,21 @@ def _unir_faltantes(faltantes: list) -> list:
     return salida
 
 
-def _pedidos_abastecimiento(sucursal_id: int | None = None) -> dict:
-    col_p, filas_p = filas_de("productos", sucursal_id)
+def _pedidos_abastecimiento(sucursal_id: int | str | None = None) -> dict:
+    sid_target = None
+    sid_str = str(sucursal_id or "").strip().lower()
+    if sid_str.startswith("web-") or sid_str.startswith("web_"):
+        partes = sid_str.replace("_", "-").split("-")
+        if len(partes) > 1 and partes[1].isdigit():
+            sid_target = int(partes[1])
+    elif sid_str.isdigit():
+        sid_target = int(sid_str)
+    elif sid_str == "web":
+        sid_target = None
+
+    col_p, filas_p = filas_de("productos", sid_target)
     if not col_p:
-        col_p, filas_p = filas_de("articulos", sucursal_id)
+        col_p, filas_p = filas_de("articulos", sid_target)
     idx_p = _indice(col_p)
 
     faltantes = []
@@ -698,7 +728,7 @@ def _nombres_en_crm() -> dict[str, dict]:
 
 
 def _filas_clientes(sucursal_id: int | str | None) -> tuple[list[str], list[list]]:
-    es_web = str(sucursal_id or "").strip().lower() == "web"
+    es_web = str(sucursal_id or "").strip().lower().startswith("web")
     if es_web:
         columnas, filas = [], []
     else:
@@ -1431,7 +1461,7 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
     total_medios = round(sum(_numero(m.get("monto")) for m in medios_lista), 2)
     tickets = sum(int(m.get("tickets") or 0) for m in medios_lista)
 
-    es_web = str(sucursal_id or "").strip().lower() == "web"
+    es_web = str(sucursal_id or "").strip().lower().startswith("web")
     if es_web:
         return {
             "ventas": total_medios,
