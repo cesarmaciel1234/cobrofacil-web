@@ -111,9 +111,102 @@
         if (!id) return '';
         const clean = String(id).trim().replace(/^#?RF-?/i, '');
         if (clean.length > 5) {
-            return 'RF-' + clean.slice(0, 5);
+            return ('RF-' + clean.slice(0, 5)).toUpperCase();
         }
-        return 'RF-' + clean;
+        return ('RF-' + clean).toUpperCase();
+    }
+
+    function limpiarDireccion(dir) {
+        if (!dir) return 'Domicilio';
+        let str = String(dir).trim();
+        // Evitar duplicar barrio/localidad consecutivos separados por coma (ej: "Monterrey, Monterrey" -> "Monterrey")
+        str = str.replace(/([^,]+)(,\s*\1)+/gi, '$1');
+        return str;
+    }
+
+    function capitalizarNombre(str) {
+        if (!str) return '';
+        return String(str).toLowerCase().replace(/(?:^|\s)\S/g, function(a) { return a.toUpperCase(); });
+    }
+
+    // Sistema de alerta sonora (Chime Web Audio API)
+    let sonidoHabilitado = localStorage.getItem('cf_rf_sound_enabled') !== '0';
+    let prevPendientesCount = -1;
+    let prevUnreadChatTotal = -1;
+
+    function reproducirAlertaSonora() {
+        if (!sonidoHabilitado) return;
+        try {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContext) return;
+            const ctx = new AudioContext();
+            if (ctx.state === 'suspended') {
+                ctx.resume();
+            }
+            const now = ctx.currentTime;
+            
+            // Tono 1 (Ding)
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(587.33, now); // D5
+            osc1.frequency.exponentialRampToValueAtTime(880, now + 0.12); // A5
+            gain1.gain.setValueAtTime(0.28, now);
+            gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.start(now);
+            osc1.stop(now + 0.35);
+
+            // Tono 2 (Dong armónico)
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'triangle';
+            osc2.frequency.setValueAtTime(880, now + 0.14); // A5
+            osc2.frequency.exponentialRampToValueAtTime(1174.66, now + 0.28); // D6
+            gain2.gain.setValueAtTime(0.22, now + 0.14);
+            gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.start(now + 0.14);
+            osc2.stop(now + 0.65);
+        } catch (e) {
+            console.warn('[RepartoFacil] No se pudo reproducir alerta sonora:', e);
+        }
+    }
+
+    function toggleSonido() {
+        sonidoHabilitado = !sonidoHabilitado;
+        localStorage.setItem('cf_rf_sound_enabled', sonidoHabilitado ? '1' : '0');
+        actualizarBotonSonido();
+        if (sonidoHabilitado) {
+            reproducirAlertaSonora();
+            mostrarToast('🔔 Alerta sonora activada para nuevos pedidos y mensajes');
+        } else {
+            mostrarToast('🔕 Alerta sonora silenciada');
+        }
+    }
+
+    function actualizarBotonSonido() {
+        const btn = $('btnToggleSonidoReparto');
+        const icono = $('iconoSonidoReparto');
+        const lbl = $('lblSonidoReparto');
+        if (!btn) return;
+        if (sonidoHabilitado) {
+            if (icono) icono.textContent = '🔔';
+            if (lbl) lbl.textContent = 'ON';
+            btn.style.background = '#ffffff';
+            btn.style.borderColor = '#fde047';
+            btn.style.color = '#2D3277';
+            btn.title = 'Alerta sonora activada (clic para silenciar)';
+        } else {
+            if (icono) icono.textContent = '🔕';
+            if (lbl) lbl.textContent = 'MUTE';
+            btn.style.background = '#f1f5f9';
+            btn.style.borderColor = '#cbd5e1';
+            btn.style.color = '#94a3b8';
+            btn.title = 'Alerta sonora silenciada (clic para activar)';
+        }
     }
 
     function obtenerPruebaDeVida(driverLastPing) {
@@ -236,13 +329,62 @@
         }
     }
 
-    // Actualiza el badge en la barra superior
+    // Actualiza badges numéricos en vivo, título de pestaña y alerta sonora
     function actualizarBadge() {
         const badge = $('repartoFacilCountBadge');
-        if (!badge) return;
-        const activos = pedidosLista.filter(p => p.estado !== 'delivered' && p.estado !== 'cancelled' && p.estado !== 'rejected');
-        badge.textContent = activos.length;
-        badge.style.display = activos.length > 0 ? 'inline-block' : 'none';
+        const pwaBadge = $('pwaNavPedidosBadge');
+
+        const nuevosPendientes = pedidosLista.filter(p => {
+            const st = String(p.estado || '').toLowerCase();
+            return st === 'pending' || st === 'pending_store';
+        }).length;
+
+        const unreadChatsTotal = pedidosLista.reduce((acc, p) => acc + (Number(p.unread_chat_count) || 0), 0);
+        const totalPendientesAlerta = nuevosPendientes + unreadChatsTotal;
+
+        // Sonar alerta si entraron pedidos nuevos o llegaron mensajes sin leer
+        if (prevPendientesCount >= 0 && (nuevosPendientes > prevPendientesCount || unreadChatsTotal > prevUnreadChatTotal)) {
+            reproducirAlertaSonora();
+        }
+        prevPendientesCount = nuevosPendientes;
+        prevUnreadChatTotal = unreadChatsTotal;
+
+        // Badge en el encabezado de Pedidos Reparto Fácil
+        if (badge) {
+            if (totalPendientesAlerta > 0) {
+                let textoBadge = nuevosPendientes > 0 ? `${nuevosPendientes} NUEVO${nuevosPendientes === 1 ? '' : 'S'}` : '';
+                if (unreadChatsTotal > 0) {
+                    textoBadge += (textoBadge ? ' · ' : '') + `💬 ${unreadChatsTotal}`;
+                }
+                badge.textContent = textoBadge || String(totalPendientesAlerta);
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // Badge rojo en la barra de navegación inferior (ícono Pedidos)
+        if (pwaBadge) {
+            if (totalPendientesAlerta > 0) {
+                pwaBadge.textContent = totalPendientesAlerta > 99 ? '99+' : String(totalPendientesAlerta);
+                pwaBadge.style.display = 'inline-block';
+            } else {
+                pwaBadge.style.display = 'none';
+            }
+        }
+
+        // Título dinámico de la pestaña del navegador
+        if (nuevosPendientes > 0 && unreadChatsTotal > 0) {
+            document.title = `(${totalPendientesAlerta}) ${nuevosPendientes} pedidos / ${unreadChatsTotal} mensajes · Cobro Fácil`;
+        } else if (nuevosPendientes > 0) {
+            document.title = `(${nuevosPendientes}) Nuevo pedido · Cobro Fácil`;
+        } else if (unreadChatsTotal > 0) {
+            document.title = `(${unreadChatsTotal}) Mensaje nuevo · Cobro Fácil`;
+        } else {
+            document.title = 'Cobro Fácil';
+        }
+
+        actualizarBotonSonido();
     }
 
     // Renderizar tarjetas de clientes
@@ -541,13 +683,14 @@
 
             // Modalidad ya resuelta arriba
 
+            const textoCantItems = cantItems + (cantItems === 1 ? ' ítem' : ' ítems');
             const resumenLinea = esRechazado
-                ? `<span style="color:#b91c1c; font-weight:700;">${esCanceladoCliente ? 'Cancelado por el cliente' : (esRechazadoComercio ? 'Rechazado por el comercio' : 'Cancelado por tiempo de espera')} · ${cantItems} ítems</span>`
+                ? `<span style="color:#b91c1c; font-weight:700;">${esCanceladoCliente ? 'Cancelado por el cliente' : (esRechazadoComercio ? 'Rechazado por el comercio' : 'Cancelado por tiempo de espera')} · ${textoCantItems}</span>`
                 : (alertaStock
-                    ? `⚠️ Faltan ${itemsSinStock.length} productos · ${cantItems} ítems`
+                    ? `⚠️ Faltan ${itemsSinStock.length} productos · ${textoCantItems}`
                     : (repartidorAsignado
-                        ? `Chofer: ${escaparTextoChat(repartidorAsignado)} · ${cantItems} ítems`
-                        : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${cantItems} ítems` : `${cantItems} ítems · Pago Web`)));
+                        ? `Chofer: ${escaparTextoChat(repartidorAsignado)} · ${textoCantItems}`
+                        : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${textoCantItems}` : `${textoCantItems} · Pago Web`)));
 
             html += `
                 <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" style="background:${cardBg}; border-radius:18px; border:2px solid ${cardBorder}; box-shadow:0 3px 12px rgba(234,179,8,0.1), 0 1px 3px rgba(15,23,42,0.04); padding:12px 14px; position:relative; transition:all 0.18s ease;">
@@ -580,7 +723,7 @@
                                 <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                     ${esRetiroEnTienda 
                                         ? `🏪 Retira en: ${escaparTextoChat(p.sucursal_origen || 'Local Maciel')}` 
-                                        : `📍 ${escaparTextoChat(p.direccion_entrega || 'Entrega a domicilio')} · <span style="color:#2563eb; font-weight:700;">Despacha: ${escaparTextoChat(p.sucursal_origen || (p.sucursal_id ? ('Sucursal ' + p.sucursal_id) : 'Alfaro 1964'))}</span>`}
+                                        : `📍 ${escaparTextoChat(limpiarDireccion(p.direccion_entrega || 'Entrega a domicilio'))} · <span style="color:#2563eb; font-weight:700;">Despacha: ${escaparTextoChat(p.sucursal_origen || (p.sucursal_id ? ('Sucursal ' + p.sucursal_id) : 'Alfaro 1964'))}</span>`}
                                 </div>
                                 <div style="font-size:14px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
                                     ${formatMoney(p.total)}
@@ -651,11 +794,11 @@
                                 <span>🏪 VENTA CON RETIRO EN TIENDA / LOCAL · El comprador retira directamente en el mostrador</span>
                             </div>
                             ` : `
-                            <div style="display:flex; align-items:center; justify-content:space-between; background:#fffef5; border:1px solid #fde047; border-radius:9px; padding:5px 9px; margin-bottom:7px; font-size:11px;">
-                                <span style="color:#2D3277; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:230px;" title="${escaparTextoChat(p.direccion_entrega || '')}">
-                                    🛵 Domicilio: ${escaparTextoChat(p.direccion_entrega || 'Domicilio')}
-                                </span>
-                                <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer" style="color:#2D3277; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:2px; flex-shrink:0; background:#FFE600; padding:2px 8px; border-radius:6px; border:1px solid #eab308;">
+                            <div style="display:flex; align-items:flex-start; justify-content:space-between; background:#fffef5; border:1px solid #fde047; border-radius:9px; padding:6px 9px; margin-bottom:7px; font-size:11.5px; gap:8px;">
+                                <div style="color:#2D3277; font-weight:700; line-height:1.35; word-break:break-word; flex:1;" title="${escaparTextoChat(p.direccion_entrega || '')}">
+                                    🛵 <b>Domicilio:</b> ${escaparTextoChat(limpiarDireccion(p.direccion_entrega || 'Domicilio'))}
+                                </div>
+                                <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer" style="color:#2D3277; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:2px; flex-shrink:0; background:#FFE600; padding:3px 9px; border-radius:7px; border:1px solid #eab308; box-shadow:0 1px 3px rgba(234,179,8,0.2);">
                                     <span>GPS</span> ↗
                                 </a>
                             </div>
@@ -669,7 +812,7 @@
                                 <div style="background:#fee2e2; color:#b91c1c; padding:6px 8px; border-radius:7px; font-size:11px; font-weight:700; margin-bottom:6px; border:1px solid #fca5a5;">
                                     ⚠️ Faltan productos en stock para este ticket:
                                     ${itemsSinStock.map(i => `
-                                        <div style="margin-top:2px; font-weight:600;">• ${escaparTextoChat(i.producto_nombre || i.name || i.nombre)}: stock ${escaparTextoChat(i.stock_disponible)} de ${escaparTextoChat(i.stock_requerido)}</div>
+                                        <div style="margin-top:2px; font-weight:600;">• ${escaparTextoChat(capitalizarNombre(i.producto_nombre || i.name || i.nombre))}: stock ${escaparTextoChat(i.stock_disponible)} de ${escaparTextoChat(i.stock_requerido)}</div>
                                     `).join('')}
                                 </div>
                             ` : ''}
@@ -685,11 +828,12 @@
                                     const cant = Number(item.quantity || item.cantidad || 1);
                                     const precio = Number(item.price || item.precio || 0);
                                     const subtotal = precio * cant;
+                                    const unidadTexto = item.unit || item.unidad || 'KG';
                                     return `
                                     <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; border-bottom:1px solid #fef9c3;">
                                         <div style="min-width:0; flex:1; padding-right:8px;">
                                             <div style="font-weight:700; ${styleSinStock} overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                                                • ${cant} ${escaparTextoChat(item.unit || item.unidad || 'KG')} de ${escaparTextoChat(item.name || item.nombre || 'Artículo')}
+                                                • ${cant} ${escaparTextoChat(unidadTexto)} de ${escaparTextoChat(capitalizarNombre(item.name || item.nombre || 'Artículo'))}
                                                 ${itemSinStock ? `<span style="color:#b91c1c; font-size:10px; margin-left:4px;">(falta stock)</span>` : ''}
                                             </div>
                                         </div>
@@ -712,11 +856,101 @@
                                 </div>
                             ` : ''}
 
-                            <!-- Pie del Ticket: Total y Método de Pago -->
-                            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:8px; border-top:1px dashed #fde047; font-size:12.5px;">
-                                <span style="font-weight:800; color:#64748b;">TOTAL TICKET:</span>
-                                <span style="font-weight:900; color:#2D3277; font-family:monospace; font-size:14.5px;">${formatMoney(p.total)}</span>
-                            </div>
+                            <!-- DESGLOSE COMPLETO DE IMPORTES (SUBTOTAL, ENVÍO, DESCUENTOS Y TOTAL) -->
+                            ${(() => {
+                                const subtotalCalculado = itemsArray.reduce((acc, it) => acc + (Number(it.price || it.precio || 0) * Number(it.quantity || it.cantidad || 1)), 0);
+                                const subtotalProd = Number(p.subtotal) > 0 ? Number(p.subtotal) : (subtotalCalculado || (Number(p.total || 0) - Number(p.costo_envio || 0)));
+                                const costoEnvioVal = Number(p.costo_envio || 0);
+                                const totalVal = Number(p.total || 0);
+                                const descuentoVal = Math.max(0, Math.round(((subtotalProd + costoEnvioVal) - totalVal) * 100) / 100);
+
+                                const metodoLower = String(p.metodo_pago || 'cash').toLowerCase();
+                                const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash');
+                                const esTransfer = metodoLower.includes('transfer');
+                                const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
+                                const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
+
+                                let iconoP = '💵';
+                                let tituloP = 'Efectivo contra entrega';
+                                let subtextoP = 'Cobrar en mano al entregar el pedido';
+                                let badgeTextoP = 'COBRAR EN EFECTIVO';
+                                let badgeBgP = '#fef3c7';
+                                let badgeColorP = '#92400e';
+                                let badgeBorderP = '#fde68a';
+                                let boxBgP = '#fffef5';
+                                let boxBorderP = '#fde047';
+
+                                if (esTransfer) {
+                                    iconoP = '🏦';
+                                    tituloP = 'Transferencia Bancaria';
+                                    subtextoP = 'Verificar comprobante bancario antes de despachar';
+                                    badgeTextoP = 'VERIFICAR PAGO';
+                                    badgeBgP = '#eff6ff';
+                                    badgeColorP = '#1e40af';
+                                    badgeBorderP = '#bfdbfe';
+                                    boxBgP = '#eff6ff';
+                                    boxBorderP = '#bfdbfe';
+                                } else if (esTarj) {
+                                    iconoP = '💳';
+                                    tituloP = 'Tarjeta Débito / Crédito';
+                                    subtextoP = 'Cobro procesado con tarjeta / Posnet móvil';
+                                    badgeTextoP = 'PAGO CON TARJETA';
+                                    badgeBgP = '#f0fdf4';
+                                    badgeColorP = '#166534';
+                                    badgeBorderP = '#bbf7d0';
+                                    boxBgP = '#f0fdf4';
+                                    boxBorderP = '#86efac';
+                                } else if (esMP) {
+                                    iconoP = '📱';
+                                    tituloP = 'Pago Online (Mercado Pago / Web)';
+                                    subtextoP = 'Acreditado y confirmado vía web';
+                                    badgeTextoP = 'PAGADO ONLINE';
+                                    badgeBgP = '#ecfdf5';
+                                    badgeColorP = '#065f46';
+                                    badgeBorderP = '#a7f3d0';
+                                    boxBgP = '#ecfdf5';
+                                    boxBorderP = '#6ee7b7';
+                                }
+
+                                return `
+                                <div style="display:flex; flex-direction:column; gap:4px; padding-top:8px; border-top:1px dashed #fde047; font-size:12px;">
+                                    <div style="display:flex; justify-content:space-between; align-items:center; color:#64748b;">
+                                        <span>Subtotal productos (${cantItems} ${cantItems === 1 ? 'ítem' : 'ítems'}):</span>
+                                        <span style="font-family:monospace; font-weight:700; color:#2D3277;">${formatMoney(subtotalProd)}</span>
+                                    </div>
+                                    <div style="display:flex; justify-content:space-between; align-items:center; color:#64748b;">
+                                        <span>Costo de envío / delivery:</span>
+                                        <span style="font-family:monospace; font-weight:700; color:${costoEnvioVal > 0 ? '#2563eb' : '#059669'};">
+                                            ${costoEnvioVal > 0 ? formatMoney(costoEnvioVal) : (esRetiroEnTienda ? 'Retiro en Tienda' : 'Envío Gratis')}
+                                        </span>
+                                    </div>
+                                    ${descuentoVal > 0 ? `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; color:#059669;">
+                                        <span>Descuento aplicado:</span>
+                                        <span style="font-family:monospace; font-weight:800;">-${formatMoney(descuentoVal)}</span>
+                                    </div>
+                                    ` : ''}
+                                    <div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; margin-top:2px; border-top:1px solid #fef08a; font-size:13.5px;">
+                                        <span style="font-weight:900; color:#2D3277;">TOTAL TICKET:</span>
+                                        <span style="font-weight:900; color:#2D3277; font-family:monospace; font-size:15px;">${formatMoney(totalVal)}</span>
+                                    </div>
+                                </div>
+
+                                <!-- MÉTODO DE PAGO DESTACADO Y CONDICIÓN DE COBRO -->
+                                <div style="background:${boxBgP}; border:1.5px solid ${boxBorderP}; border-radius:10px; padding:8px 10px; margin-top:8px; font-size:11.5px; display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                                    <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                                        <span style="font-size:16px;">${iconoP}</span>
+                                        <div style="min-width:0;">
+                                            <div style="font-weight:900; color:#2D3277;">${tituloP}</div>
+                                            <div style="font-size:10px; color:#64748b; font-weight:700;">${subtextoP}</div>
+                                        </div>
+                                    </div>
+                                    <span style="background:${badgeBgP}; color:${badgeColorP}; border:1px solid ${badgeBorderP}; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:6px; white-space:nowrap; flex-shrink:0;">
+                                        ${badgeTextoP}
+                                    </span>
+                                </div>
+                                `;
+                            })()}
                         </div>
 
                         ${esNuevoPendiente ? `
@@ -753,9 +987,10 @@
                                 <span>Ocultar</span>
                             </button>
 
-                            <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" style="flex:1; min-width:0; background:#fefce8; color:#2D3277; border:1.5px solid #fde047; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap; transition:all 0.15s ease;">
+                            <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" style="flex:1; min-width:0; background:${p.unread_chat_count > 0 ? '#fee2e2' : '#fefce8'}; color:${p.unread_chat_count > 0 ? '#b91c1c' : '#2D3277'}; border:1.5px solid ${p.unread_chat_count > 0 ? '#ef4444' : '#fde047'}; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap; transition:all 0.15s ease;">
                                 <span>💬</span>
                                 <span>Chat</span>
+                                ${p.unread_chat_count > 0 ? `<span style="background:#ef4444; color:#ffffff; font-size:9.5px; font-weight:900; padding:1px 6px; border-radius:999px; margin-left:3px; box-shadow:0 1px 3px rgba(239,68,68,0.4);">${p.unread_chat_count}</span>` : ''}
                             </button>
 
                             <button type="button" class="btn btn-embalar-pedido" onclick="${accionBotonEmbalar}" ${(!accionBotonEmbalar || esRechazado) ? 'disabled' : ''} style="flex:1.4; min-width:0; background:${bgBotonEmbalar}; color:${colorBotonEmbalar}; border:${borderBotonEmbalar}; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:${accionBotonEmbalar ? 'pointer' : 'default'}; box-shadow:${accionBotonEmbalar ? '0 2px 8px rgba(234,179,8,0.25)' : 'none'}; white-space:nowrap; transition:all 0.15s ease;">
@@ -1194,8 +1429,15 @@
 
         const shortCode = formatearIdCorto(orderId);
         $('rfChatTitle').textContent = `Chat · ${clienteNombre}`;
-        $('rfChatSub').textContent = `📍 ${order && order.direccion_entrega ? order.direccion_entrega : 'Entrega a domicilio'} · #${shortCode}`;
+        $('rfChatSub').textContent = `📍 ${order && order.direccion_entrega ? limpiarDireccion(order.direccion_entrega) : 'Entrega a domicilio'} · #${shortCode}`;
         
+        // Descontar automáticamente mensajes no leídos al abrir el chat
+        if (order && order.unread_chat_count) {
+            order.unread_chat_count = 0;
+            actualizarBadge();
+            renderizarCards();
+        }
+
         const ticketBtn = $('rfChatTicketBtn');
         if (order && order.ticket_id) {
             ticketBtn.style.display = 'inline-block';
@@ -1431,29 +1673,35 @@
                     </div>
 
                     <!-- Fila Inferior: Métricas Consolidadas del Día (Físico + E-Commerce) -->
-                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; text-align:center;">
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 6px;">
-                            <span style="font-size:9.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase;">🏪 Mostrador Físico</span>
-                            <b style="font-size:13px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:6px; text-align:center;">
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 4px;">
+                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🏪 Mostrador</span>
+                            <b style="font-size:12.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
                                 ${formatMoneyNum(data.ventas_mostrador_hoy)}
                             </b>
-                            <small style="font-size:9.5px; color:#854d0e; font-weight:700;">${data.cant_ventas_mostrador_hoy} venta${data.cant_ventas_mostrador_hoy === 1 ? '' : 's'}</small>
+                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;">${data.cant_ventas_mostrador_hoy || 0} venta${data.cant_ventas_mostrador_hoy === 1 ? '' : 's'}</small>
                         </div>
 
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 6px;">
-                            <span style="font-size:9.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase;">🌐 E-Commerce Web</span>
-                            <b style="font-size:13px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
-                                ${formatMoneyNum(data.ventas_web_hoy)}
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:8px 4px;">
+                            <span style="font-size:9px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🌐 E-Commerce</span>
+                            <b style="font-size:12.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                                ${formatMoneyNum(data.monto_web_total || data.ventas_web_hoy)}
                             </b>
-                            <small style="font-size:9.5px; color:#854d0e; font-weight:700;">${data.cant_pedidos_web_hoy} pedido${data.cant_pedidos_web_hoy === 1 ? '' : 's'}</small>
+                            <small style="font-size:9px; color:#854d0e; font-weight:700; white-space:nowrap;" title="${data.cant_pendientes_hoy > 0 ? ('Pendiente de aceptar: ' + formatMoneyNum(data.monto_pendientes_hoy)) : ''}">
+                                ${data.cant_pendientes_hoy > 0 && !data.ventas_web_hoy
+                                    ? `Pendiente: ${formatMoneyNum(data.monto_pendientes_hoy)}`
+                                    : `${data.cant_pedidos_web_hoy || 0} pedido${data.cant_pedidos_web_hoy === 1 ? '' : 's'}`}
+                            </small>
                         </div>
 
-                        <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:14px; padding:8px 6px; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
-                            <span style="font-size:9.5px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase;">📈 Total Omnicanal</span>
-                            <b style="font-size:13.5px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
+                        <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:14px; padding:8px 4px; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
+                            <span style="font-size:9px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📈 Omnicanal</span>
+                            <b style="font-size:13px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px;">
                                 ${formatMoneyNum(data.total_omnicanal_hoy)}
                             </b>
-                            <small style="font-size:9.5px; color:#2D3277; font-weight:900;">${data.pedidos_activos_web} activo${data.pedidos_activos_web === 1 ? '' : 's'}</small>
+                            <small style="font-size:9px; color:#2D3277; font-weight:900; white-space:nowrap;">
+                                ${(data.cant_ventas_mostrador_hoy || 0) + (data.pedidos_activos_web || 0)} activos
+                            </small>
                         </div>
                     </div>
                 </div>
@@ -1488,6 +1736,7 @@
         cargarPedidos,
         cargarMetricasOmnicanal,
         sincronizarStockTpv,
+        toggleSonido,
         toggleDetalle,
         aceptarPedido,
         rechazarPedido,

@@ -364,43 +364,54 @@ def get_repartofacil_pedidos():
         return error
     try:
         with get_db(empresa_id=0) as conn:
+            usuario_comercio = f"store-{empresa_actual}"
             sql = """
                 SELECT
-                    id,
-                    ticket_id,
-                    cliente_id,
-                    cliente_usuario_id,
-                    cliente_nombre,
-                    cliente_telefono,
-                    direccion_entrega,
-                    tipo_entrega,
-                    metodo_pago,
-                    estado,
-                    empresa_id,
-                    empresa_slug,
-                    repartidor_id,
-                    repartidor_nombre,
-                    repartidor_usuario_id,
-                    items,
-                    subtotal,
-                    costo_envio,
-                    total,
-                    ganancia_repartidor,
-                    minutos_estimados,
-                    distancia_km,
-                    notas,
-                    sucursal_origen,
-                    custodio_estado,
-                    custodio_advertencia_at,
-                    driver_last_ping,
-                    created_at,
-                    updated_at
-                FROM public.repartofacil_pedidos
-                WHERE empresa_id = %s
-                ORDER BY created_at DESC
+                    p.id,
+                    p.ticket_id,
+                    p.cliente_id,
+                    p.cliente_usuario_id,
+                    p.cliente_nombre,
+                    p.cliente_telefono,
+                    p.direccion_entrega,
+                    p.tipo_entrega,
+                    p.metodo_pago,
+                    p.estado,
+                    p.empresa_id,
+                    p.empresa_slug,
+                    p.repartidor_id,
+                    p.repartidor_nombre,
+                    p.repartidor_usuario_id,
+                    p.items,
+                    COALESCE(p.subtotal, 0) AS subtotal,
+                    COALESCE(p.costo_envio, 0) AS costo_envio,
+                    COALESCE(p.total, 0) AS total,
+                    p.ganancia_repartidor,
+                    p.minutos_estimados,
+                    p.distancia_km,
+                    p.notas,
+                    p.sucursal_origen,
+                    p.custodio_estado,
+                    p.custodio_advertencia_at,
+                    p.driver_last_ping,
+                    p.created_at,
+                    p.updated_at,
+                    COALESCE((
+                        SELECT COUNT(*)
+                        FROM public.repartofacil_chat_mensajes m
+                        WHERE m.order_id = p.id
+                          AND LOWER(COALESCE(m.author_role, '')) <> 'store'
+                          AND NOT EXISTS (
+                              SELECT 1 FROM public.repartofacil_chat_lecturas l
+                              WHERE l.mensaje_id = m.id AND l.usuario_id = %s
+                          )
+                    ), 0) AS unread_chat_count
+                FROM public.repartofacil_pedidos p
+                WHERE p.empresa_id = %s
+                ORDER BY p.created_at DESC
                 LIMIT 50
             """
-            rows = conn.execute(sql, (empresa_actual,)).fetchall()
+            rows = conn.execute(sql, (usuario_comercio, empresa_actual)).fetchall()
             pedidos = []
             for r in rows:
                 d = dict(r)
@@ -409,10 +420,38 @@ def get_repartofacil_pedidos():
                         d["items"] = json.loads(d["items"])
                     except Exception:
                         d["items"] = []
-                # Pago siempre legible como Web o el método especificado
-                pago_metodo = str(d.get("metodo_pago") or "Web").strip()
-                if pago_metodo.lower() in ("web", "tarjeta", "card", "online", "repartofacil"):
-                    d["metodo_pago"] = "Web"
+
+                # Convert numeric/Decimal fields to float for clean JSON serialization
+                for k in ("subtotal", "costo_envio", "total", "ganancia_repartidor", "distancia_km"):
+                    if d.get(k) is not None:
+                        try:
+                            d[k] = float(d[k])
+                        except Exception:
+                            pass
+                d["unread_chat_count"] = int(d.get("unread_chat_count") or 0)
+
+                # Método de pago normalizado y descriptivo
+                pago_raw = str(d.get("metodo_pago") or "cash").strip().lower()
+                if pago_raw in ("cash", "efectivo"):
+                    d["metodo_pago"] = "Efectivo"
+                    d["metodo_pago_tipo"] = "cash"
+                    d["pago_contra_entrega"] = True
+                elif pago_raw in ("transfer", "transferencia"):
+                    d["metodo_pago"] = "Transferencia"
+                    d["metodo_pago_tipo"] = "transfer"
+                    d["pago_contra_entrega"] = False
+                elif pago_raw in ("card", "tarjeta"):
+                    d["metodo_pago"] = "Tarjeta"
+                    d["metodo_pago_tipo"] = "card"
+                    d["pago_contra_entrega"] = False
+                elif pago_raw in ("qr", "mercadopago", "mp"):
+                    d["metodo_pago"] = "Mercado Pago"
+                    d["metodo_pago_tipo"] = "qr"
+                    d["pago_contra_entrega"] = False
+                else:
+                    d["metodo_pago"] = "Pago Web"
+                    d["metodo_pago_tipo"] = "web"
+                    d["pago_contra_entrega"] = False
 
                 # Validar stock para este pedido
                 validacion = _validar_stock_pedido(d.get("items"), empresa_actual)
@@ -667,6 +706,19 @@ def get_repartofacil_metricas_omnicanal():
             total_mostrador = float(vm_row["total"] or 0.0) if vm_row else 0.0
             cant_mostrador = int(vm_row["cant"] or 0) if vm_row else 0
 
+            # Si en ventas_mostrador no hay filas, consultar las ventas del TPV físico sincronizadas en pos_base
+            if total_mostrador == 0 or cant_mostrador == 0:
+                try:
+                    from app.services.pos_base import filas_de
+                    from app.services.pos_jefe import _indice, _valor, _numero
+                    cols, rows = filas_de("ventas", sucursal_id=None, desde=fecha_hoy, hasta=fecha_hoy, empresa_id=empresa_id)
+                    if rows:
+                        idx = _indice(cols)
+                        total_mostrador = round(sum(_numero(_valor(r, idx, "total", "monto", "importe")) for r in rows), 2)
+                        cant_mostrador = len(rows)
+                except Exception:
+                    pass
+
             # 2. Ventas web Reparto Fácil hoy
             rf_rows = conn.execute(
                 """
@@ -682,6 +734,8 @@ def get_repartofacil_metricas_omnicanal():
             pedidos_web_hoy = 0
             pedidos_activos_web = 0
             pedidos_entregados_hoy = 0
+            monto_pendientes_hoy = 0.0
+            cant_pendientes_hoy = 0
 
             for r in rf_rows:
                 est = str(r["estado"] or "").strip().lower()
@@ -691,10 +745,15 @@ def get_repartofacil_metricas_omnicanal():
 
                 if est in ("confirmed", "assigned", "ready", "embalado", "picked up", "in transit", "delivered"):
                     ventas_web_hoy += tot
+                if est in ("pending", "pending_store"):
+                    monto_pendientes_hoy += tot
+                    cant_pendientes_hoy += c
                 if est in ("pending", "pending_store", "confirmed", "assigned", "ready", "embalado", "picked up", "in transit"):
                     pedidos_activos_web += c
                 if est == "delivered":
                     pedidos_entregados_hoy += c
+
+            monto_web_total = ventas_web_hoy + monto_pendientes_hoy
 
             # 3. Estado de sincronización de catálogo TPV en pos_base
             pos_info = conn.execute(
@@ -710,10 +769,13 @@ def get_repartofacil_metricas_omnicanal():
                 "ventas_mostrador_hoy": total_mostrador,
                 "cant_ventas_mostrador_hoy": cant_mostrador,
                 "ventas_web_hoy": ventas_web_hoy,
+                "monto_pendientes_hoy": monto_pendientes_hoy,
+                "cant_pendientes_hoy": cant_pendientes_hoy,
+                "monto_web_total": monto_web_total,
                 "cant_pedidos_web_hoy": pedidos_web_hoy,
                 "pedidos_activos_web": pedidos_activos_web,
                 "pedidos_entregados_hoy": pedidos_entregados_hoy,
-                "total_omnicanal_hoy": total_mostrador + ventas_web_hoy,
+                "total_omnicanal_hoy": round(total_mostrador + monto_web_total, 2),
                 "tpv_conectado": cant_tablas_pos > 0,
                 "ultima_sync_tpv": ult_sync or "Automática en tiempo real"
             })
