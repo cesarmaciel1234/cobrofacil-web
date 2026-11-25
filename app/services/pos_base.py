@@ -721,6 +721,10 @@ def _guardar_delta(tabla: str, columnas: list, limpias: list, sid: int | None, s
             tocadas += 1
         for baja in bajas:
             clave = str(baja)
+            # Inquebrantabilidad de datos financieros:
+            # Nunca borrar ventas, detalles de venta, cobros de cuenta corriente ni movimientos de caja por bajas del cliente
+            if tabla in ("cuenta_corriente", "movimientos_caja", "ventas", "detalles_ventas", "detalle_ventas", "ventas_items"):
+                continue
             if clave in por_id:
                 del por_id[clave]
                 orden = [item for item in orden if item != clave]
