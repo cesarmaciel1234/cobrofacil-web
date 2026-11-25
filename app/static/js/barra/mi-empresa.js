@@ -630,21 +630,23 @@
                         : '✓ No hay PCs esperando asignación. Cualquier equipo nuevo que inicie enviará su saludo y aparecerá aquí automáticamente.'}
                 </p>
                 ${pendientes.length > 0 ? `
-                <div style="display:flex; flex-direction:column; gap:6px;">
+                <div style="display:flex; flex-direction:column; gap:8px;">
                     ${pendientes.map(pt => `
-                        <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #fef08a; border-radius:8px; padding:8px 12px; font-size:11px;">
-                            <div style="display:flex; flex-direction:column; gap:2px;">
-                                <div style="display:flex; align-items:center; gap:6px;">
-                                    <span style="font-size:14px;">🖥️</span>
-                                    <strong style="color:#1e293b;">${textoSeguro(pt.nombre || 'PC Nueva')}</strong>
-                                    <span style="background:#fef9c3; color:#a16207; font-size:9px; font-weight:800; padding:1px 6px; border-radius:4px;">PENDIENTE</span>
+                        <div style="display:flex; flex-direction:column; gap:8px; background:#ffffff; border:1px solid #fef08a; border-radius:10px; padding:10px 12px; font-size:11px;">
+                            <div style="display:flex; flex-direction:column; gap:4px;">
+                                <div style="display:flex; align-items:center; justify-content:space-between;">
+                                    <div style="display:flex; align-items:center; gap:6px;">
+                                        <span style="font-size:14px;">🖥️</span>
+                                        <strong style="color:#1e293b; font-size:12px;">${textoSeguro(pt.nombre || 'PC Nueva')}</strong>
+                                    </div>
+                                    <span style="background:#fef9c3; color:#a16207; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">PENDIENTE</span>
                                 </div>
-                                <small style="color:#64748b; font-size:10px;">
-                                    ID: <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px;">${textoSeguro(pt.identificador_pc)}</code>
-                                    ${pt.ultimo_sync ? ` · Último saludo: ${pt.ultimo_sync.replace('T', ' ').substring(0, 16)}` : ''}
-                                </small>
+                                <div style="display:flex; flex-direction:column; gap:2px; color:#64748b; font-size:10px;">
+                                    <span>ID: <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px; word-break:break-all;">${textoSeguro(pt.identificador_pc)}</code></span>
+                                    ${pt.ultimo_sync ? `<span>Último saludo: ${textoSeguro(pt.ultimo_sync.replace('GMT', '').trim())}</span>` : ''}
+                                </div>
                             </div>
-                            <button type="button" class="btn-asignar-terminal" data-tid="${pt.id}" style="background:#FFE600; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:800; color:#2D3277; cursor:pointer; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                            <button type="button" class="btn-asignar-terminal" data-tid="${pt.id}" style="width:100%; background:#FFE600; border:none; border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; color:#2D3277; cursor:pointer; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
                                 + Asignar a Sucursal
                             </button>
                         </div>
