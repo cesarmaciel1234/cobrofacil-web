@@ -975,4 +975,331 @@ def api_pos_neural_query():
     })
 
 
+# ==============================================================================
+# PROTOCOLO SALUDO AUTOMÁTICO -> ASIGNACIÓN DESDE LA WEB -> SUBIDA INCREMENTAL
+# ==============================================================================
+
+def _tabla_pos(nombre: str) -> str:
+    from app.database import is_postgres
+    return f"public.{nombre}" if is_postgres() else nombre
+
+
+def _resolver_empresa_id(data: dict) -> int:
+    emp_raw = session.get("empresa_id") or request.headers.get("X-Empresa-ID") or data.get("empresa_id")
+    if str(emp_raw or "").isdigit():
+        return int(emp_raw)
+    empresa_usuario = str(data.get("empresa_usuario") or "").strip()
+    if empresa_usuario:
+        from app.database import get_db
+        with get_db(0) as conn:
+            row = conn.execute(
+                f"SELECT empresa_id FROM {_tabla_pos('usuarios')} WHERE username ILIKE ? LIMIT 1",
+                (empresa_usuario,)
+            ).fetchone()
+            if row and row["empresa_id"]:
+                return int(row["empresa_id"])
+    return 1
+
+
+@api_bp.route("/pos/terminal/saludo", methods=["POST"])
+@api_bp.route("/pos/terminal/heartbeat", methods=["POST"])
+def api_pos_terminal_saludo():
+    """
+    Saludo automático y liviano (Heartbeat) de la terminal TPV hacia Cobro Fácil.
+    Paso 1 del nuevo protocolo:
+    - Se envía machine_id, nombre_pc, version_pos, empresa_usuario.
+    - Si la terminal está habilitada en la nube, devuelve sucursal_id, nombre_sucursal y caja_nombre.
+    - Si está pendiente de asignar o bloqueada, devuelve habilitada: false.
+    """
+    from app.database import get_db
+    data = request.get_json(silent=True) or {}
+    machine_id = str(data.get("machine_id") or "").strip()
+    nombre_pc = str(data.get("nombre_pc") or "").strip()
+    version_pos = str(data.get("version_pos") or "5.0").strip()
+    
+    if not machine_id:
+        return jsonify({"error": "Falta machine_id"}), 400
+        
+    emp_id = _resolver_empresa_id(data)
+    
+    with get_db(emp_id) as conn:
+        term = conn.execute(
+            f"""SELECT id, sucursal_id, empresa_id, nombre, identificador_pc, activo
+               FROM {_tabla_pos('terminales')}
+               WHERE empresa_id = ? AND (identificador_pc = ? OR identificador_pc = ?)
+               LIMIT 1""",
+            (emp_id, machine_id, nombre_pc)
+        ).fetchone()
+        
+        if term:
+            if term["activo"] == -1:
+                return jsonify({"error": "Terminal revocada por el administrador", "habilitada": False}), 403
+                
+            conn.execute(
+                f"""UPDATE {_tabla_pos('terminales')}
+                   SET identificador_pc = ?, descripcion = ?, ultimo_sync = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
+                   WHERE id = ?""",
+                (machine_id, f"PC: {nombre_pc} | v{version_pos}", term["id"])
+            )
+            if hasattr(conn, "commit"):
+                conn.commit()
+                
+            sid = term["sucursal_id"]
+            if term["activo"] == 1 and sid:
+                suc = conn.execute(
+                    f"SELECT id, nombre FROM {_tabla_pos('sucursales')} WHERE id = ? AND empresa_id = ?",
+                    (sid, emp_id)
+                ).fetchone()
+                nombre_suc = suc["nombre"] if suc else f"Sucursal {sid}"
+                return jsonify({
+                    "habilitada": True,
+                    "sucursal_id": sid,
+                    "nombre_sucursal": nombre_suc,
+                    "caja_nombre": term["nombre"],
+                    "machine_id": machine_id
+                })
+            else:
+                return jsonify({
+                    "habilitada": False,
+                    "mensaje": "Terminal registrada pero pendiente de asignación en Cobro Fácil",
+                    "machine_id": machine_id
+                })
+        else:
+            sucs = conn.execute(
+                f"SELECT id, nombre FROM {_tabla_pos('sucursales')} WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC",
+                (emp_id,)
+            ).fetchall()
+            
+            sid_defecto = None
+            for s in sucs:
+                if "alfaro" in s["nombre"].lower():
+                    sid_defecto = s["id"]
+                    break
+            if not sid_defecto and sucs:
+                sid_defecto = sucs[0]["id"]
+                
+            caja_nombre = f"Caja {nombre_pc}" if nombre_pc else "Caja Nueva"
+            cur = conn.execute(
+                f"""INSERT INTO {_tabla_pos('terminales')}
+                   (sucursal_id, empresa_id, nombre, identificador_pc, descripcion, activo, ultimo_sync)
+                   VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+                   RETURNING id""",
+                (sid_defecto or 1, emp_id, caja_nombre, machine_id, f"PC: {nombre_pc} | v{version_pos}")
+            )
+            if hasattr(conn, "commit"):
+                conn.commit()
+                
+            suc_target = next((s for s in sucs if s["id"] == (sid_defecto or 1)), None)
+            return jsonify({
+                "habilitada": True,
+                "sucursal_id": sid_defecto or 1,
+                "nombre_sucursal": suc_target["nombre"] if suc_target else "Casa Central",
+                "caja_nombre": caja_nombre,
+                "machine_id": machine_id
+            })
+
+
+@api_bp.route("/pos/tickets/incremental", methods=["POST"])
+def api_pos_tickets_incremental():
+    """
+    Subida incremental de Tickets y detección de faltantes.
+    Paso 2 del nuevo protocolo:
+    - Sube únicamente tickets nuevos o modificados desde el último envío.
+    - Soporta tickets cancelados/anulados (sin borrarlos físicamente).
+    - Detecta huecos o números faltantes en la secuencia para pedirlos al TPV.
+    """
+    data = request.get_json(silent=True) or {}
+    machine_id = str(data.get("machine_id") or "").strip()
+    tickets = data.get("tickets") or []
+    resumen_diario = data.get("resumen_diario") or []
+    no_encontrados = set(data.get("no_encontrados") or [])
+    
+    if not machine_id:
+        return jsonify({"error": "Falta machine_id"}), 400
+        
+    emp_id = _resolver_empresa_id(data)
+    
+    from app.database import get_db
+    with get_db(emp_id) as conn:
+        term = conn.execute(
+            f"""SELECT id, sucursal_id, activo
+               FROM {_tabla_pos('terminales')}
+               WHERE empresa_id = ? AND identificador_pc = ?
+               LIMIT 1""",
+            (emp_id, machine_id)
+        ).fetchone()
+        
+        if not term:
+            return jsonify({"error": "Terminal no registrada. Ejecutar saludo primero.", "habilitada": False}), 401
+        if term["activo"] == -1:
+            return jsonify({"error": "Terminal revocada por el administrador", "habilitada": False}), 403
+        if term["activo"] != 1 or not term["sucursal_id"]:
+            return jsonify({"error": "Terminal pendiente de asignación", "habilitada": False}), 403
+            
+        sid = term["sucursal_id"]
+        
+        conn.execute(
+            f"UPDATE {_tabla_pos('terminales')} SET ultimo_sync = CURRENT_TIMESTAMP WHERE id = ?",
+            (term["id"],)
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
+
+    from app.services.pos_base import guardar_parte
+    
+    filas_ventas = []
+    filas_detalles = []
+    cols_ventas = [
+        "id", "fecha", "total", "pago_con", "cambio", "pago_efectivo", "pago_otro",
+        "usuario", "estado", "metodo_pago", "caja_id", "descuento", "recargo",
+        "request_id", "cliente_nombre", "cancelado_por", "fecha_cancel",
+        "perfil_cancel", "caja_cancel", "usuario_secundario"
+    ]
+    cols_detalles = [
+        "id", "id_venta", "id_producto", "nombre_producto", "cantidad", "precio_unitario", "subtotal"
+    ]
+    
+    numeros_recibidos = []
+    for t in tickets:
+        nro = t.get("nro_ticket")
+        if nro is not None:
+            try:
+                numeros_recibidos.append(int(nro))
+            except (ValueError, TypeError):
+                pass
+        uuid_t = str(t.get("ticket_uuid") or f"T-{machine_id[:8]}-{nro}")
+        estado_in = str(t.get("estado") or "ACTIVO").upper()
+        es_canc = estado_in in ("CANCELADO", "CANCELADA")
+        tot = 0.0 if es_canc else float(t.get("total") or 0.0)
+        metodo = str(t.get("metodo_pago") or "Efectivo")
+        fecha = str(t.get("fecha_hora") or "")
+        pef = tot if metodo.lower() == "efectivo" else 0.0
+        pot = 0.0 if metodo.lower() == "efectivo" else tot
+        
+        filas_ventas.append([
+            nro, fecha, tot, tot, 0.0, pef, pot,
+            "cajero", "CANCELADA" if es_canc else "COMPLETADA", metodo, 1,
+            0.0, 0.0, uuid_t, str(t.get("cliente_nombre") or ""),
+            "admin" if es_canc else None, fecha if es_canc else None,
+            None, None, ""
+        ])
+        
+        for idx_item, item in enumerate(t.get("items") or []):
+            item_id = item.get("id") or (int(nro) * 100 + idx_item if str(nro).isdigit() else idx_item)
+            cant = float(item.get("cantidad") or 1.0)
+            pu = float(item.get("precio") or item.get("precio_unitario") or 0.0)
+            sub = float(item.get("subtotal") or (cant * pu))
+            filas_detalles.append([
+                item_id, nro, str(item.get("id_producto") or item.get("id_unico") or ""),
+                str(item.get("nombre") or ""), cant, pu, sub
+            ])
+            
+    if filas_ventas:
+        guardar_parte("ventas", cols_ventas, filas_ventas, 1, 1, sid, modo="delta", empresa_id=emp_id)
+    if filas_detalles:
+        guardar_parte("detalles_ventas", cols_detalles, filas_detalles, 1, 1, sid, modo="delta", empresa_id=emp_id)
+        
+    faltantes = []
+    if numeros_recibidos:
+        min_n = min(numeros_recibidos)
+        max_n = max(numeros_recibidos)
+        recibidos_set = set(numeros_recibidos)
+        if 1 < (max_n - min_n) <= 300:
+            for num in range(min_n, max_n + 1):
+                if num not in recibidos_set and num not in no_encontrados:
+                    faltantes.append(num)
+                    
+    try:
+        from app.services.signal_bus import broadcast_refresh
+        broadcast_refresh()
+    except Exception:
+        pass
+        
+    return jsonify({
+        "ok": True,
+        "procesados": len(filas_ventas),
+        "sucursal_id": sid,
+        "tickets_faltantes": faltantes[:50]
+    })
+
+
+@api_bp.route("/pos/inventario/sync", methods=["POST"])
+def api_pos_inventario_sync():
+    """
+    Subida estructurada de Inventario de la PC TPV.
+    Paso 3 del nuevo protocolo:
+    - Incluye: machine_id, id_unico, codigo_barras, codigo_plu, nombre, departamento, precio, stock, updated_at.
+    - Consolida los artículos dentro de la sucursal asignada a la máquina.
+    """
+    data = request.get_json(silent=True) or {}
+    machine_id = str(data.get("machine_id") or "").strip()
+    articulos = data.get("articulos") or []
+    
+    if not machine_id:
+        return jsonify({"error": "Falta machine_id"}), 400
+        
+    emp_id = _resolver_empresa_id(data)
+    
+    from app.database import get_db
+    with get_db(emp_id) as conn:
+        term = conn.execute(
+            f"""SELECT id, sucursal_id, activo
+               FROM {_tabla_pos('terminales')}
+               WHERE empresa_id = ? AND identificador_pc = ?
+               LIMIT 1""",
+            (emp_id, machine_id)
+        ).fetchone()
+        
+        if not term or term["activo"] != 1 or not term["sucursal_id"]:
+            return jsonify({"error": "Terminal no autorizada", "habilitada": False}), 403
+            
+        sid = term["sucursal_id"]
+
+    from app.services.pos_base import guardar_parte
+
+    cols_productos = [
+        "id", "nombre", "precio", "stock", "categoria", "unidad", "costo",
+        "cant_mayoreo", "precio_mayoreo", "stock_minimo", "stock_maximo",
+        "codigo", "departamento", "es_pesable", "cant_oferta", "precio_oferta",
+        "tipo_unidad_oferta", "es_sos", "precio_oferta_relampago",
+        "precio_oferta_promedio", "limite_oferta_relampago", "ventas_oferta_relampago", "icono"
+    ]
+    
+    filas_productos = []
+    for art in articulos:
+        id_u = art.get("id_unico") or art.get("id")
+        cod = str(art.get("codigo_barras") or art.get("codigo_plu") or "").strip()
+        es_pes = 1 if art.get("codigo_plu") else (1 if str(art.get("unidad", "")).upper() == "KG" else 0)
+        dep = str(art.get("departamento") or "GENERAL").strip()
+        filas_productos.append([
+            id_u,
+            str(art.get("nombre") or ""),
+            float(art.get("precio") or 0.0),
+            float(art.get("stock") or 0.0),
+            dep.upper(),
+            "KG" if es_pes else "UN",
+            0.0, 0.0, 0.0, 0.0, 0.0,
+            cod if cod else None,
+            dep.lower(),
+            es_pes,
+            0.0, 0.0, "Unidades", 0, 0.0, 0.0, 0.0, 0.0, ""
+        ])
+        
+    if filas_productos:
+        guardar_parte("productos", cols_productos, filas_productos, 1, 1, sid, modo="delta", empresa_id=emp_id)
+        
+    try:
+        from app.services.signal_bus import broadcast_refresh
+        broadcast_refresh()
+    except Exception:
+        pass
+        
+    return jsonify({
+        "ok": True,
+        "articulos_procesados": len(filas_productos),
+        "sucursal_id": sid
+    })
+
+
+
 
