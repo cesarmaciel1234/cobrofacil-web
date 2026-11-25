@@ -52,11 +52,60 @@
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/enterprise.css?v=8.7">
+    <link rel="stylesheet" href="/static/enterprise.css?v=8.8">
     <link rel="stylesheet" href="/static/css/auditoria.css?v=8.7">
     <link rel="stylesheet" href="/static/vendor/leaflet.css?v=1.9.4">
     <link rel="stylesheet" href="/static/css/perfil-empresa.css?v=8.7">
     <style>
+        /* ==============================================================================
+           UNIFICACIÓN DE ANCHO ESTILO MÓVIL (MAX-WIDTH 640px / max-w-xl mx-auto)
+           En celular ocupa 100% de pantalla; en PC se mantiene angosto, centrado y compacto.
+           ============================================================================== */
+        .app-mobile-container,
+        .auditoria-mobile-container,
+        .content > .view,
+        #view-reporte,
+        #view-contabilidad,
+        #view-pedidos,
+        #view-cartera,
+        #view-ticket,
+        #view-mi-empresa,
+        #pedidosRepartoFacilWrap,
+        #pedidosHistorialWrap,
+        #pedidosFaltantesWrap,
+        #pedidosAuditoriaWrap,
+        #cargaLibro {
+            max-width: 640px !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            width: 100% !important;
+            box-sizing: border-box !important;
+        }
+
+        @media (min-width: 641px) {
+            .topbar {
+                max-width: 640px;
+                margin-left: auto;
+                margin-right: auto;
+                border-left: 1.5px solid #e2e8f0;
+                border-right: 1.5px solid #e2e8f0;
+                border-bottom-left-radius: 16px;
+                border-bottom-right-radius: 16px;
+                box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+            }
+            .bottom-pwa-bar {
+                max-width: 640px !important;
+                left: 50% !important;
+                right: auto !important;
+                transform: translateX(-50%) !important;
+                border-left: 1.5px solid #e2e8f0 !important;
+                border-right: 1.5px solid #e2e8f0 !important;
+                border-top-left-radius: 16px !important;
+                border-top-right-radius: 16px !important;
+                box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.08) !important;
+            }
+        }
+
         .topbar-central-pill {
             height: 40px !important;
             min-height: 40px !important;
@@ -253,7 +302,7 @@
                 </div>
                 <div class="carga-libro-riel" aria-hidden="true"><div id="cargaLibroBarra"></div></div>
             </div>
-            <div class="view" id="view-mi-empresa">
+            <div class="view app-mobile-container" id="view-mi-empresa">
                 <section class="perfil-empresa">
                     <p id="empresaPerfilEstado" role="status" aria-live="polite"></p>
                     <div id="empresaPerfilResumen" hidden>
@@ -429,7 +478,7 @@
                     </form>
                 </section>
             </div>
-            <div class="view active" id="view-reporte">
+            <div class="view active app-mobile-container" id="view-reporte">
                 <div id="reporteVitrina">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
                         <p id="reporteDia" class="periodo-chip" style="margin:0;">Hoy</p>
@@ -559,7 +608,7 @@
                     </div>
                 </div>
             </div>
-            <div class="view" id="view-ticket">
+            <div class="view app-mobile-container" id="view-ticket">
                 <p id="ticketPeriodo" class="periodo-chip">Mes</p>
                 <div class="card" id="ticketLista">
                     <p id="ticketFiltro" class="ticket-suma">Mes · —</p>
@@ -569,7 +618,7 @@
                     <div id="desgloseCuerpo"></div>
                 </div>
             </div>
-            <div class="view" id="view-contabilidad">
+            <div class="view app-mobile-container" id="view-contabilidad">
                 <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
                     <p id="cajaPeriodo" class="periodo-chip" style="margin:0;">Hoy</p>
                 </div>
@@ -578,19 +627,19 @@
                     <div class="card-body" id="contaCuerpo">Cargando el libro…</div>
                 </div>
             </div>
-            <div class="view" id="view-pedidos">
-                <div id="pedidosFaltantesWrap" style="display:none;">
+            <div class="view app-mobile-container" id="view-pedidos">
+                <div id="pedidosFaltantesWrap" class="app-mobile-container" style="display:none;">
                     <div class="card">
                         <div class="card-body" id="pedidosCuerpo" style="padding:12px 16px 16px; line-height:1.5;">Cargando faltantes de stock…</div>
                     </div>
                 </div>
-                <div id="pedidosAuditoriaWrap" style="display:none;"></div>
+                <div id="pedidosAuditoriaWrap" class="app-mobile-container" style="display:none;"></div>
                 
                 <!-- 📜 MÓDULO HISTORIAL DE PEDIDOS FINALIZADOS -->
-                <div id="pedidosHistorialWrap" style="display:none; padding:10px 14px 190px;"></div>
+                <div id="pedidosHistorialWrap" class="app-mobile-container" style="display:none; padding:10px 14px 190px;"></div>
 
                 <!-- 🛵 MÓDULO REPARTO FÁCIL: RECEPCIÓN DE PEDIDOS Y EMBALADO (ESTÁNDAR BLANCO Y AMARILLO) -->
-                <div id="pedidosRepartoFacilWrap" style="display:block; padding:10px 14px 190px;">
+                <div id="pedidosRepartoFacilWrap" class="app-mobile-container" style="display:block; padding:10px 14px 190px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
                         <strong style="font-size:15px; font-weight:800; color:#2D3277;">🛵 Pedidos Reparto Fácil</strong>
                     </div>
@@ -604,7 +653,7 @@
                     <div id="repartoFacilCardsContenedor" style="display:flex; flex-direction:column; gap:12px; padding-bottom:30px;"></div>
                 </div>
             </div>
-            <div class="view" id="view-cartera">
+            <div class="view app-mobile-container" id="view-cartera">
                 <div id="carteraLista">
                     <input class="buscar" id="searchInput" type="search" placeholder="Buscar nombre o DNI" autocomplete="off">
                     <nav class="resumen" aria-label="Resumen de cartera">
@@ -1101,6 +1150,6 @@
     <script src="/static/js/espejo-engine.js?v=7.7"></script>
     <script src="/static/js/nodo.js?v=7.7"></script>
     <script src="/static/js/barra/neural-hud.js?v=10.2"></script>
-    <script src="/static/js/app.js?v=9.9"></script>
+    <script src="/static/js/app.js?v=10.0"></script>
 </body>
 </html>
