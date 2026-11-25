@@ -196,7 +196,14 @@ def register_security(app):
         path = request.path
         if path.startswith("/static/"):
             return None
-        if path in PUBLIC_PATHS or path.startswith("/api/repartofacil/") or path.startswith("/api/sucursales/publicas/"):
+        if (
+            path in PUBLIC_PATHS 
+            or path.startswith("/api/repartofacil/") 
+            or path.startswith("/api/sucursales/publicas/")
+            or path.startswith("/api/pos/terminal/")
+            or path.startswith("/api/pos/tickets/")
+            or path.startswith("/api/pos/inventario/")
+        ):
             return None
         if is_authenticated():
             return None
@@ -210,7 +217,13 @@ def register_security(app):
     def _enforce_role_writes():
         if not auth_enabled() or request.method in ("GET", "HEAD", "OPTIONS"):
             return None
-        if not request.path.startswith("/api/") or request.path.startswith("/api/repartofacil/"):
+        if (
+            not request.path.startswith("/api/")
+            or request.path.startswith("/api/repartofacil/")
+            or request.path.startswith("/api/pos/terminal/")
+            or request.path.startswith("/api/pos/tickets/")
+            or request.path.startswith("/api/pos/inventario/")
+        ):
             return None
         if current_role() == "visor":
             return jsonify({"error": "Tu rol es solo lectura"}), 403
