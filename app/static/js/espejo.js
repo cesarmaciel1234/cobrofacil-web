@@ -222,7 +222,7 @@
             const num = Number(s);
             if (!isNaN(num) && num > 0) return false;
         }
-        return s === f;
+        return s === f || !s || s === '0' || s === 'null';
     }
 
     function diaDe(fecha) {

@@ -1488,7 +1488,13 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
             "caja": [],
         }
 
-    idx_cc, movimientos = _filas_en_rango("cuenta_corriente", ini, fin, sucursal_id)
+    corte_ini, corte_fin = ini, fin
+    if str(etiqueta or "").strip().startswith("Hoy"):
+        hoy_real = datetime.now(_ZONA).date().isoformat()
+        corte_ini = min(ini, hoy_real) if ini else hoy_real
+        corte_fin = max(fin, hoy_real) if fin else hoy_real
+
+    idx_cc, movimientos = _filas_en_rango("cuenta_corriente", corte_ini, corte_fin, sucursal_id)
     cobros = 0.0
     detalle_cobros = []
     cobros_por_medio: dict[str, dict] = {}
@@ -1520,7 +1526,7 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
                 "medio": medio,
             })
 
-    idx_g, gastos = _filas_en_rango("gastos", ini, fin, sucursal_id)
+    idx_g, gastos = _filas_en_rango("gastos", corte_ini, corte_fin, sucursal_id)
     lista_gastos = []
     total_gastos = 0.0
     for fila in gastos:
@@ -1536,7 +1542,7 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
                 "monto": round(monto, 2),
             }
         )
-    idx_caja, caja = _filas_en_rango("movimientos_caja", ini, fin, sucursal_id)
+    idx_caja, caja = _filas_en_rango("movimientos_caja", corte_ini, corte_fin, sucursal_id)
     por_tipo: dict[str, float] = {}
     for fila in caja:
         tipo = str(_valor(fila, idx_caja, "tipo") or "Movimiento")

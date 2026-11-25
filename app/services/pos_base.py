@@ -1377,7 +1377,7 @@ def preparar_vista(
                 _cache_dia[(ambito, tabla, sid, corte_desde, corte_hasta)] = (ahora, columnas, filas)
             else:
                 _cache[(ambito, tabla, sid)] = (ahora, sello, columnas, filas)
-        for tabla in completas:
+        for tabla in ("clientes", "productos", "configuracion"):
             if (ambito, tabla, sid) not in _cache:
                 _cache[(ambito, tabla, sid)] = (ahora, (None, 0), [], [])
         for tabla in dia_tablas:
