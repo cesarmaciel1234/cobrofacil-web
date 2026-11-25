@@ -3264,7 +3264,6 @@ const $ = id => document.getElementById(id);
 
         function actualizarNombreEmpresaTopbar() {
             const nomEl = $('empresaNombre');
-            if (!nomEl) return;
             let baseEmpresa = '';
             if (typeof sessionUser !== 'undefined' && sessionUser && sessionUser.empresa_nombre) {
                 baseEmpresa = sessionUser.empresa_nombre;
@@ -3274,27 +3273,55 @@ const $ = id => document.getElementById(id);
                     baseEmpresa = (JSON.parse(localStorage.getItem('empresa_datos') || '{}').nombre) || '';
                 } catch (_) {}
             }
-            if (!baseEmpresa) {
+            if (!baseEmpresa && nomEl) {
                 const puesto = (nomEl.textContent || '').trim();
                 if (puesto && puesto.toUpperCase() !== 'JEFE') baseEmpresa = puesto;
             }
-            if (!baseEmpresa) return;
+            if (!baseEmpresa) baseEmpresa = 'COBRO FÁCIL';
+            baseEmpresa = baseEmpresa.toUpperCase();
+            if (nomEl) nomEl.textContent = baseEmpresa;
 
-            const sidStr = String(activeSucursalId || '');
-            if (sidStr === 'web') {
-                nomEl.textContent = baseEmpresa.toUpperCase() + ' · TIENDA WEB (TODAS)';
-            } else if (sidStr.startsWith('web-')) {
-                const subId = sidStr.replace('web-', '');
-                const subSuc = sucursalesConocidas.find((s) => String(s.id) === subId);
-                const subNom = subSuc ? subSuc.nombre : ('SUCURSAL ' + subId);
-                nomEl.textContent = baseEmpresa.toUpperCase() + ' · TIENDA WEB (' + subNom.toUpperCase() + ')';
-            } else {
-                const elegida = sucursalesConocidas.find((s) => String(s.id) === sidStr);
-                if (elegida) {
-                    nomEl.textContent = baseEmpresa.toUpperCase() + ' · ' + elegida.nombre.toUpperCase();
-                } else {
-                    nomEl.textContent = baseEmpresa.toUpperCase();
+            // 🏪 Selector Centralizado en el Header (TopBar)
+            const selTopbar = $('topbarSucursalSelect');
+            if (selTopbar) {
+                const sucs = (sucursalesConocidas && sucursalesConocidas.length) ? sucursalesConocidas : [];
+                const fisicas = sucs.filter(s => String(s.id) !== 'web' && !String(s.id).startsWith('web-'));
+                const activeVal = activeSucursalId == null ? '' : String(activeSucursalId);
+
+                let optsHtml = `<option value="" ${activeVal === '' ? 'selected' : ''}>${baseEmpresa} · TODAS</option>`;
+                fisicas.forEach(s => {
+                    const isSel = String(s.id) === activeVal ? 'selected' : '';
+                    const nomSuc = String(s.nombre || ('Sucursal ' + s.id)).toUpperCase();
+                    optsHtml += `<option value="${s.id}" ${isSel}>${baseEmpresa} · ${nomSuc}</option>`;
+                });
+                selTopbar.innerHTML = optsHtml;
+                selTopbar.value = activeVal;
+
+                if (typeof sessionUser !== 'undefined' && sessionUser && sessionUser.sucursal_id != null) {
+                    selTopbar.disabled = true;
+                    selTopbar.style.cursor = 'default';
                 }
+
+                if (!selTopbar._boundChange) {
+                    selTopbar._boundChange = true;
+                    selTopbar.addEventListener('change', (e) => {
+                        const val = e.target.value;
+                        aplicarSucursal(val ? parseInt(val, 10) : null);
+                        cargarSucursalesSelector();
+                    });
+                }
+            }
+
+            const pill = $('topbarNormalMode');
+            if (pill && !pill._boundPillClick) {
+                pill._boundPillClick = true;
+                pill.addEventListener('click', (e) => {
+                    const sel = $('topbarSucursalSelect');
+                    if (sel && e.target !== sel && !sel.disabled) {
+                        sel.focus();
+                        try { sel.showPicker(); } catch (_) { sel.click(); }
+                    }
+                });
             }
         }
         window.actualizarNombreEmpresaTopbar = actualizarNombreEmpresaTopbar;
@@ -3348,39 +3375,19 @@ const $ = id => document.getElementById(id);
         }
 
         function renderSucursalSelectors() {
+            // El selector ahora está centralizado en el header (#topbarSucursalSelect).
+            // Limpiamos slots secundarios si existieran para evitar controles duplicados.
             const slots = document.querySelectorAll('.sucursal-selector-slot');
-            if (!slots.length) return;
-
-            const sucs = (sucursalesConocidas && sucursalesConocidas.length) ? sucursalesConocidas : [];
-            const fisicas = sucs.filter(s => String(s.id) !== 'web' && !String(s.id).startsWith('web-'));
-            const activeVal = activeSucursalId == null ? '' : String(activeSucursalId);
-
-            slots.forEach(slot => {
-                let html = `
-                <div style="display:inline-flex; align-items:center; gap:5px; background:#ffffff; border:1.5px solid #cbd5e1; border-radius:10px; padding:2px 8px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
-                    <span style="font-size:12px;">🏢</span>
-                    <select class="sucursal-filtro-select" style="border:none; background:transparent; font-size:11.5px; font-weight:800; color:#1e293b; outline:none; cursor:pointer; padding:3px 2px;">
-                        <option value="" ${activeVal === '' ? 'selected' : ''}>Todas las Sucursales</option>
-                        ${fisicas.map(s => `
-                            <option value="${s.id}" ${String(s.id) === activeVal ? 'selected' : ''}>${textoJefe(s.nombre || ('Sucursal ' + s.id))}</option>
-                        `).join('')}
-                    </select>
-                </div>`;
-                slot.innerHTML = html;
-
-                const sel = slot.querySelector('.sucursal-filtro-select');
-                if (sel) {
-                    sel.onchange = (e) => {
-                        const val = e.target.value;
-                        aplicarSucursal(val ? parseInt(val, 10) : null);
-                        cargarSucursalesSelector();
-                    };
-                }
-            });
+            slots.forEach(slot => { slot.innerHTML = ''; });
+            actualizarNombreEmpresaTopbar();
         }
 
         function actualizarDropdownsSucursal() {
             const activeVal = activeSucursalId == null ? '' : String(activeSucursalId);
+            const selTopbar = $('topbarSucursalSelect');
+            if (selTopbar) {
+                selTopbar.value = activeVal;
+            }
             document.querySelectorAll('.sucursal-filtro-select').forEach(sel => {
                 sel.value = activeVal;
             });
