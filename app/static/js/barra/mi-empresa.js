@@ -867,7 +867,6 @@
         }
     });
 
-    let sucursalesDisponibles = [];
     let colaboradoresLista = [];
 
     async function cargarColaboradores() {
