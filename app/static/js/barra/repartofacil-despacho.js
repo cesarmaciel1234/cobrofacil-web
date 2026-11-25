@@ -519,7 +519,7 @@
         ];
 
         host.innerHTML = `
-            <div style="display:flex; align-items:center; gap:6px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch;">
+            <div class="rf-tabs-scroll-bar" style="display:flex; align-items:center; gap:8px; overflow-x:auto; overflow-y:hidden; padding:4px 2px 8px 2px; -webkit-overflow-scrolling:touch; scrollbar-width:thin; white-space:nowrap; width:100%; box-sizing:border-box;">
                 ${tabs.map(t => {
                     const isActive = tabPedidos === t.id;
                     const bg = isActive ? '#2D3277' : '#ffffff';
@@ -529,9 +529,9 @@
                     const badgeColor = isActive ? '#2D3277' : (t.alert ? '#ffffff' : '#475569');
                     return `
                         <button type="button" onclick="window.RepartoFacilDespacho.setTab('${t.id}')"
-                            style="background:${bg}; color:${color}; border:1.5px solid ${border}; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; flex-shrink:0; box-shadow:${isActive ? '0 2px 6px rgba(45,50,119,0.25)' : 'none'}; transition:all 0.15s ease;">
+                            style="background:${bg}; color:${color}; border:1.5px solid ${border}; border-radius:999px; padding:7px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; flex-shrink:0; box-shadow:${isActive ? '0 2px 6px rgba(45,50,119,0.25)' : 'none'}; transition:all 0.15s ease;">
                             <span>${t.label}</span>
-                            <span style="background:${badgeBg}; color:${badgeColor}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
+                            <span style="background:${badgeBg}; color:${badgeColor}; font-size:10px; font-weight:900; padding:1px 7px; border-radius:999px;">
                                 ${t.count}
                             </span>
                         </button>
@@ -788,8 +788,8 @@
                         </div>
                     </div>
 
-                    <!-- LÍNEA 2: PAGO, MONTO TOTAL Y 3 BOTONES EN LÍNEA -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                    <!-- LÍNEA 2: PAGO, MONTO TOTAL Y BOTONES CON FLEX-WRAP Y GAP-2 -->
+                    <div class="rf-card-linea2" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
                         <div style="display:flex; align-items:center; gap:6px; min-width:0;">
                             <span style="background:${pagoBadgeBg}; color:${pagoBadgeColor}; border:1px solid ${pagoBadgeBorder}; font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px; white-space:nowrap;">
                                 ${pagoBadgeTexto}
@@ -799,17 +799,17 @@
                             </b>
                         </div>
 
-                        <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;" onclick="event.stopPropagation()">
+                        <div class="rf-card-botones" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;" onclick="event.stopPropagation()">
                             <!-- Botón 1: Ver Ticket / Comanda (ícono SVG limpio) -->
                             <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})" title="Ver Comanda completa"
-                                style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:8px; padding:5px 7px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap;">
                                 ${SVG_ICONOS.ticket}
                                 <span>Ticket</span>
                             </button>
 
                             <!-- Botón 2: Chat (con contador numérico) -->
                             <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" title="Chat con cliente"
-                                style="background:${p.unread_chat_count > 0 ? '#ef4444' : '#eff6ff'}; color:${p.unread_chat_count > 0 ? '#ffffff' : '#1d4ed8'}; border:1px solid ${p.unread_chat_count > 0 ? '#dc2626' : '#bfdbfe'}; border-radius:8px; padding:5px 7px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                style="background:${p.unread_chat_count > 0 ? '#ef4444' : '#eff6ff'}; color:${p.unread_chat_count > 0 ? '#ffffff' : '#1d4ed8'}; border:1px solid ${p.unread_chat_count > 0 ? '#dc2626' : '#bfdbfe'}; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap;">
                                 ${SVG_ICONOS.chat}
                                 <span>Chat</span>
                                 ${p.unread_chat_count > 0 ? `<span style="background:#ffffff; color:#ef4444; font-size:9.5px; font-weight:900; padding:0 5px; border-radius:999px;">${p.unread_chat_count}</span>` : ''}
@@ -933,12 +933,12 @@
         if (esNuevoPendiente) {
             botonesAccionModal = `
                 <button type="button" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})"
-                    style="background:#ffffff; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                    style="background:#ffffff; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px; width:100%; box-sizing:border-box;">
                     ${SVG_ICONOS.cruz}
                     <span>Rechazar</span>
                 </button>
                 <button type="button" onclick="window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})"
-                    style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(234,179,8,0.3);">
+                    style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px; box-shadow:0 2px 8px rgba(234,179,8,0.3); width:100%; box-sizing:border-box;">
                     ${SVG_ICONOS.check}
                     <span>${esRetiroEnTienda ? 'Aceptar y Preparar' : 'Aceptar y Publicar'}</span>
                 </button>
@@ -946,7 +946,7 @@
         } else if (esConfirmado) {
             botonesAccionModal = `
                 <button type="button" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)"
-                    style="background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(16,185,129,0.3);">
+                    style="background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px; box-shadow:0 2px 8px rgba(16,185,129,0.3); width:100%; box-sizing:border-box;">
                     ${SVG_ICONOS.box}
                     <span>${esRetiroEnTienda ? 'Listo p/ Retirar' : 'Embalar'}</span>
                 </button>
@@ -954,14 +954,14 @@
         } else if (esEmbalado && esRetiroEnTienda) {
             botonesAccionModal = `
                 <button type="button" onclick="window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})"
-                    style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(2,132,199,0.3);">
+                    style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:4px; box-shadow:0 2px 8px rgba(2,132,199,0.3); width:100%; box-sizing:border-box;">
                     ${SVG_ICONOS.check}
                     <span>Entregar al Cliente</span>
                 </button>
             `;
         } else if (esEmbalado && !esRetiroEnTienda) {
             botonesAccionModal = `
-                <span style="font-size:12px; font-weight:800; color:#047857; display:inline-flex; align-items:center; gap:4px; padding:8px 10px; background:#ecfdf5; border-radius:10px;">
+                <span style="font-size:12px; font-weight:800; color:#047857; display:inline-flex; align-items:center; justify-content:center; gap:4px; padding:10px 12px; background:#ecfdf5; border-radius:10px; grid-column:span 2; width:100%; box-sizing:border-box;">
                     <span>✓</span>
                     <span>Embalado · Esperando chofer</span>
                 </span>
@@ -1107,24 +1107,22 @@
                 </div>
 
                 <!-- FOOTER FIJO DE ACCIÓN -->
-                <div style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:10px 14px; display:flex; gap:8px; align-items:center; justify-content:space-between; flex-shrink:0; flex-wrap:wrap;">
-                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <!-- FOOTER DE ACCIONES EN GRILLA RESPONSIVE DE 2 COLUMNAS (GAP-2 Y BUEN PADDING) -->
+                <div class="rf-modal-pie" style="background:#f8fafc; border-top:1.5px solid #e2e8f0; padding:12px 14px; flex-shrink:0; box-sizing:border-box;">
+                    <div class="rf-modal-pie-grid" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; width:100%; box-sizing:border-box;">
                         <button type="button" onclick="window.RepartoFacilDespacho.imprimirComanda(${argumentoPedido(p.id)})"
-                            style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:10px; padding:7px 11px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                            style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; box-shadow:0 1px 2px rgba(0,0,0,0.04); width:100%; box-sizing:border-box;">
                             ${SVG_ICONOS.print}
                             <span>Imprimir</span>
                         </button>
                         <button type="button" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})"
-                            style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; padding:7px 11px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; width:100%; box-sizing:border-box;">
                             ${SVG_ICONOS.chat}
                             <span>Chat</span>
                         </button>
-                    </div>
-
-                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                         ${botonesAccionModal}
                         <button type="button" onclick="window.RepartoFacilDespacho.cerrarModal()"
-                            style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:10px; padding:7px 10px; font-size:11.5px; font-weight:800; cursor:pointer;">
+                            style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:10px; padding:10px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; width:100%; box-sizing:border-box; ${esNuevoPendiente ? 'grid-column:span 2;' : ''}">
                             Cerrar
                         </button>
                     </div>

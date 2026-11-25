@@ -110,7 +110,7 @@
 
             .neural-orb-btn {
                 position: fixed;
-                bottom: calc(88px + env(safe-area-inset-bottom, 0px));
+                bottom: calc(76px + env(safe-area-inset-bottom, 0px));
                 right: 14px;
                 width: 58px;
                 height: 58px;
@@ -125,6 +125,12 @@
                 animation: arcPulse 3s infinite ease-in-out;
                 user-select: none;
                 transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+            }
+            @media (max-width: 640px) {
+                .neural-orb-btn {
+                    bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+                    right: 12px;
+                }
             }
             .neural-orb-btn:hover {
                 transform: scale(1.1);
