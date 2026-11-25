@@ -10,6 +10,9 @@
     let chatPollingTimer = null;
     let orderChatActivo = null;
     const pedidosExpandidos = new Set();
+    let tabPedidos = 'activos'; // 'activos' | 'nuevos' | 'retira' | 'delivery' | 'historial'
+    let pedidoModal = null; // ID del pedido con modal comanda abierto
+    let busquedaHistorial = '';
     let ultimoCountActivos = 0;
     let audioContext = null;
     let ultimoOrderIdNotificado = new Set();
@@ -387,26 +390,264 @@
         actualizarBotonSonido();
     }
 
-    // Renderizar tarjetas de clientes
+    // Iconos SVG limpios (evitan cuadros vacíos o caracteres rotos en Android / Windows)
+    const SVG_ICONOS = {
+        cruz: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+        ticket: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>`,
+        chat: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>`,
+        print: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>`,
+        check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><polyline points="20 6 9 17 4 12"/></svg>`,
+        refresh: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`
+    };
+
+    // Funciones de control de Pestañas
+    function setTab(nuevaTab) {
+        tabPedidos = String(nuevaTab || 'activos').toLowerCase();
+        renderizarCards();
+    }
+
+    function setBusquedaHistorial(texto) {
+        busquedaHistorial = String(texto || '').trim();
+        renderizarCards();
+    }
+
+    // Funciones de control de Modal de Comanda
+    function abrirModal(orderId) {
+        pedidoModal = String(orderId);
+        renderizarComandaModal();
+    }
+
+    function cerrarModal() {
+        pedidoModal = null;
+        const modal = $('rfComandaModal');
+        if (modal) modal.style.display = 'none';
+    }
+
+    // Imprimir comanda en ticket térmico estándar (80mm/58mm)
+    function imprimirComanda(orderId) {
+        const p = pedidosLista.find(item => String(item.id) === String(orderId));
+        if (!p) return;
+        const itemsArray = Array.isArray(p.items) ? p.items : [];
+        const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
+        const esRetiro = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+
+        const subtotalCalculado = itemsArray.reduce((acc, it) => acc + (Number(it.price || it.precio || 0) * Number(it.quantity || it.cantidad || 1)), 0);
+        const subtotalProd = Number(p.subtotal) > 0 ? Number(p.subtotal) : (subtotalCalculado || (Number(p.total || 0) - Number(p.costo_envio || 0)));
+
+        const w = window.open('', '_blank', 'width=380,height=600');
+        if (!w) {
+            alert('Por favor habilitá las ventanas emergentes del navegador para imprimir la comanda.');
+            return;
+        }
+
+        const htmlTicket = `
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="utf-8">
+                <title>Ticket #${escaparTextoChat(p.ticket_id || formatearIdCorto(p.id))}</title>
+                <style>
+                    body { font-family: monospace; font-size: 13px; line-height: 1.35; margin: 10px; color: #000; }
+                    .center { text-align: center; }
+                    .bold { font-weight: bold; }
+                    .line { border-top: 1px dashed #000; margin: 8px 0; }
+                    .row { display: flex; justify-content: space-between; margin: 3px 0; }
+                </style>
+            </head>
+            <body onload="window.print()">
+                <div class="center bold" style="font-size:16px;">REPARTO FÁCIL</div>
+                <div class="center">${escaparTextoChat(p.sucursal_origen || 'Sucursal Maciel')}</div>
+                <div class="center">Ticket #${escaparTextoChat(p.ticket_id || formatearIdCorto(p.id))}</div>
+                <div class="center">${formatFecha(p.created_at)}</div>
+                <div class="line"></div>
+                <div><b>Cliente:</b> ${escaparTextoChat(p.cliente_nombre || 'Cliente')}</div>
+                ${p.cliente_telefono ? `<div><b>Teléfono:</b> ${escaparTextoChat(p.cliente_telefono)}</div>` : ''}
+                <div><b>Modalidad:</b> ${esRetiro ? 'RETIRO EN LOCAL / MOSTRADOR' : 'DELIVERY A DOMICILIO'}</div>
+                ${!esRetiro && p.direccion_entrega ? `<div><b>Domicilio:</b> ${escaparTextoChat(limpiarDireccion(p.direccion_entrega))}</div>` : ''}
+                <div class="line"></div>
+                <div class="bold">PRODUCTOS:</div>
+                ${itemsArray.map(it => {
+                    const cant = Number(it.quantity || it.cantidad || 1);
+                    const precio = Number(it.price || it.precio || 0);
+                    return `
+                        <div class="row">
+                            <span>${cant} x ${escaparTextoChat(capitalizarNombre(it.name || it.nombre))}</span>
+                            <span>$${formatMoneyNum(precio * cant)}</span>
+                        </div>
+                    `;
+                }).join('')}
+                <div class="line"></div>
+                <div class="row"><span>Subtotal:</span><span>$${formatMoneyNum(subtotalProd)}</span></div>
+                ${Number(p.costo_envio) > 0 ? `<div class="row"><span>Envío:</span><span>$${formatMoneyNum(p.costo_envio)}</span></div>` : ''}
+                <div class="row bold" style="font-size:15px; margin-top:4px;"><span>TOTAL:</span><span>$${formatMoneyNum(p.total)}</span></div>
+                <div class="line"></div>
+                <div class="center"><b>Pago:</b> ${escaparTextoChat(p.metodo_pago || 'Efectivo')}</div>
+                ${p.notas ? `<div style="margin-top:6px;"><b>Nota:</b> "${escaparTextoChat(p.notas)}"</div>` : ''}
+            </body>
+            </html>
+        `;
+        w.document.write(htmlTicket);
+        w.document.close();
+    }
+
+    // Renderizar barra de pestañas (Activos, Nuevos, Retira, Delivery, Historial)
+    function renderizarTabs(countActivos, countNuevos, countRetira, countDelivery, countHistorial) {
+        let host = $('repartoFacilFiltrosTabs');
+        if (!host) {
+            const banner = $('repartoFacilOmnicanalBanner');
+            if (banner && banner.parentNode) {
+                host = document.createElement('div');
+                host.id = 'repartoFacilFiltrosTabs';
+                host.style.marginBottom = '12px';
+                banner.parentNode.insertBefore(host, $('repartoFacilCardsContenedor'));
+            }
+        }
+        if (!host) return;
+
+        const tabs = [
+            { id: 'activos', label: 'Activos', count: countActivos },
+            { id: 'nuevos', label: 'Nuevos', count: countNuevos, alert: countNuevos > 0 },
+            { id: 'retira', label: 'Retira', count: countRetira },
+            { id: 'delivery', label: 'Delivery', count: countDelivery },
+            { id: 'historial', label: 'Historial', count: countHistorial },
+        ];
+
+        host.innerHTML = `
+            <div style="display:flex; align-items:center; gap:6px; overflow-x:auto; padding-bottom:6px; -webkit-overflow-scrolling:touch;">
+                ${tabs.map(t => {
+                    const isActive = tabPedidos === t.id;
+                    const bg = isActive ? '#2D3277' : '#ffffff';
+                    const color = isActive ? '#ffffff' : '#334155';
+                    const border = isActive ? '#2D3277' : '#cbd5e1';
+                    const badgeBg = isActive ? '#FFE600' : (t.alert ? '#ef4444' : '#f1f5f9');
+                    const badgeColor = isActive ? '#2D3277' : (t.alert ? '#ffffff' : '#475569');
+                    return `
+                        <button type="button" onclick="window.RepartoFacilDespacho.setTab('${t.id}')"
+                            style="background:${bg}; color:${color}; border:1.5px solid ${border}; border-radius:999px; padding:6px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; white-space:nowrap; flex-shrink:0; box-shadow:${isActive ? '0 2px 6px rgba(45,50,119,0.25)' : 'none'}; transition:all 0.15s ease;">
+                            <span>${t.label}</span>
+                            <span style="background:${badgeBg}; color:${badgeColor}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
+                                ${t.count}
+                            </span>
+                        </button>
+                    `;
+                }).join('')}
+            </div>
+            ${tabPedidos === 'historial' ? `
+                <div style="margin-top:8px;">
+                    <input type="search" placeholder="🔍 Buscar por #RF o cliente en historial..."
+                        value="${escaparTextoChat(busquedaHistorial)}"
+                        oninput="window.RepartoFacilDespacho.setBusquedaHistorial(this.value)"
+                        style="width:100%; box-sizing:border-box; background:#ffffff; border:1.5px solid #cbd5e1; border-radius:12px; padding:8px 12px; font-size:12.5px; color:#1e293b; outline:none;" />
+                </div>
+            ` : ''}
+        `;
+    }
+
+    // Renderizar tarjetas de clientes (COMPACTAS 1-2 LÍNEAS, SIN ACORDEÓN INLINE)
     function renderizarCards() {
         const contenedor = $('repartoFacilCardsContenedor');
         if (!contenedor) return;
 
-        if (pedidosLista.length === 0) {
+        // 1. Calcular conteos para todas las pestañas
+        let countActivos = 0;
+        let countNuevos = 0;
+        let countRetira = 0;
+        let countDelivery = 0;
+        let countHistorial = 0;
+
+        pedidosLista.forEach((p) => {
+            const st = (p.estado || 'pending').toLowerCase();
+            const esFin = st === 'delivered' || st === 'rejected' || st === 'cancelled' || st === 'cancelled_by_client' || st === 'cancelled_timeout';
+            const esNuevo = st === 'pending' || st === 'pending_store';
+            const tipo = String(p.tipo_entrega || '').toLowerCase();
+            const retira = tipo === 'pickup' || tipo === 'takeaway' || tipo === 'retiro' || tipo === 'tienda' || tipo === 'mostrador';
+
+            if (esNuevo) countNuevos++;
+            if (!esFin) {
+                countActivos++;
+                if (retira) countRetira++;
+                else countDelivery++;
+            } else {
+                countHistorial++;
+            }
+        });
+
+        // 2. Renderizar barra de pestañas
+        renderizarTabs(countActivos, countNuevos, countRetira, countDelivery, countHistorial);
+
+        // 3. Filtrar lista ANTES de renderizar
+        let pedidosFiltrados = [];
+        if (tabPedidos === 'activos') {
+            pedidosFiltrados = pedidosLista.filter(p => {
+                const st = (p.estado || 'pending').toLowerCase();
+                return st !== 'delivered' && st !== 'rejected' && st !== 'cancelled' && st !== 'cancelled_by_client' && st !== 'cancelled_timeout';
+            });
+        } else if (tabPedidos === 'nuevos') {
+            pedidosFiltrados = pedidosLista.filter(p => {
+                const st = (p.estado || 'pending').toLowerCase();
+                return st === 'pending' || st === 'pending_store';
+            });
+        } else if (tabPedidos === 'retira') {
+            pedidosFiltrados = pedidosLista.filter(p => {
+                const st = (p.estado || 'pending').toLowerCase();
+                const esAct = st !== 'delivered' && st !== 'rejected' && st !== 'cancelled' && st !== 'cancelled_by_client' && st !== 'cancelled_timeout';
+                const tipo = String(p.tipo_entrega || '').toLowerCase();
+                const retira = tipo === 'pickup' || tipo === 'takeaway' || tipo === 'retiro' || tipo === 'tienda' || tipo === 'mostrador';
+                return esAct && retira;
+            });
+        } else if (tabPedidos === 'delivery') {
+            pedidosFiltrados = pedidosLista.filter(p => {
+                const st = (p.estado || 'pending').toLowerCase();
+                const esAct = st !== 'delivered' && st !== 'rejected' && st !== 'cancelled' && st !== 'cancelled_by_client' && st !== 'cancelled_timeout';
+                const tipo = String(p.tipo_entrega || '').toLowerCase();
+                const retira = tipo === 'pickup' || tipo === 'takeaway' || tipo === 'retiro' || tipo === 'tienda' || tipo === 'mostrador';
+                return esAct && !retira;
+            });
+        } else if (tabPedidos === 'historial') {
+            pedidosFiltrados = pedidosLista.filter(p => {
+                const st = (p.estado || 'pending').toLowerCase();
+                const esFin = st === 'delivered' || st === 'rejected' || st === 'cancelled' || st === 'cancelled_by_client' || st === 'cancelled_timeout';
+                if (!esFin) return false;
+                if (busquedaHistorial) {
+                    const q = busquedaHistorial.toLowerCase();
+                    const pool = `${p.id || ''} ${p.cliente_nombre || ''} ${p.ticket_id || ''}`.toLowerCase();
+                    return pool.includes(q);
+                }
+                return true;
+            });
+        }
+
+        if (pedidosFiltrados.length === 0) {
+            let msgTitulo = 'No hay pedidos en esta pestaña';
+            let msgSub = 'Los pedidos entrarán en vivo automáticamente aquí.';
+            if (tabPedidos === 'nuevos') {
+                msgTitulo = 'No hay pedidos nuevos pendientes';
+                msgSub = 'Cuando un cliente haga una orden web, sonará la alerta y aparecerá aquí.';
+            } else if (tabPedidos === 'historial') {
+                msgTitulo = 'Historial vacío';
+                msgSub = busquedaHistorial ? 'No se encontraron pedidos con ese criterio de búsqueda.' : 'Los pedidos entregados y cancelados se archivarán acá.';
+            } else if (tabPedidos === 'retira') {
+                msgTitulo = 'Sin pedidos para retiro en mostrador';
+                msgSub = 'Las compras donde el comprador retira en local aparecerán acá.';
+            } else if (tabPedidos === 'delivery') {
+                msgTitulo = 'Sin pedidos con envío delivery';
+                msgSub = 'Las compras con entrega a domicilio por chofer aparecerán acá.';
+            }
+
             contenedor.innerHTML = `
-                <div style="text-align:center; padding:48px 20px; background:#fff; border-radius:20px; border:1px dashed #cbd5e1; margin-top:8px;">
-                    <span style="font-size:36px; display:block; margin-bottom:8px;">🛵</span>
-                    <h4 style="margin:0 0 6px; font-size:15px; font-weight:800; color:#1e293b;">No hay pedidos activos de Reparto Fácil</h4>
-                    <p style="margin:0; font-size:12px; color:#64748b; max-width:300px; margin:0 auto;">
-                        Los pedidos que los clientes realicen desde la tienda online aparecerán automáticamente aquí listos para aceptar, embalar y despachar.
-                    </p>
+                <div style="text-align:center; padding:36px 20px; background:#fff; border-radius:18px; border:1px dashed #cbd5e1; margin-top:4px;">
+                    <span style="font-size:32px; display:block; margin-bottom:6px;">🛵</span>
+                    <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:#1e293b;">${msgTitulo}</h4>
+                    <p style="margin:0; font-size:12px; color:#64748b; max-width:300px; margin:0 auto;">${msgSub}</p>
                 </div>
             `;
+            // Asegurar que si hay modal activo se mantenga
+            renderizarComandaModal();
             return;
         }
 
         let html = '';
-        pedidosLista.forEach((p) => {
+        pedidosFiltrados.forEach((p) => {
             const estadoLower = (p.estado || 'pending').toLowerCase();
             const esNuevoPendiente = estadoLower === 'pending' || estadoLower === 'pending_store';
             const esTimeout = estadoLower === 'cancelled_timeout';
@@ -416,587 +657,164 @@
             const esConfirmado = estadoLower === 'confirmed' || estadoLower === 'accepted';
             const esEmbalado = estadoLower === 'ready' || estadoLower === 'embalado';
             const esEntregado = estadoLower === 'delivered';
-            const puedeEmbalar = esConfirmado || esEmbalado || estadoLower === 'assigned';
-            const puedeReasignar = Boolean(p.repartidor_id) && (estadoLower === 'assigned' || esEmbalado);
-            const repartidorAsignado = p.repartidor_nombre || (p.repartidor_id ? 'Lucas Motomensajero' : null);
 
             const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
             const esRetiroEnTienda = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
             const badgeTipoEntrega = esRetiroEnTienda
-                ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🏪 En Tienda</span>`
-                : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🛵 Con Delivery</span>`;
+                ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🏪 En Tienda</span>`
+                : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🛵 Con Delivery</span>`;
 
             let badgeEstadoHtml = '';
             if (esCanceladoCliente) {
-                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✕ CANCELADO</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONOS.cruz} CANCELADO</span>`;
             } else if (esRechazadoComercio) {
-                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✕ RECHAZADO</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONOS.cruz} RECHAZADO</span>`;
             } else if (esTimeout) {
-                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">⏰ CANCELADO (1H)</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">⏰ CANCELADO (1H)</span>`;
             } else if (esEntregado) {
-                badgeEstadoHtml = `<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:9.5px; font-weight:800; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">✓ ${esRetiroEnTienda ? 'RETIRADO' : 'ENTREGADO'}</span>`;
+                badgeEstadoHtml = `<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">✓ ${esRetiroEnTienda ? 'RETIRADO' : 'ENTREGADO'}</span>`;
             } else if (esRetiroEnTienda) {
                 if (esEmbalado) {
-                    badgeEstadoHtml = `<span style="background:#ecfdf5; color:#065f46; border:1.5px solid #10b981; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 1px 4px rgba(16,185,129,0.2);">🛍️ LISTO PARA RETIRAR</span>`;
+                    badgeEstadoHtml = `<span style="background:#ecfdf5; color:#065f46; border:1px solid #10b981; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">🛍️ LISTO</span>`;
                 } else if (esConfirmado) {
-                    badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">👨‍🍳 EN PREPARACIÓN</span>`;
+                    badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">👨‍🍳 PREPARANDO</span>`;
                 } else {
-                    badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 0 10px rgba(255,230,0,0.6); animation:pulse 2s infinite;">🔔 NUEVO (RETIRO)</span>`;
+                    badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">🔔 NUEVO</span>`;
                 }
             } else if (esEmbalado) {
-                badgeEstadoHtml = `<span style="background:#fef9c3; color:#713f12; border:1px solid #facc15; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">📦 EMBALADO</span>`;
-            } else if (repartidorAsignado) {
-                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 1px 4px rgba(234,179,8,0.25);">🛵 EN CAMINO</span>`;
+                badgeEstadoHtml = `<span style="background:#fef9c3; color:#713f12; border:1px solid #facc15; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">📦 EMBALADO</span>`;
+            } else if (p.repartidor_nombre || p.repartidor_id) {
+                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">🛵 EN CAMINO</span>`;
             } else if (esConfirmado) {
-                badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap;">⏳ BUSCANDO CHOFER</span>`;
+                badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">⏳ CHOFER</span>`;
             } else {
-                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:8px; white-space:nowrap; box-shadow:0 0 10px rgba(255,230,0,0.6); animation:pulse 2s infinite;">🔔 NUEVO</span>`;
+                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">🔔 NUEVO</span>`;
             }
 
-            const itemsArray = Array.isArray(p.items) ? p.items : [];
-            const cantItems = itemsArray.reduce((acc, item) => acc + (Number(item.quantity || item.cantidad || 1)), 0);
-            const abierto = pedidosExpandidos.has(p.id) || esNuevoPendiente;
-            const iniciales = obtenerIniciales(p.cliente_nombre);
+            // Método de pago para badge rápido
+            const metodoLower = String(p.metodo_pago || 'cash').toLowerCase();
+            const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash');
+            const esTransfer = metodoLower.includes('transfer');
+            const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
+            const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
 
-            // Validación de stock desde el backend
-            const tieneStockValido = p.stock_valido !== false;
-            const itemsSinStock = Array.isArray(p.items_sin_stock) ? p.items_sin_stock : [];
-            const alertaStock = !tieneStockValido && itemsSinStock.length > 0;
+            let pagoBadgeTexto = '💵 Efectivo';
+            let pagoBadgeBg = '#fef3c7';
+            let pagoBadgeColor = '#92400e';
+            let pagoBadgeBorder = '#fde68a';
 
-            // Cálculo de ETA y Tiempo de Espera para el Repartidor
-            const distanciaKm = Number(p.distancia_km || 1.8);
-            const etaBaseMinutos = Math.max(3, Math.min(15, Math.round(Number(p.minutos_estimados || 8) * 0.5) || 6));
-
-            let minutosRestantesChofer = etaBaseMinutos;
-            let minutosDemoraChofer = 0;
-            let recargoEsperaChofer = 0;
-
-            if (repartidorAsignado && !esEntregado && !esRechazado) {
-                const fechaReferencia = p.driver_last_ping ? new Date(p.driver_last_ping).getTime() : new Date(p.updated_at || p.created_at).getTime();
-                const tiempoTranscurridoMin = Math.max(0, Math.floor((Date.now() - fechaReferencia) / 60000));
-                
-                if (tiempoTranscurridoMin < etaBaseMinutos) {
-                    minutosRestantesChofer = etaBaseMinutos - tiempoTranscurridoMin;
-                } else {
-                    minutosRestantesChofer = 0;
-                    minutosDemoraChofer = tiempoTranscurridoMin - etaBaseMinutos;
-                    // Recargo por espera al chofer en mostrador: base $500 + $100/min extra (tope $2500)
-                    recargoEsperaChofer = Math.min(2500, 500 + (minutosDemoraChofer * 100));
-                }
+            if (esTransfer) {
+                pagoBadgeTexto = '🏦 Transf.';
+                pagoBadgeBg = '#eff6ff';
+                pagoBadgeColor = '#1e40af';
+                pagoBadgeBorder = '#bfdbfe';
+            } else if (esTarj) {
+                pagoBadgeTexto = '💳 Tarjeta';
+                pagoBadgeBg = '#f0fdf4';
+                pagoBadgeColor = '#166534';
+                pagoBadgeBorder = '#bbf7d0';
+            } else if (esMP) {
+                pagoBadgeTexto = '📱 MPago';
+                pagoBadgeBg = '#ecfdf5';
+                pagoBadgeColor = '#065f46';
+                pagoBadgeBorder = '#a7f3d0';
             }
 
-            // Indicador de ETA visual y Prueba de Vida dentro del ticket (Estilo Blanco y Amarillo)
-            // Indicador de ETA visual y Estado dentro del ticket (Estilo Blanco y Amarillo)
-            let indicadorEtaHtml = '';
-            if (esRetiroEnTienda) {
-                if (esEmbalado && !esEntregado && !esRechazado) {
-                    indicadorEtaHtml = `
-                        <div style="background:#ecfdf5; border:1.5px solid #10b981; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; align-items:center; justify-content:space-between; box-shadow:0 1px 3px rgba(16,185,129,0.1);">
-                            <span style="font-weight:900;">🛍️ Pedido listo para retirar</span>
-                            <span style="font-weight:900; background:#10b981; color:#ffffff; padding:2px 8px; border-radius:6px;">Esperando al cliente</span>
-                        </div>
-                    `;
-                } else if (esConfirmado && !esEntregado && !esRechazado) {
-                    indicadorEtaHtml = `
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#2D3277; display:flex; align-items:center; justify-content:space-between;">
-                            <span style="font-weight:800;">👨‍🍳 Pedido en preparación en el mostrador</span>
-                            <span style="font-weight:900; background:#FFE600; color:#2D3277; padding:2px 8px; border-radius:6px; border:1px solid #eab308;">Avisale al estar listo</span>
-                        </div>
-                    `;
-                } else if (esNuevoPendiente) {
-                    indicadorEtaHtml = `
-                        <div style="background:#ecfdf5; border:1.5px solid #a7f3d0; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#065f46; display:flex; align-items:center; justify-content:space-between;">
-                            <span style="font-weight:800;">🏪 Modalidad: Retiro en Mostrador</span>
-                            <span style="font-weight:900; background:#d1fae5; color:#065f46; padding:2px 8px; border-radius:6px; border:1px solid #6ee7b7;">Sin Chofer · Retira Cliente</span>
-                        </div>
-                    `;
-                }
-            } else if (repartidorAsignado && !esEntregado && !esRechazado) {
-                const pruebaDeVida = obtenerPruebaDeVida(p.driver_last_ping);
-                if (minutosRestantesChofer > 0) {
-                    indicadorEtaHtml = `
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#2D3277; display:flex; flex-direction:column; gap:4px; box-shadow:0 1px 3px rgba(234,179,8,0.08);">
-                            <div style="display:flex; align-items:center; justify-content:space-between;">
-                                <span style="font-weight:900;">🛵 ${escaparTextoChat(repartidorAsignado)} en camino</span>
-                                <span style="font-weight:900; background:#FFE600; color:#2D3277; padding:1.5px 7px; border-radius:6px; border:1px solid #eab308;">Llega en ~${minutosRestantesChofer} min</span>
-                            </div>
-                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:800; border-top:1px dashed #fde047; padding-top:3px; display:flex; justify-content:space-between;">
-                                <span>${pruebaDeVida.label}</span>
-                                <span style="opacity:0.8;">Custodio Blindado</span>
-                            </div>
-                        </div>
-                    `;
-                } else {
-                    indicadorEtaHtml = `
-                        <div style="background:#fffbeb; border:1.5px solid #facc15; border-radius:10px; padding:7px 10px; margin-bottom:8px; font-size:11px; color:#92400e; display:flex; flex-direction:column; gap:4px; box-shadow:0 1px 3px rgba(234,179,8,0.08);">
-                            <div style="display:flex; align-items:center; justify-content:space-between;">
-                                <span style="font-weight:900;">⏱️ Chofer esperando (+${minutosDemoraChofer}m)</span>
-                                <span style="font-weight:900; background:#fef3c7; color:#b45309; padding:1.5px 7px; border-radius:6px; border:1px solid #fde68a;">Demora: +$${recargoEsperaChofer} al chofer</span>
-                            </div>
-                            <div style="font-size:10px; color:${pruebaDeVida.color}; font-weight:800; border-top:1px dashed #fde68a; padding-top:3px; display:flex; justify-content:space-between;">
-                                <span>${pruebaDeVida.label}</span>
-                                <span style="opacity:0.8;">Custodio Activo</span>
-                            </div>
-                        </div>
-                    `;
-                }
-            } else if (esNuevoPendiente || esConfirmado) {
-                indicadorEtaHtml = `
-                    <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:10px; padding:6px 9px; margin-bottom:8px; font-size:11px; color:#2D3277; display:flex; align-items:center; justify-content:space-between;">
-                        <span style="font-weight:800;">⏱️ Tiempo estimado chofer al local:</span>
-                        <span style="font-weight:900; background:#FFE600; color:#2D3277; padding:1px 6px; border-radius:6px; border:1px solid #eab308;">~${etaBaseMinutos} min (~${distanciaKm.toFixed(1)} km)</span>
-                    </div>
+            // Botón de acción rápida (Botón 3)
+            let botonAccionRapidaHtml = '';
+            if (esNuevoPendiente) {
+                botonAccionRapidaHtml = `
+                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})"
+                        style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(234,179,8,0.25);">
+                        ${SVG_ICONOS.check}
+                        <span>Aceptar</span>
+                    </button>
                 `;
-            }
-
-            // Estado dinámico del botón de Acción (Embalar en delivery / Retiro en mostrador)
-            let textoBotonEmbalar = 'Embalar';
-            let iconoBotonEmbalar = '📦';
-            let bgBotonEmbalar = puedeEmbalar ? '#FFE600' : '#f1f5f9';
-            let colorBotonEmbalar = puedeEmbalar ? '#2D3277' : '#94a3b8';
-            let borderBotonEmbalar = puedeEmbalar ? '1.5px solid #eab308' : '1px solid #cbd5e1';
-            let accionBotonEmbalar = `window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, ${recargoEsperaChofer}, ${minutosDemoraChofer})`;
-
-            if (esRetiroEnTienda) {
-                if (esEntregado) {
-                    textoBotonEmbalar = 'Retirado';
-                    iconoBotonEmbalar = '✓';
-                    bgBotonEmbalar = '#f1f5f9';
-                    colorBotonEmbalar = '#475569';
-                    borderBotonEmbalar = '1px solid #cbd5e1';
-                    accionBotonEmbalar = '';
-                } else if (esEmbalado) {
-                    textoBotonEmbalar = 'Entregar';
-                    iconoBotonEmbalar = '✓';
-                    bgBotonEmbalar = '#10b981';
-                    colorBotonEmbalar = '#ffffff';
-                    borderBotonEmbalar = '1.5px solid #059669';
-                    accionBotonEmbalar = `window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})`;
-                } else if (esConfirmado) {
-                    textoBotonEmbalar = 'Listo p/ Retirar';
-                    iconoBotonEmbalar = '🛍️';
-                    bgBotonEmbalar = '#FFE600';
-                    colorBotonEmbalar = '#2D3277';
-                    borderBotonEmbalar = '1.5px solid #eab308';
-                    accionBotonEmbalar = `window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)`;
-                } else {
-                    textoBotonEmbalar = 'Retiro';
-                    iconoBotonEmbalar = '🏪';
-                    bgBotonEmbalar = '#f1f5f9';
-                    colorBotonEmbalar = '#94a3b8';
-                    borderBotonEmbalar = '1px solid #cbd5e1';
-                    accionBotonEmbalar = '';
-                }
-            } else {
-                if (esEmbalado) {
-                    textoBotonEmbalar = 'Embalado';
-                    iconoBotonEmbalar = '✓';
-                    bgBotonEmbalar = '#fef08a';
-                    colorBotonEmbalar = '#713f12';
-                    borderBotonEmbalar = '1.5px solid #facc15';
-                } else if (repartidorAsignado) {
-                    if (minutosRestantesChofer > 0) {
-                        textoBotonEmbalar = `Embalar (~${minutosRestantesChofer}m)`;
-                        iconoBotonEmbalar = '📦';
-                        bgBotonEmbalar = '#FFE600';
-                        colorBotonEmbalar = '#2D3277';
-                        borderBotonEmbalar = '1.5px solid #eab308';
-                    } else {
-                        textoBotonEmbalar = `Embalar (+⏱️ $${recargoEsperaChofer})`;
-                        iconoBotonEmbalar = '⚠️';
-                        bgBotonEmbalar = '#f59e0b';
-                        colorBotonEmbalar = '#ffffff';
-                        borderBotonEmbalar = '1.5px solid #d97706';
-                    }
-                }
-            }
-            // Tema cromático Reparto Fácil Oficial: Blanco con Amarillo (#FFE600) y Navy (#2D3277)
-            let cardBg = '#ffffff';
-            let cardBorder = '#fde047';
-            let avatarBg = '#FFE600';
-            let avatarBorder = '#eab308';
-            let avatarColor = '#2D3277';
-            let dotColor = '#10b981';
-            let pillBg = '#fefce8';
-            let pillColor = '#854d0e';
-            let pillBorder = '#fde047';
-            let checkIcon = '<span style="color:#eab308; font-weight:800;">✓✓</span>';
-            let totalColor = '#2D3277';
-
-            if (esRechazado) {
-                cardBg = '#fffafa';
-                cardBorder = '#fca5a5';
-                avatarBg = '#fee2e2';
-                avatarBorder = '#f87171';
-                avatarColor = '#b91c1c';
-                dotColor = '#dc2626';
-                pillBg = '#fee2e2';
-                pillColor = '#b91c1c';
-                pillBorder = '#fca5a5';
-                checkIcon = '<span style="color:#dc2626; font-weight:900;">✕</span>';
-                totalColor = '#b91c1c';
+            } else if (esConfirmado) {
+                botonAccionRapidaHtml = `
+                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)"
+                        style="background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(16,185,129,0.25);">
+                        <span>📦</span>
+                        <span>Embalar</span>
+                    </button>
+                `;
+            } else if (esEmbalado && esRetiroEnTienda) {
+                botonAccionRapidaHtml = `
+                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})"
+                        style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(2,132,199,0.25);">
+                        <span>🛍️</span>
+                        <span>Entregar</span>
+                    </button>
+                `;
+            } else if (esEmbalado && !esRetiroEnTienda) {
+                botonAccionRapidaHtml = `
+                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
+                        style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:8px; padding:5px 8px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
+                        <span>🛵</span>
+                        <span>Despacho</span>
+                    </button>
+                `;
             } else if (esEntregado) {
-                cardBg = '#ffffff';
-                cardBorder = '#e2e8f0';
-                avatarBg = '#f1f5f9';
-                avatarBorder = '#cbd5e1';
-                avatarColor = '#475569';
-                dotColor = '#64748b';
-                pillBg = '#f8fafc';
-                pillColor = '#475569';
-                pillBorder = '#e2e8f0';
-                checkIcon = '<span style="color:#64748b; font-weight:800;">✓✓</span>';
-                totalColor = '#334155';
-            } else if (repartidorAsignado) {
-                cardBg = '#ffffff';
-                cardBorder = '#FFE600';
-                avatarBg = '#FFE600';
-                avatarBorder = '#eab308';
-                avatarColor = '#2D3277';
-                dotColor = '#10b981';
-                pillBg = '#fefce8';
-                pillColor = '#854d0e';
-                pillBorder = '#fde047';
-                checkIcon = '<span style="color:#10b981; font-weight:800;">✓✓</span>';
-                totalColor = '#2D3277';
-            } else if (esEmbalado) {
-                cardBg = '#ffffff';
-                cardBorder = '#facc15';
-                avatarBg = '#fef08a';
-                avatarBorder = '#eab308';
-                avatarColor = '#2D3277';
-                dotColor = '#eab308';
-                pillBg = '#fefce8';
-                pillColor = '#854d0e';
-                pillBorder = '#fde047';
-            } else if (esNuevoPendiente || esConfirmado) {
-                cardBg = esNuevoPendiente ? '#fffef5' : '#ffffff';
-                cardBorder = alertaStock ? '#f87171' : '#FFE600';
-                avatarBg = alertaStock ? '#fee2e2' : '#FFE600';
-                avatarBorder = alertaStock ? '#fca5a5' : '#eab308';
-                avatarColor = alertaStock ? '#b91c1c' : '#2D3277';
-                dotColor = alertaStock ? '#dc2626' : '#FFE600';
-                pillBg = alertaStock ? '#fee2e2' : '#fefce8';
-                pillColor = alertaStock ? '#b91c1c' : '#854d0e';
-                pillBorder = alertaStock ? '#fca5a5' : '#fde047';
+                botonAccionRapidaHtml = `<span style="color:#059669; font-size:10.5px; font-weight:800; padding:4px 6px;">✓ Listo</span>`;
+            } else if (esRechazado) {
+                botonAccionRapidaHtml = `<span style="color:#dc2626; font-size:10.5px; font-weight:800; padding:4px 6px;">Archivado</span>`;
             }
 
-            // Modalidad ya resuelta arriba
-
-            const textoCantItems = cantItems + (cantItems === 1 ? ' ítem' : ' ítems');
-            const resumenLinea = esRechazado
-                ? `<span style="color:#b91c1c; font-weight:700;">${esCanceladoCliente ? 'Cancelado por el cliente' : (esRechazadoComercio ? 'Rechazado por el comercio' : 'Cancelado por tiempo de espera')} · ${textoCantItems}</span>`
-                : (alertaStock
-                    ? `⚠️ Faltan ${itemsSinStock.length} productos · ${textoCantItems}`
-                    : (repartidorAsignado
-                        ? `Chofer: ${escaparTextoChat(repartidorAsignado)} · ${textoCantItems}`
-                        : (esNuevoPendiente ? `🔔 Tocar para aceptar o rechazar · ${textoCantItems}` : `${textoCantItems} · Pago Web`)));
+            const cardBorder = esNuevoPendiente ? '#FFE600' : (esRechazado ? '#fca5a5' : '#e2e8f0');
+            const cardBg = esNuevoPendiente ? '#fffef8' : '#ffffff';
 
             html += `
-                <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" style="background:${cardBg}; border-radius:18px; border:2px solid ${cardBorder}; box-shadow:0 3px 12px rgba(234,179,8,0.1), 0 1px 3px rgba(15,23,42,0.04); padding:12px 14px; position:relative; transition:all 0.18s ease;">
+                <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" onclick="window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
+                    style="background:${cardBg}; border-radius:14px; border:1.5px solid ${cardBorder}; box-shadow:0 2px 6px rgba(15,23,42,0.04); padding:9px 12px; cursor:pointer; transition:transform 0.1s ease, box-shadow 0.1s ease;">
                     
-                    <!-- FILA COMPACTA (ESTILO MENSAJERÍA BLANCO Y AMARILLO) -->
-                    <div onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="display:flex; align-items:center; gap:10px; cursor:pointer; user-select:none;">
-                        <!-- Avatar Circular Amarillo con Iniciales y Punto de Estado -->
-                        <div style="position:relative; width:42px; height:42px; border-radius:999px; background:${avatarBg}; border:2px solid ${avatarBorder}; display:flex; align-items:center; justify-content:center; font-weight:900; font-size:14px; color:${avatarColor}; flex-shrink:0; box-shadow:0 2px 5px rgba(234,179,8,0.25);">
-                            <span>${escaparTextoChat(iniciales)}</span>
-                            <span style="position:absolute; bottom:-1px; right:-1px; width:12px; height:12px; border-radius:999px; background:${dotColor}; border:2px solid #fff;"></span>
+                    <!-- LÍNEA 1: #RF, HORA, CLIENTE, BADGE MODALIDAD Y ESTADO -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;">
+                        <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
+                            <b style="font-size:12px; color:#2D3277; font-family:monospace; flex-shrink:0;">
+                                #${formatearIdCorto(p.id).toUpperCase()}
+                            </b>
+                            <span style="font-size:11px; color:#64748b; font-weight:700; flex-shrink:0;">
+                                ${formatFecha(p.created_at)}
+                            </span>
+                            <span style="font-size:13px; font-weight:800; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                                ${escaparTextoChat(capitalizarNombre(p.cliente_nombre || 'Cliente'))}
+                            </span>
                         </div>
-
-                        <!-- Centro: Cliente + Tipo Entrega + Dirección + Resumen -->
-                        <div style="flex:1; min-width:0;">
-                            <!-- Fila 1: Nombre del cliente + Badge Tipo Entrega a la izquierda y Estado a la derecha -->
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:3px;">
-                                <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
-                                    <span style="font-weight:900; font-size:14px; color:${esRechazado ? '#991b1b' : '#2D3277'}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                        ${escaparTextoChat(p.cliente_nombre || 'Cliente')}
-                                    </span>
-                                    ${badgeTipoEntrega}
-                                </div>
-                                <div style="flex-shrink:0;">
-                                    ${badgeEstadoHtml}
-                                </div>
-                            </div>
-
-                            <!-- Fila 2: Dirección/Retiro a la izquierda y Monto Total a la derecha -->
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px;">
-                                <div style="font-size:11.5px; color:#475569; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                    ${esRetiroEnTienda 
-                                        ? `🏪 Retira en: ${escaparTextoChat(p.sucursal_origen || 'Local Maciel')}` 
-                                        : `📍 ${escaparTextoChat(limpiarDireccion(p.direccion_entrega || 'Entrega a domicilio'))} · <span style="color:#2563eb; font-weight:700;">Despacha: ${escaparTextoChat(p.sucursal_origen || (p.sucursal_id ? ('Sucursal ' + p.sucursal_id) : 'Alfaro 1964'))}</span>`}
-                                </div>
-                                <div style="font-size:14px; font-weight:900; color:${totalColor}; ${esRechazado ? 'text-decoration:line-through;' : ''} white-space:nowrap; flex-shrink:0;">
-                                    ${formatMoney(p.total)}
-                                </div>
-                            </div>
-
-                            <!-- Fila 3: Resumen ítems + ID Corto a la izquierda y Hora a la derecha -->
-                            <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
-                                <div style="font-size:11px; color:#64748b; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; gap:4px; min-width:0; flex:1;">
-                                    ${checkIcon} <span style="overflow:hidden; text-overflow:ellipsis;">${resumenLinea}</span>
-                                    <span title="#${escaparTextoChat(p.id)}" style="background:${pillBg}; color:${pillColor}; border:1px solid ${pillBorder}; font-family:monospace; font-size:9.5px; font-weight:800; padding:1px 5px; border-radius:6px; flex-shrink:0;">#${escaparTextoChat(formatearIdCorto(p.id))}</span>
-                                </div>
-                                <span style="color:#64748b; font-size:10.5px; font-weight:700; white-space:nowrap; flex-shrink:0;">${formatFecha(p.created_at)}</span>
-                            </div>
-                        </div>
-
-                        <!-- Flecha indicadora de desplegable -->
-                        <div id="chevron-pedido-${escaparTextoChat(p.id)}" style="color:#2D3277; font-size:18px; font-weight:900; flex-shrink:0; transition:transform 0.2s ease; transform:${abierto ? 'rotate(90deg)' : 'rotate(0deg)'};">
-                            ›
+                        <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                            ${badgeTipoEntrega}
+                            ${badgeEstadoHtml}
                         </div>
                     </div>
 
-                    <!-- PANEL EXPANDIBLE AL CLICK: DETALLES, TICKET Y ACCIONES -->
-                    <div id="detalle-pedido-${escaparTextoChat(p.id)}" style="display:${abierto ? 'block' : 'none'}; margin-top:12px; padding-top:12px; border-top:1px solid #fef08a;">
-                        
-                        <!-- TICKET / COMANDA DIGITAL INTEGRADA (PEDIDOS ADENTRO DEL TICKET ESTILO BLANCO Y AMARILLO) -->
-                        <div style="background:#ffffff; border:2px dashed #facc15; border-radius:16px; padding:12px 14px; margin-bottom:10px; position:relative; box-shadow:0 2px 8px rgba(234,179,8,0.06);">
-                            <!-- Encabezado del Ticket -->
-                            <div style="display:flex; align-items:center; justify-content:space-between; padding-bottom:8px; margin-bottom:8px; border-bottom:1px dashed #fde047;">
-                                <div style="display:flex; align-items:center; gap:6px;">
-                                    <span style="font-size:15px;">🧾</span>
-                                    <div>
-                                        <div style="font-size:12px; font-weight:900; color:#2D3277; text-transform:uppercase; letter-spacing:0.3px;">
-                                            ${p.ticket_id ? `Ticket #${escaparTextoChat(p.ticket_id)}` : `Comanda #${escaparTextoChat(formatearIdCorto(p.id))}`}
-                                        </div>
-                                        <div style="font-size:10px; color:#64748b; font-weight:700;">
-                                            ${escaparTextoChat(p.sucursal_origen || 'Sucursal Maciel')} · ${formatFecha(p.created_at)}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div style="display:flex; align-items:center; gap:5px;">
-                                    ${p.ticket_id ? `
-                                        <button type="button" onclick="window.RepartoFacilDespacho.verTicket(${argumentoPedido(p.ticket_id)})" style="background:#fef9c3; color:#2D3277; border:1px solid #fde047; border-radius:8px; font-size:10.5px; font-weight:900; padding:3px 8px; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
-                                            Ver / Imprimir ↗
-                                        </button>
-                                    ` : ''}
-                                    ${puedeReasignar ? `
-                                        <button type="button" onclick="window.RepartoFacilDespacho.liberarPorCustodio(${argumentoPedido(p.id)})" style="background:#fff1f2; color:#be123c; border:1px solid #fecdd3; border-radius:8px; font-size:10px; font-weight:800; padding:3px 6px; cursor:pointer;">
-                                            ⚠️ Reasignar
-                                        </button>
-                                    ` : ''}
-                                </div>
-                            </div>
-
-                            <!-- Teléfono y WhatsApp dentro del Ticket -->
-                            ${p.cliente_telefono ? `
-                                <div style="display:flex; align-items:center; justify-content:space-between; background:#fffef5; border:1px solid #fde047; border-radius:9px; padding:5px 9px; margin-bottom:7px; font-size:11px;">
-                                    <span style="color:#2D3277; font-weight:700;">📞 ${escaparTextoChat(p.cliente_telefono)}</span>
-                                    <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer" style="color:#15803d; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:#f0fdf4; border:1px solid #bbf7d0; padding:2px 8px; border-radius:6px;">
-                                        <span>WhatsApp</span> ↗
-                                    </a>
-                                </div>
-                            ` : ''}
-
-                            <!-- Modalidad: Retiro en Tienda o Domicilio exacto y enlace GPS -->
-                            ${esRetiroEnTienda ? `
-                            <div style="display:flex; align-items:center; gap:6px; background:#ecfdf5; border:1px solid #a7f3d0; border-radius:9px; padding:7px 10px; margin-bottom:7px; font-size:11.5px; color:#065f46; font-weight:800;">
-                                <span>🏪 VENTA CON RETIRO EN TIENDA / LOCAL · El comprador retira directamente en el mostrador</span>
-                            </div>
-                            ` : `
-                            <div style="display:flex; align-items:flex-start; justify-content:space-between; background:#fffef5; border:1px solid #fde047; border-radius:9px; padding:6px 9px; margin-bottom:7px; font-size:11.5px; gap:8px;">
-                                <div style="color:#2D3277; font-weight:700; line-height:1.35; word-break:break-word; flex:1;" title="${escaparTextoChat(p.direccion_entrega || '')}">
-                                    🛵 <b>Domicilio:</b> ${escaparTextoChat(limpiarDireccion(p.direccion_entrega || 'Domicilio'))}
-                                </div>
-                                <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer" style="color:#2D3277; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:2px; flex-shrink:0; background:#FFE600; padding:3px 9px; border-radius:7px; border:1px solid #eab308; box-shadow:0 1px 3px rgba(234,179,8,0.2);">
-                                    <span>GPS</span> ↗
-                                </a>
-                            </div>
-                            `}
-
-                            <!-- Indicador de ETA y Chofer en Camino dentro del Ticket -->
-                            ${indicadorEtaHtml}
-
-                            <!-- Alerta de Stock si faltan cortes -->
-                            ${alertaStock ? `
-                                <div style="background:#fee2e2; color:#b91c1c; padding:6px 8px; border-radius:7px; font-size:11px; font-weight:700; margin-bottom:6px; border:1px solid #fca5a5;">
-                                    ⚠️ Faltan productos en stock para este ticket:
-                                    ${itemsSinStock.map(i => `
-                                        <div style="margin-top:2px; font-weight:600;">• ${escaparTextoChat(capitalizarNombre(i.producto_nombre || i.name || i.nombre))}: stock ${escaparTextoChat(i.stock_disponible)} de ${escaparTextoChat(i.stock_requerido)}</div>
-                                    `).join('')}
-                                </div>
-                            ` : ''}
-
-                            <!-- LISTA DE PEDIDOS / CORTES ADENTRO DEL TICKET (CON SCROLL CONTROLADO PARA TICKETS LARGOS) -->
-                            <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:8px; max-height:170px; overflow-y:auto; padding-right:4px;">
-                                ${itemsArray.map(item => {
-                                    const itemSinStock = itemsSinStock.find(s =>
-                                        (s.name || s.nombre) === (item.name || item.nombre) ||
-                                        s.id === item.id
-                                    );
-                                    const styleSinStock = itemSinStock ? 'color:#b91c1c; text-decoration:line-through; opacity:0.6;' : 'color:#2D3277;';
-                                    const cant = Number(item.quantity || item.cantidad || 1);
-                                    const precio = Number(item.price || item.precio || 0);
-                                    const subtotal = precio * cant;
-                                    const unidadTexto = item.unit || item.unidad || 'KG';
-                                    return `
-                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; border-bottom:1px solid #fef9c3;">
-                                        <div style="min-width:0; flex:1; padding-right:8px;">
-                                            <div style="font-weight:700; ${styleSinStock} overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                                                • ${cant} ${escaparTextoChat(unidadTexto)} de ${escaparTextoChat(capitalizarNombre(item.name || item.nombre || 'Artículo'))}
-                                                ${itemSinStock ? `<span style="color:#b91c1c; font-size:10px; margin-left:4px;">(falta stock)</span>` : ''}
-                                            </div>
-                                        </div>
-                                        <div style="font-weight:900; font-family:monospace; color:#2D3277; flex-shrink:0;">
-                                            ${formatMoney(subtotal)}
-                                        </div>
-                                    </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                            ${itemsArray.length > 3 ? `
-                                <div style="font-size:9.5px; color:#854d0e; text-align:center; padding-bottom:5px; font-weight:700;">
-                                    ↕ Deslizá para ver los ${itemsArray.length} cortes
-                                </div>
-                            ` : ''}
-
-                            ${p.notas ? `
-                                <div style="font-size:11px; color:#854d0e; background:#fefce8; padding:6px 9px; border-radius:8px; border:1px solid #fde047; margin-bottom:7px;">
-                                    <b>Nota del cliente:</b> "${escaparTextoChat(p.notas)}"
-                                </div>
-                            ` : ''}
-
-                            <!-- DESGLOSE COMPLETO DE IMPORTES (SUBTOTAL, ENVÍO, DESCUENTOS Y TOTAL) -->
-                            ${(() => {
-                                const subtotalCalculado = itemsArray.reduce((acc, it) => acc + (Number(it.price || it.precio || 0) * Number(it.quantity || it.cantidad || 1)), 0);
-                                const subtotalProd = Number(p.subtotal) > 0 ? Number(p.subtotal) : (subtotalCalculado || (Number(p.total || 0) - Number(p.costo_envio || 0)));
-                                const costoEnvioVal = Number(p.costo_envio || 0);
-                                const totalVal = Number(p.total || 0);
-                                const descuentoVal = Math.max(0, Math.round(((subtotalProd + costoEnvioVal) - totalVal) * 100) / 100);
-
-                                const metodoLower = String(p.metodo_pago || 'cash').toLowerCase();
-                                const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash');
-                                const esTransfer = metodoLower.includes('transfer');
-                                const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
-                                const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
-
-                                let iconoP = '💵';
-                                let tituloP = 'Efectivo contra entrega';
-                                let subtextoP = 'Cobrar en mano al entregar el pedido';
-                                let badgeTextoP = 'COBRAR EN EFECTIVO';
-                                let badgeBgP = '#fef3c7';
-                                let badgeColorP = '#92400e';
-                                let badgeBorderP = '#fde68a';
-                                let boxBgP = '#fffef5';
-                                let boxBorderP = '#fde047';
-
-                                if (esTransfer) {
-                                    iconoP = '🏦';
-                                    tituloP = 'Transferencia Bancaria';
-                                    subtextoP = 'Verificar comprobante bancario antes de despachar';
-                                    badgeTextoP = 'VERIFICAR PAGO';
-                                    badgeBgP = '#eff6ff';
-                                    badgeColorP = '#1e40af';
-                                    badgeBorderP = '#bfdbfe';
-                                    boxBgP = '#eff6ff';
-                                    boxBorderP = '#bfdbfe';
-                                } else if (esTarj) {
-                                    iconoP = '💳';
-                                    tituloP = 'Tarjeta Débito / Crédito';
-                                    subtextoP = 'Cobro procesado con tarjeta / Posnet móvil';
-                                    badgeTextoP = 'PAGO CON TARJETA';
-                                    badgeBgP = '#f0fdf4';
-                                    badgeColorP = '#166534';
-                                    badgeBorderP = '#bbf7d0';
-                                    boxBgP = '#f0fdf4';
-                                    boxBorderP = '#86efac';
-                                } else if (esMP) {
-                                    iconoP = '📱';
-                                    tituloP = 'Pago Online (Mercado Pago / Web)';
-                                    subtextoP = 'Acreditado y confirmado vía web';
-                                    badgeTextoP = 'PAGADO ONLINE';
-                                    badgeBgP = '#ecfdf5';
-                                    badgeColorP = '#065f46';
-                                    badgeBorderP = '#a7f3d0';
-                                    boxBgP = '#ecfdf5';
-                                    boxBorderP = '#6ee7b7';
-                                }
-
-                                return `
-                                <div style="display:flex; flex-direction:column; gap:4px; padding-top:8px; border-top:1px dashed #fde047; font-size:12px;">
-                                    <div style="display:flex; justify-content:space-between; align-items:center; color:#64748b;">
-                                        <span>Subtotal productos (${cantItems} ${cantItems === 1 ? 'ítem' : 'ítems'}):</span>
-                                        <span style="font-family:monospace; font-weight:700; color:#2D3277;">${formatMoney(subtotalProd)}</span>
-                                    </div>
-                                    <div style="display:flex; justify-content:space-between; align-items:center; color:#64748b;">
-                                        <span>Costo de envío / delivery:</span>
-                                        <span style="font-family:monospace; font-weight:700; color:${costoEnvioVal > 0 ? '#2563eb' : '#059669'};">
-                                            ${costoEnvioVal > 0 ? formatMoney(costoEnvioVal) : (esRetiroEnTienda ? 'Retiro en Tienda' : 'Envío Gratis')}
-                                        </span>
-                                    </div>
-                                    ${descuentoVal > 0 ? `
-                                    <div style="display:flex; justify-content:space-between; align-items:center; color:#059669;">
-                                        <span>Descuento aplicado:</span>
-                                        <span style="font-family:monospace; font-weight:800;">-${formatMoney(descuentoVal)}</span>
-                                    </div>
-                                    ` : ''}
-                                    <div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; margin-top:2px; border-top:1px solid #fef08a; font-size:13.5px;">
-                                        <span style="font-weight:900; color:#2D3277;">TOTAL TICKET:</span>
-                                        <span style="font-weight:900; color:#2D3277; font-family:monospace; font-size:15px;">${formatMoney(totalVal)}</span>
-                                    </div>
-                                </div>
-
-                                <!-- MÉTODO DE PAGO DESTACADO Y CONDICIÓN DE COBRO -->
-                                <div style="background:${boxBgP}; border:1.5px solid ${boxBorderP}; border-radius:10px; padding:8px 10px; margin-top:8px; font-size:11.5px; display:flex; align-items:center; justify-content:space-between; gap:6px;">
-                                    <div style="display:flex; align-items:center; gap:6px; min-width:0;">
-                                        <span style="font-size:16px;">${iconoP}</span>
-                                        <div style="min-width:0;">
-                                            <div style="font-weight:900; color:#2D3277;">${tituloP}</div>
-                                            <div style="font-size:10px; color:#64748b; font-weight:700;">${subtextoP}</div>
-                                        </div>
-                                    </div>
-                                    <span style="background:${badgeBgP}; color:${badgeColorP}; border:1px solid ${badgeBorderP}; font-size:9.5px; font-weight:900; padding:2.5px 7px; border-radius:6px; white-space:nowrap; flex-shrink:0;">
-                                        ${badgeTextoP}
-                                    </span>
-                                </div>
-                                `;
-                            })()}
+                    <!-- LÍNEA 2: PAGO, MONTO TOTAL Y 3 BOTONES EN LÍNEA -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                        <div style="display:flex; align-items:center; gap:6px; min-width:0;">
+                            <span style="background:${pagoBadgeBg}; color:${pagoBadgeColor}; border:1px solid ${pagoBadgeBorder}; font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px; white-space:nowrap;">
+                                ${pagoBadgeTexto}
+                            </span>
+                            <b style="font-size:14px; font-weight:900; color:#2D3277; font-family:monospace; white-space:nowrap;">
+                                ${formatMoney(p.total)}
+                            </b>
                         </div>
 
-                        ${esNuevoPendiente ? `
-                            <!-- DECISIÓN DE COBRO FÁCIL: ACEPTAR O RECHAZAR -->
-                            <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:14px; padding:12px; margin-bottom:8px; box-shadow:0 2px 6px rgba(234,179,8,0.08);">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
-                                    <span style="font-size:11px; font-weight:900; color:#2D3277; text-transform:uppercase;">
-                                        ${esRetiroEnTienda ? '¿Aceptar pedido para retiro en tienda?' : '¿Aceptar pedido para despacho?'}
-                                    </span>
-                                    <span style="background:${esRetiroEnTienda ? '#ecfdf5' : '#fef9c3'}; color:${esRetiroEnTienda ? '#065f46' : '#2D3277'}; border:1px solid ${esRetiroEnTienda ? '#a7f3d0' : '#fde047'}; font-size:10px; font-weight:800; padding:1px 6px; border-radius:6px;">
-                                        ${esRetiroEnTienda ? '🏪 En Mostrador' : `⏱️ Chofer a sucursal: ~${etaBaseMinutos}m`}
-                                    </span>
-                                </div>
-                                <div style="font-size:10.5px; color:#64748b; line-height:1.4; margin-bottom:10px;">
-                                    ${esRetiroEnTienda 
-                                        ? '💬 <i>El comprador retira directamente en tu local. Al aceptar, se emite el ticket y le avisamos que estás preparando su pedido.</i>'
-                                        : '💬 <i>Podés usar el <b>Chat con el cliente</b> para pulir el pedido antes de aceptar o embalar si necesitás unos minutos extra sin apurar al cliente.</i>'}
-                                </div>
-                                <div style="display:flex; gap:8px;">
-                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})" style="flex:1; background:#ffffff; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; font-size:11px; font-weight:800; padding:8px 6px !important; cursor:pointer;">
-                                        ✕ Rechazar
-                                    </button>
-                                    <button type="button" class="btn" onclick="window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})" style="flex:1.5; background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:12px; font-weight:900; padding:8px 8px !important; cursor:pointer; box-shadow:0 3px 10px rgba(255,230,0,0.35);">
-                                        ${esRetiroEnTienda ? '✓ Aceptar y Preparar' : '✓ Aceptar y Publicar'}
-                                    </button>
-                                </div>
-                            </div>
-                        ` : ''}
-
-                        <!-- BOTONES DE ACCIÓN: CERRAR DETALLE, CHAT Y EMBALADO CON IMPACTO DE TIEMPO -->
-                        <div style="display:flex; gap:6px; width:100%; box-sizing:border-box;">
-                            <button type="button" class="btn btn-ver-pedido" onclick="window.RepartoFacilDespacho.toggleDetalle(${argumentoPedido(p.id)})" style="flex:1; min-width:0; background:#ffffff; color:#475569; border:1.5px solid #e2e8f0; border-radius:12px; font-size:11px; font-weight:800; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap; transition:all 0.15s ease;">
-                                <span>📋</span>
-                                <span>Ocultar</span>
+                        <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;" onclick="event.stopPropagation()">
+                            <!-- Botón 1: Ver Ticket / Comanda (ícono SVG limpio) -->
+                            <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})" title="Ver Comanda completa"
+                                style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:8px; padding:5px 7px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                ${SVG_ICONOS.ticket}
+                                <span>Ticket</span>
                             </button>
 
-                            <button type="button" class="btn btn-chat-pedido" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" style="flex:1; min-width:0; background:${p.unread_chat_count > 0 ? '#fee2e2' : '#fefce8'}; color:${p.unread_chat_count > 0 ? '#b91c1c' : '#2D3277'}; border:1.5px solid ${p.unread_chat_count > 0 ? '#ef4444' : '#fde047'}; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:pointer; white-space:nowrap; transition:all 0.15s ease;">
-                                <span>💬</span>
+                            <!-- Botón 2: Chat (con contador numérico) -->
+                            <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" title="Chat con cliente"
+                                style="background:${p.unread_chat_count > 0 ? '#ef4444' : '#eff6ff'}; color:${p.unread_chat_count > 0 ? '#ffffff' : '#1d4ed8'}; border:1px solid ${p.unread_chat_count > 0 ? '#dc2626' : '#bfdbfe'}; border-radius:8px; padding:5px 7px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 1px 2px rgba(0,0,0,0.03);">
+                                ${SVG_ICONOS.chat}
                                 <span>Chat</span>
-                                ${p.unread_chat_count > 0 ? `<span style="background:#ef4444; color:#ffffff; font-size:9.5px; font-weight:900; padding:1px 6px; border-radius:999px; margin-left:3px; box-shadow:0 1px 3px rgba(239,68,68,0.4);">${p.unread_chat_count}</span>` : ''}
+                                ${p.unread_chat_count > 0 ? `<span style="background:#ffffff; color:#ef4444; font-size:9.5px; font-weight:900; padding:0 5px; border-radius:999px;">${p.unread_chat_count}</span>` : ''}
                             </button>
 
-                            <button type="button" class="btn btn-embalar-pedido" onclick="${accionBotonEmbalar}" ${(!accionBotonEmbalar || esRechazado) ? 'disabled' : ''} style="flex:1.4; min-width:0; background:${bgBotonEmbalar}; color:${colorBotonEmbalar}; border:${borderBotonEmbalar}; border-radius:12px; font-size:11px; font-weight:900; padding:8px 4px !important; gap:3px !important; display:inline-flex; align-items:center; justify-content:center; cursor:${accionBotonEmbalar ? 'pointer' : 'default'}; box-shadow:${accionBotonEmbalar ? '0 2px 8px rgba(234,179,8,0.25)' : 'none'}; white-space:nowrap; transition:all 0.15s ease;">
-                                <span>${iconoBotonEmbalar}</span>
-                                <span>${textoBotonEmbalar}</span>
-                            </button>
+                            <!-- Botón 3: Acción Principal -->
+                            ${botonAccionRapidaHtml}
                         </div>
                     </div>
 
@@ -1005,46 +823,323 @@
         });
 
         contenedor.innerHTML = html;
+
+        // Si hay comanda modal abierta, asegurar renderizado actualizado
+        renderizarComandaModal();
     }
 
-    // Toggle para desplegar/ocultar detalles al click en la fila compacta
-    // Acción: Entregar pedido en mostrador al cliente
-    async function entregarPedidoMostrador(orderId) {
-        if (!confirm(`¿Confirmás que el cliente retiró el pedido #${escaparTextoChat(orderId)} en el mostrador?`)) {
+    // Modal centrado fixed/overlay con la comanda completa del pedido seleccionado
+    function renderizarComandaModal() {
+        if (!pedidoModal) {
+            const m = $('rfComandaModal');
+            if (m) m.style.display = 'none';
             return;
         }
-        try {
-            mostrarToast(`🏪 Entregando pedido #${escaparTextoChat(orderId)} en mostrador…`);
-            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/entregar-mostrador`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' }
-            });
-            const data = await resp.json();
-            if (data.success) {
-                mostrarToast(`✓ Pedido #${escaparTextoChat(orderId)} entregado en mostrador.`);
-                cargarPedidos();
-            } else {
-                mostrarToast(`❌ Error: ${data.error || 'No se pudo entregar el pedido'}`);
-            }
-        } catch (e) {
-            mostrarToast(`❌ Error de conexión: ${e.message}`);
+
+        const p = pedidosLista.find(item => String(item.id) === String(pedidoModal));
+        if (!p) {
+            cerrarModal();
+            return;
         }
+
+        let modal = $('rfComandaModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'rfComandaModal';
+            modal.style.cssText = `
+                position:fixed; inset:0; z-index:999990; background:rgba(15,23,42,0.65);
+                backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center;
+                padding:12px; box-sizing:border-box;
+            `;
+            modal.onclick = (e) => {
+                if (e.target === modal) cerrarModal();
+            };
+            document.body.appendChild(modal);
+        } else {
+            modal.style.display = 'flex';
+        }
+
+        const estadoLower = (p.estado || 'pending').toLowerCase();
+        const esNuevoPendiente = estadoLower === 'pending' || estadoLower === 'pending_store';
+        const esConfirmado = estadoLower === 'confirmed' || estadoLower === 'accepted';
+        const esEmbalado = estadoLower === 'ready' || estadoLower === 'embalado';
+        const esEntregado = estadoLower === 'delivered';
+        const esTimeout = estadoLower === 'cancelled_timeout';
+        const esCanceladoCliente = estadoLower === 'cancelled' || estadoLower === 'cancelled_by_client';
+        const esRechazadoComercio = estadoLower === 'rejected';
+        const esRechazado = esRechazadoComercio || esCanceladoCliente || esTimeout;
+
+        const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
+        const esRetiroEnTienda = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+        const badgeTipoEntrega = esRetiroEnTienda
+            ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">🏪 En Tienda</span>`
+            : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">🛵 Con Delivery</span>`;
+
+        const itemsArray = Array.isArray(p.items) ? p.items : [];
+        const cantItems = itemsArray.reduce((acc, item) => acc + (Number(item.quantity || item.cantidad || 1)), 0);
+
+        const subtotalCalculado = itemsArray.reduce((acc, it) => acc + (Number(it.price || it.precio || 0) * Number(it.quantity || it.cantidad || 1)), 0);
+        const subtotalProd = Number(p.subtotal) > 0 ? Number(p.subtotal) : (subtotalCalculado || (Number(p.total || 0) - Number(p.costo_envio || 0)));
+        const costoEnvioVal = Number(p.costo_envio || 0);
+        const totalVal = Number(p.total || 0);
+        const descuentoVal = Math.max(0, Math.round(((subtotalProd + costoEnvioVal) - totalVal) * 100) / 100);
+
+        const metodoLower = String(p.metodo_pago || 'cash').toLowerCase();
+        const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash');
+        const esTransfer = metodoLower.includes('transfer');
+        const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
+        const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
+
+        let iconoP = '💵';
+        let tituloP = 'Efectivo contra entrega';
+        let subtextoP = 'Cobrar en mano al entregar el pedido';
+        let badgeTextoP = 'COBRAR EN EFECTIVO';
+        let badgeBgP = '#fef3c7';
+        let badgeColorP = '#92400e';
+        let badgeBorderP = '#fde68a';
+        let boxBgP = '#fffef5';
+        let boxBorderP = '#fde047';
+
+        if (esTransfer) {
+            iconoP = '🏦';
+            tituloP = 'Transferencia Bancaria';
+            subtextoP = 'Verificar comprobante bancario antes de despachar';
+            badgeTextoP = 'VERIFICAR PAGO';
+            badgeBgP = '#eff6ff';
+            badgeColorP = '#1e40af';
+            badgeBorderP = '#bfdbfe';
+            boxBgP = '#eff6ff';
+            boxBorderP = '#bfdbfe';
+        } else if (esTarj) {
+            iconoP = '💳';
+            tituloP = 'Tarjeta Débito / Crédito';
+            subtextoP = 'Cobro procesado con tarjeta / Posnet';
+            badgeTextoP = 'PAGO CON TARJETA';
+            badgeBgP = '#f0fdf4';
+            badgeColorP = '#166534';
+            badgeBorderP = '#bbf7d0';
+            boxBgP = '#f0fdf4';
+            boxBorderP = '#86efac';
+        } else if (esMP) {
+            iconoP = '📱';
+            tituloP = 'Pago Online (Mercado Pago / Web)';
+            subtextoP = 'Acreditado y confirmado vía web';
+            badgeTextoP = 'PAGADO ONLINE';
+            badgeBgP = '#ecfdf5';
+            badgeColorP = '#065f46';
+            badgeBorderP = '#a7f3d0';
+            boxBgP = '#ecfdf5';
+            boxBorderP = '#6ee7b7';
+        }
+
+        let botonesAccionModal = '';
+        if (esNuevoPendiente) {
+            botonesAccionModal = `
+                <button type="button" onclick="window.RepartoFacilDespacho.rechazarPedido(${argumentoPedido(p.id)})"
+                    style="background:#ffffff; color:#b91c1c; border:1px solid #fca5a5; border-radius:10px; padding:9px 12px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                    ${SVG_ICONOS.cruz}
+                    <span>Rechazar</span>
+                </button>
+                <button type="button" onclick="window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})"
+                    style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(234,179,8,0.3);">
+                    ${SVG_ICONOS.check}
+                    <span>${esRetiroEnTienda ? 'Aceptar y Preparar' : 'Aceptar y Publicar'}</span>
+                </button>
+            `;
+        } else if (esConfirmado) {
+            botonesAccionModal = `
+                <button type="button" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)"
+                    style="background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(16,185,129,0.3);">
+                    <span>📦</span>
+                    <span>${esRetiroEnTienda ? 'Listo p/ Retirar' : 'Embalar'}</span>
+                </button>
+            `;
+        } else if (esEmbalado && esRetiroEnTienda) {
+            botonesAccionModal = `
+                <button type="button" onclick="window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})"
+                    style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(2,132,199,0.3);">
+                    <span>🛍️</span>
+                    <span>Entregar al Cliente</span>
+                </button>
+            `;
+        } else if (esEmbalado && !esRetiroEnTienda) {
+            botonesAccionModal = `
+                <span style="font-size:12px; font-weight:800; color:#047857; display:inline-flex; align-items:center; gap:4px; padding:8px 10px; background:#ecfdf5; border-radius:10px;">
+                    <span>✓</span>
+                    <span>Embalado · Esperando chofer</span>
+                </span>
+            `;
+        }
+
+        modal.innerHTML = `
+            <div style="background:#ffffff; width:100%; max-width:440px; max-height:90vh; border-radius:20px; box-shadow:0 20px 60px rgba(0,0,0,0.3); display:flex; flex-direction:column; overflow:hidden; font-family:'Inter', sans-serif; border:2px solid #FFE600;" onclick="event.stopPropagation()">
+                
+                <!-- HEADER DE LA COMANDA -->
+                <div style="background:#2D3277; color:#ffffff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+                    <div>
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:16px;">🧾</span>
+                            <span style="font-size:15px; font-weight:900; color:#FFE600; font-family:monospace; letter-spacing:0.5px;">
+                                #${formatearIdCorto(p.id).toUpperCase()}
+                            </span>
+                            ${badgeTipoEntrega}
+                        </div>
+                        <div style="font-size:11px; color:#cbd5e1; font-weight:700; margin-top:3px;">
+                            ${escaparTextoChat(p.sucursal_origen || 'Sucursal Maciel')} · ${formatFecha(p.created_at)}
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.RepartoFacilDespacho.cerrarModal()" aria-label="Cerrar comanda"
+                        style="background:rgba(255,255,255,0.15); border:none; border-radius:999px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#ffffff; transition:all 0.15s ease;">
+                        ${SVG_ICONOS.cruz}
+                    </button>
+                </div>
+
+                <!-- CUERPO DE LA COMANDA (SCROLLABLE) -->
+                <div style="overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:10px; flex:1;">
+                    
+                    <!-- CLIENTE Y WHATSAPP -->
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; display:flex; align-items:center; justify-content:space-between; gap:8px;">
+                        <div>
+                            <div style="font-size:10px; color:#64748b; font-weight:800; text-transform:uppercase;">Cliente</div>
+                            <div style="font-size:13.5px; font-weight:900; color:#1e293b; margin-top:1px;">
+                                ${escaparTextoChat(capitalizarNombre(p.cliente_nombre || 'Cliente'))}
+                            </div>
+                            ${p.cliente_telefono ? `<div style="font-size:11px; color:#475569; font-weight:700; margin-top:2px;">📞 ${escaparTextoChat(p.cliente_telefono)}</div>` : ''}
+                        </div>
+                        ${p.cliente_telefono ? `
+                            <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer"
+                                style="color:#15803d; font-size:11px; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:#f0fdf4; border:1px solid #bbf7d0; padding:5px 10px; border-radius:8px; flex-shrink:0;">
+                                <span>WhatsApp</span> ↗
+                            </a>
+                        ` : ''}
+                    </div>
+
+                    <!-- MODALIDAD DE ENTREGA / DOMICILIO -->
+                    ${esRetiroEnTienda ? `
+                        <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:10px 12px; font-size:11.5px; color:#065f46; font-weight:800; display:flex; align-items:center; gap:6px;">
+                            <span style="font-size:16px;">🏪</span>
+                            <div>
+                                <div style="font-weight:900;">RETIRO EN MOSTRADOR / TIENDA</div>
+                                <div style="font-size:10.5px; font-weight:600; opacity:0.9;">El comprador retira directamente en el local físico.</div>
+                            </div>
+                        </div>
+                    ` : `
+                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:10px 12px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
+                            <div style="flex:1;">
+                                <div style="font-size:10px; color:#854d0e; font-weight:800; text-transform:uppercase;">Domicilio de entrega</div>
+                                <div style="font-size:12px; font-weight:800; color:#2D3277; margin-top:2px; line-height:1.35;">
+                                    🛵 ${escaparTextoChat(limpiarDireccion(p.direccion_entrega || 'Domicilio'))}
+                                </div>
+                            </div>
+                            <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer"
+                                style="color:#2D3277; font-size:11px; font-weight:900; text-decoration:none; display:inline-flex; align-items:center; gap:3px; background:#FFE600; padding:5px 10px; border-radius:8px; border:1px solid #eab308; flex-shrink:0;">
+                                <span>GPS</span> ↗
+                            </a>
+                        </div>
+                    `}
+
+                    <!-- LISTA DE PRODUCTOS / CORTES -->
+                    <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px;">
+                        <div style="font-size:10.5px; font-weight:800; color:#64748b; text-transform:uppercase; margin-bottom:6px; border-bottom:1px solid #f1f5f9; padding-bottom:4px;">
+                            Productos del ticket (${cantItems} ${cantItems === 1 ? 'ítem' : 'ítems'})
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:5px; max-height:180px; overflow-y:auto; padding-right:2px;">
+                            ${itemsArray.map(item => {
+                                const cant = Number(item.quantity || item.cantidad || 1);
+                                const precio = Number(item.price || item.precio || 0);
+                                const subtotal = precio * cant;
+                                const unidadTexto = item.unit || item.unidad || 'KG';
+                                return `
+                                    <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; padding:3px 0; border-bottom:1px dashed #f1f5f9;">
+                                        <div style="font-weight:700; color:#1e293b; min-width:0; flex:1; padding-right:6px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                                            • ${cant} ${escaparTextoChat(unidadTexto)} · ${escaparTextoChat(capitalizarNombre(item.name || item.nombre || 'Artículo'))}
+                                        </div>
+                                        <div style="font-weight:900; font-family:monospace; color:#2D3277; flex-shrink:0;">
+                                            ${formatMoney(subtotal)}
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+
+                    <!-- DESGLOSE ECONÓMICO -->
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:12px; padding:10px 12px; font-size:12px; display:flex; flex-direction:column; gap:4px;">
+                        <div style="display:flex; justify-content:space-between; color:#64748b;">
+                            <span>Subtotal productos:</span>
+                            <span style="font-family:monospace; font-weight:700; color:#2D3277;">${formatMoney(subtotalProd)}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; color:#64748b;">
+                            <span>Costo de envío:</span>
+                            <span style="font-family:monospace; font-weight:700; color:${costoEnvioVal > 0 ? '#2563eb' : '#059669'};">
+                                ${costoEnvioVal > 0 ? formatMoney(costoEnvioVal) : (esRetiroEnTienda ? 'Retiro en Tienda' : 'Envío Gratis')}
+                            </span>
+                        </div>
+                        ${descuentoVal > 0 ? `
+                            <div style="display:flex; justify-content:space-between; color:#059669;">
+                                <span>Descuento aplicado:</span>
+                                <span style="font-family:monospace; font-weight:800;">-${formatMoney(descuentoVal)}</span>
+                            </div>
+                        ` : ''}
+                        <div style="display:flex; justify-content:space-between; align-items:center; padding-top:6px; margin-top:2px; border-top:1.5px solid #cbd5e1; font-size:14px;">
+                            <span style="font-weight:900; color:#2D3277;">TOTAL TICKET:</span>
+                            <span style="font-weight:900; color:#2D3277; font-family:monospace; font-size:16px;">${formatMoney(totalVal)}</span>
+                        </div>
+                    </div>
+
+                    <!-- CONDICIÓN Y MÉTODO DE PAGO -->
+                    <div style="background:${boxBgP}; border:1.5px solid ${boxBorderP}; border-radius:12px; padding:9px 12px; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:6px;">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <span style="font-size:18px;">${iconoP}</span>
+                            <div>
+                                <div style="font-weight:900; color:#2D3277;">${tituloP}</div>
+                                <div style="font-size:10.5px; color:#64748b; font-weight:700;">${subtextoP}</div>
+                            </div>
+                        </div>
+                        <span style="background:${badgeBgP}; color:${badgeColorP}; border:1px solid ${badgeBorderP}; font-size:9.5px; font-weight:900; padding:3px 8px; border-radius:6px; white-space:nowrap; flex-shrink:0;">
+                            ${badgeTextoP}
+                        </span>
+                    </div>
+
+                    ${p.notas ? `
+                        <div style="font-size:11px; color:#854d0e; background:#fefce8; padding:8px 10px; border-radius:10px; border:1px solid #fde047;">
+                            <b>Nota del cliente:</b> "${escaparTextoChat(p.notas)}"
+                        </div>
+                    ` : ''}
+
+                </div>
+
+                <!-- FOOTER FIJO DE ACCIÓN -->
+                <div style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:10px 14px; display:flex; gap:6px; align-items:center; justify-content:space-between; flex-shrink:0;">
+                    <div style="display:flex; gap:6px;">
+                        <button type="button" onclick="window.RepartoFacilDespacho.imprimirComanda(${argumentoPedido(p.id)})"
+                            style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:10px; padding:7px 11px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                            ${SVG_ICONOS.print}
+                            <span>Imprimir</span>
+                        </button>
+                        <button type="button" onclick="window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})"
+                            style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; padding:7px 11px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px;">
+                            ${SVG_ICONOS.chat}
+                            <span>Chat</span>
+                        </button>
+                    </div>
+
+                    <div style="display:flex; gap:6px; align-items:center;">
+                        ${botonesAccionModal}
+                        <button type="button" onclick="window.RepartoFacilDespacho.cerrarModal()"
+                            style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:10px; padding:7px 10px; font-size:11.5px; font-weight:800; cursor:pointer;">
+                            Cerrar
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+        `;
     }
 
+    // Toggle compatible
     function toggleDetalle(orderId) {
-        const d = $('detalle-pedido-' + orderId);
-        const chev = $('chevron-pedido-' + orderId);
-        if (!d) return;
-        const visible = d.style.display !== 'none';
-        if (visible) {
-            d.style.display = 'none';
-            pedidosExpandidos.delete(orderId);
-            if (chev) chev.style.transform = 'rotate(0deg)';
-        } else {
-            d.style.display = 'block';
-            pedidosExpandidos.add(orderId);
-            if (chev) chev.style.transform = 'rotate(90deg)';
-        }
+        abrirModal(orderId);
     }
 
     // Acción: ACEPTAR PEDIDO (Cobro Fácil emite Ticket y publica a repartidores)
@@ -1676,8 +1771,8 @@
                                 <span id="iconoSonidoReparto">${sonidoHabilitado ? '🔔' : '🔕'}</span>
                                 <span id="lblSonidoReparto" style="font-size:9.5px; font-weight:900;">${sonidoHabilitado ? 'ON' : 'OFF'}</span>
                             </button>
-                            <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos(true)" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:13px; font-weight:900; padding:4px 9px; cursor:pointer; color:#2D3277; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Refrescar pedidos">
-                                ↻
+                            <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos(true)" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:13px; font-weight:900; padding:5px 8px; cursor:pointer; color:#2D3277; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:inline-flex; align-items:center; justify-content:center;" title="Refrescar pedidos">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             </button>
                             <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:10px; font-weight:900; padding:5px 9px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(234,179,8,0.25);">
                                 <span>⚡ Sincronizar Stock</span>
@@ -1752,6 +1847,11 @@
         sincronizarStockTpv,
         toggleSonido,
         toggleDetalle,
+        setTab,
+        setBusquedaHistorial,
+        abrirModal,
+        cerrarModal,
+        imprimirComanda,
         aceptarPedido,
         rechazarPedido,
         marcarEmbalado,
