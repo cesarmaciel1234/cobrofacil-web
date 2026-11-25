@@ -217,12 +217,11 @@
             <div class="topbar-mobile-title" style="display: none; font-size: 16px; font-weight: 800; color: var(--text-primary); text-align: center; flex: 1; letter-spacing: -0.02em;">Cobro Fácil</div>
             
             <div style="display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0;" class="topbar-greeting-block">
-                <div id="topbarNormalMode" class="topbar-central-pill" style="display: inline-flex; align-items: center; gap: 6px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 4px 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 100%; cursor: pointer;">
-                    <span style="font-size: 15px; flex-shrink: 0;" aria-hidden="true">🏪</span>
-                    <select id="topbarSucursalSelect" class="sucursal-filtro-select-central" aria-label="Filtrar por sucursal" style="border: none; background: transparent; font-size: 13.5px; font-weight: 800; color: #1e293b; outline: none; cursor: pointer; padding: 0 4px 0 0; text-align: center; max-width: 175px; text-overflow: ellipsis; white-space: nowrap; -webkit-appearance: none; appearance: none;">
+                <div id="topbarNormalMode" class="topbar-central-pill" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 0 12px; height: 36px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 100%; cursor: pointer;">
+                    <span style="font-size: 15px; line-height: 1; flex-shrink: 0;" aria-hidden="true">🏪</span>
+                    <select id="topbarSucursalSelect" class="sucursal-filtro-select-central" aria-label="Filtrar por sucursal" style="border: none; background: transparent; font-size: 13px; font-weight: 800; color: #1e293b; outline: none; cursor: pointer; padding: 0; text-align: center; max-width: 175px; text-overflow: ellipsis; white-space: nowrap; line-height: 1;">
                         <option value="">{{ empresa_nombre|upper }} · TODAS</option>
                     </select>
-                    <svg viewBox="0 0 24 24" width="13" height="13" stroke="#64748b" stroke-width="2.5" fill="none" style="flex-shrink: 0; pointer-events: none;" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
                     <strong id="empresaNombre" style="display: none;">{{ empresa_nombre|upper }}</strong>
                     <button type="button" id="topbarIcon" style="display: none;" aria-label="Sucursales"></button>
                 </div>
@@ -1090,6 +1089,6 @@
     <script src="/static/js/espejo-engine.js?v=7.7"></script>
     <script src="/static/js/nodo.js?v=7.7"></script>
     <script src="/static/js/barra/neural-hud.js?v=10.2"></script>
-    <script src="/static/js/app.js?v=9.8"></script>
+    <script src="/static/js/app.js?v=9.9"></script>
 </body>
 </html>
