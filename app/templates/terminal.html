@@ -878,9 +878,12 @@
                 <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px;">
                     <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
                         <button type="button" id="modalTerminalCancelar" class="btn btn-ghost" style="border-radius:10px; font-weight:700; padding:10px;">Cancelar</button>
-                        <button type="submit" id="modalTerminalGuardar" class="btn btn-primary" style="background:#FFE600; color:#2D3277; font-weight:800; border-radius:10px; padding:10px;">Guardar</button>
+                        <button type="submit" id="modalTerminalGuardar" class="btn btn-primary" style="background:#FFE600; color:#2D3277; font-weight:800; border-radius:10px; padding:10px;">Guardar Cambios</button>
                     </div>
-                    <button type="button" id="modalTerminalEliminar" class="btn btn-ghost" style="color:#ef4444; border-radius:10px; font-weight:700; border:1px solid #fee2e2; padding:6px; font-size:11px;">🗑️ Desvincular de la empresa</button>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <button type="button" id="modalTerminalRevocar" class="btn btn-ghost" style="color:#b91c1c; border-radius:10px; font-weight:700; border:1px solid #fecaca; background:#fef2f2; padding:8px 6px; font-size:11px;">🚫 Bloquear / Revocar</button>
+                        <button type="button" id="modalTerminalEliminar" class="btn btn-ghost" style="color:#64748b; border-radius:10px; font-weight:700; border:1px solid #e2e8f0; background:#f8fafc; padding:8px 6px; font-size:11px;">🗑️ Desvincular</button>
+                    </div>
                 </div>
             </form>
         </div>
@@ -964,7 +967,7 @@
     <script src="/static/js/barra/cobros.js?v=7.7"></script>
     <script src="/static/js/barra/caja.js?v=7.9"></script>
     <script src="/static/vendor/leaflet.js?v=1.9.4"></script>
-    <script src="/static/js/barra/mi-empresa.js?v=8.5"></script>
+    <script src="/static/js/barra/mi-empresa.js?v=8.7"></script>
     <script src="/static/js/barra/cartera.js?v=7.7"></script>
     <script src="/static/js/barra/pedidos.js?v=7.8"></script>
     <script src="/static/js/barra/armar.js?v=8.0"></script>

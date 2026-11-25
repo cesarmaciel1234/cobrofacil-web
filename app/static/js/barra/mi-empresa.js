@@ -639,16 +639,24 @@
                                         <span style="font-size:14px;">🖥️</span>
                                         <strong style="color:#1e293b; font-size:12px;">${textoSeguro(pt.nombre || 'PC Nueva')}</strong>
                                     </div>
-                                    <span style="background:#fef9c3; color:#a16207; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">PENDIENTE</span>
+                                    ${pt.activo === -1
+                                        ? '<span style="background:#fee2e2; color:#b91c1c; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">BLOQUEADA</span>'
+                                        : '<span style="background:#fef9c3; color:#a16207; font-size:9px; font-weight:800; padding:2px 6px; border-radius:4px;">PENDIENTE</span>'}
                                 </div>
                                 <div style="display:flex; flex-direction:column; gap:2px; color:#64748b; font-size:10px;">
                                     <span>ID: <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px; word-break:break-all;">${textoSeguro(pt.identificador_pc)}</code></span>
                                     ${pt.ultimo_sync ? `<span>Último saludo: ${textoSeguro(pt.ultimo_sync.replace('GMT', '').trim())}</span>` : ''}
                                 </div>
                             </div>
-                            <button type="button" class="btn-asignar-terminal" data-tid="${pt.id}" style="width:100%; background:#FFE600; border:none; border-radius:8px; padding:8px 12px; font-size:11px; font-weight:800; color:#2D3277; cursor:pointer; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
-                                + Asignar a Sucursal
-                            </button>
+                            <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                                <button type="button" class="btn-asignar-terminal" data-tid="${pt.id}" style="flex:1; min-width:130px; background:#FFE600; border:none; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:800; color:#2D3277; cursor:pointer; text-align:center;">
+                                    + Asignar Sucursal
+                                </button>
+                                ${pt.activo === -1
+                                    ? `<button type="button" class="btn-reactivar-terminal" data-tid="${pt.id}" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; color:#15803d; cursor:pointer;">✓ Desbloquear</button>`
+                                    : `<button type="button" class="btn-revocar-terminal" data-tid="${pt.id}" style="background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; color:#b91c1c; cursor:pointer;">🚫 Revocar</button>`}
+                                <button type="button" class="btn-desvincular-terminal" data-tid="${pt.id}" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:700; color:#64748b; cursor:pointer;">🗑️ Desvincular</button>
+                            </div>
                         </div>
                     `).join('')}
                 </div>` : ''}
@@ -675,7 +683,7 @@
                             ${suc.whatsapp ? `<small style="display:block; color:#16a34a; font-size:11px; font-weight:700;">📱 WhatsApp: ${textoSeguro(suc.whatsapp)}</small>` : ''}
                         </div>
                         <button type="button" class="btn-editar-sucursal" data-id="${suc.id}" style="background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:4px 8px; font-size:11px; font-weight:700; color:#475569; cursor:pointer;">
-                            ✎ Editar
+                            ✎ Editar Sucursal
                         </button>
                     </div>
 
@@ -684,7 +692,7 @@
                         <span style="font-size:10px; font-weight:800; text-transform:uppercase; color:#94a3b8; letter-spacing:0.5px;">
                             Cajas / PCs Conectadas (${terms.length})
                         </span>
-                        <div style="margin-top:4px; display:flex; flex-direction:column; gap:4px;">
+                        <div style="margin-top:4px; display:flex; flex-direction:column; gap:6px;">
                             ${terms.length === 0 ? '<span style="font-size:11px; color:#94a3b8; font-style:italic;">⚠️ Sin cajas TPV vinculadas aún</span>' : ''}
                             ${terms.map(t => {
                                 let statusBadge = '<span style="display:inline-flex; align-items:center; gap:4px; color:#16a34a; font-weight:700; font-size:10px;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#16a34a;"></span>En vivo</span>';
@@ -694,17 +702,23 @@
                                     statusBadge = '<span style="display:inline-flex; align-items:center; gap:4px; color:#dc2626; font-weight:700; font-size:10px;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#dc2626;"></span>Bloqueada</span>';
                                 }
                                 return `
-                                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:5px 10px; font-size:11px;">
-                                    <div style="display:flex; align-items:center; gap:6px;">
-                                        <span style="font-size:13px;">💻</span>
-                                        <strong style="color:#1e293b;">${textoSeguro(t.nombre)}</strong>
-                                        <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px; font-size:10px; color:#64748b;" title="${textoSeguro(t.identificador_pc)}">${textoSeguro(t.identificador_pc.length > 18 ? t.identificador_pc.substring(0, 16) + '...' : t.identificador_pc)}</code>
-                                    </div>
-                                    <div style="display:flex; align-items:center; gap:8px;">
+                                <div style="display:flex; flex-direction:column; gap:6px; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:8px 10px; font-size:11px;">
+                                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                                        <div style="display:flex; align-items:center; gap:6px;">
+                                            <span style="font-size:13px;">💻</span>
+                                            <strong style="color:#1e293b;">${textoSeguro(t.nombre)}</strong>
+                                            <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px; font-size:10px; color:#64748b;" title="${textoSeguro(t.identificador_pc)}">${textoSeguro(t.identificador_pc.length > 18 ? t.identificador_pc.substring(0, 16) + '...' : t.identificador_pc)}</code>
+                                        </div>
                                         ${statusBadge}
-                                        <button type="button" class="btn-editar-terminal" data-tid="${t.id}" title="Mover a otra sucursal o editar" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:2px 8px; font-size:10px; font-weight:700; color:#334155; cursor:pointer;">
-                                            ✎ Mover / Editar
+                                    </div>
+                                    <div style="display:flex; flex-wrap:wrap; gap:6px; margin-top:2px;">
+                                        <button type="button" class="btn-editar-terminal" data-tid="${t.id}" title="Cambiar nombre o mover de sucursal" style="flex:1; min-width:120px; background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:5px 8px; font-size:10px; font-weight:700; color:#1e293b; cursor:pointer;">
+                                            ✎ Renombrar / Mover
                                         </button>
+                                        ${t.activo === -1
+                                            ? `<button type="button" class="btn-reactivar-terminal" data-tid="${t.id}" style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:5px 8px; font-size:10px; font-weight:700; color:#15803d; cursor:pointer;">✓ Desbloquear</button>`
+                                            : `<button type="button" class="btn-revocar-terminal" data-tid="${t.id}" style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:5px 8px; font-size:10px; font-weight:700; color:#b91c1c; cursor:pointer;">🚫 Revocar</button>`}
+                                        <button type="button" class="btn-desvincular-terminal" data-tid="${t.id}" style="background:#ffffff; border:1px solid #e2e8f0; border-radius:6px; padding:5px 8px; font-size:10px; font-weight:700; color:#64748b; cursor:pointer;">🗑️ Desvincular</button>
                                     </div>
                                 </div>
                                 `;
@@ -731,8 +745,69 @@
                     if (term) abrirModalTerminal(term);
                 };
             });
+
+            listaCont.querySelectorAll('.btn-revocar-terminal').forEach(btn => {
+                btn.onclick = () => {
+                    const tid = Number(btn.dataset.tid);
+                    const t = terminalesDisponibles.find(x => x.id === tid);
+                    if (confirm(`¿Bloquear/Revocar ${t ? t.nombre : 'esta PC'}? La nube rechazará sus sincronizaciones con código 403.`)) {
+                        actualizarEstadoTerminal(tid, -1);
+                    }
+                };
+            });
+
+            listaCont.querySelectorAll('.btn-reactivar-terminal').forEach(btn => {
+                btn.onclick = () => {
+                    const tid = Number(btn.dataset.tid);
+                    actualizarEstadoTerminal(tid, 1);
+                };
+            });
+
+            listaCont.querySelectorAll('.btn-desvincular-terminal').forEach(btn => {
+                btn.onclick = () => {
+                    const tid = Number(btn.dataset.tid);
+                    desvincularTerminal(tid);
+                };
+            });
         } catch (e) {
             if (subtitulo) subtitulo.textContent = 'Error al cargar sucursales.';
+        }
+    }
+
+    async function actualizarEstadoTerminal(tid, nuevoActivo) {
+        try {
+            const res = await fetch(`/api/terminales/${tid}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ activo: nuevoActivo })
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalTerminal();
+                cargarSucursales();
+            } else {
+                alert(data.error || 'Error al actualizar estado');
+            }
+        } catch (e) {
+            alert('Error de red al actualizar estado');
+        }
+    }
+
+    async function desvincularTerminal(tid) {
+        if (!confirm('¿Estás seguro de desvincular esta caja TPV de la empresa? Se eliminará el registro de la nube.')) {
+            return;
+        }
+        try {
+            const res = await fetch(`/api/terminales/${tid}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalTerminal();
+                cargarSucursales();
+            } else {
+                alert(data.error || 'Error al desvincular la caja');
+            }
+        } catch (e) {
+            alert('Error de red al desvincular la caja');
         }
     }
 
@@ -762,7 +837,7 @@
         if (!modal) return;
         document.getElementById('terminalFormId').value = term.id;
         document.getElementById('terminalFormIdentificador').textContent = term.identificador_pc || '-';
-        document.getElementById('terminalFormUltimoSync').textContent = term.ultimo_sync ? term.ultimo_sync.replace('T', ' ').substring(0, 19) : 'Sin contacto';
+        document.getElementById('terminalFormUltimoSync').textContent = term.ultimo_sync ? term.ultimo_sync.replace('GMT', '').trim() : 'Sin contacto';
         document.getElementById('terminalFormNombre').value = term.nombre || '';
 
         // Título dinámico
@@ -770,18 +845,20 @@
             tit.textContent = (!term.sucursal_id || term.sucursal_id === 0) ? '📥 Asignar PC a Sucursal' : '💻 Administrar Caja TPV';
         }
 
-        // Poblar select de sucursales
+        // Poblar select de sucursales (incluyendo opción de Sin Asignar / Pendiente)
         const selectSuc = document.getElementById('terminalFormSucursal');
         if (selectSuc) {
-            selectSuc.innerHTML = sucursalesDisponibles.map(s => `
+            let opts = '<option value="">-- Sin Asignar (Mover a Pendientes) --</option>';
+            opts += sucursalesDisponibles.map(s => `
                 <option value="${s.id}" ${s.id === term.sucursal_id ? 'selected' : ''}>${textoSeguro(s.nombre)}</option>
             `).join('');
+            selectSuc.innerHTML = opts;
         }
 
         const selectActivo = document.getElementById('terminalFormActivo');
         if (selectActivo) {
             if (!term.sucursal_id || term.sucursal_id === 0) {
-                selectActivo.value = '1'; // Al asignar por primera vez, sugerir habilitada
+                selectActivo.value = term.activo === -1 ? '-1' : '1';
             } else {
                 selectActivo.value = term.activo != null ? String(term.activo) : '1';
             }
@@ -834,27 +911,19 @@
         }
     });
 
+    document.getElementById('modalTerminalRevocar')?.addEventListener('click', async () => {
+        const tid = document.getElementById('terminalFormId')?.value;
+        if (!tid) return;
+        if (!confirm('¿Deseas bloquear y revocar esta PC? La nube rechazará sus sincronizaciones con código 403.')) {
+            return;
+        }
+        await actualizarEstadoTerminal(tid, -1);
+    });
+
     document.getElementById('modalTerminalEliminar')?.addEventListener('click', async () => {
         const tid = document.getElementById('terminalFormId')?.value;
         if (!tid) return;
-        if (!confirm('¿Estás seguro de desvincular esta caja TPV? Dejará de pertenecer a la empresa hasta que vuelva a sincronizar.')) {
-            return;
-        }
-
-        try {
-            const res = await fetch(`/api/terminales/${tid}`, {
-                method: 'DELETE'
-            });
-            const data = await res.json();
-            if (data.success) {
-                cerrarModalTerminal();
-                cargarSucursales();
-            } else {
-                alert(data.error || 'Error al desvincular la caja');
-            }
-        } catch (err) {
-            alert('Error de red al desvincular la caja');
-        }
+        await desvincularTerminal(tid);
     });
 
     document.getElementById('formSucursal')?.addEventListener('submit', async (e) => {
