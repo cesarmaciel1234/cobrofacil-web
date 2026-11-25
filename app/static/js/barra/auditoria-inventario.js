@@ -224,19 +224,32 @@
         pantallaActiva = id || 'repartofacil';
         const faltantesWrap = $('pedidosFaltantesWrap');
         const auditoriaWrap = $('pedidosAuditoriaWrap');
+        const historialWrap = $('pedidosHistorialWrap');
         const repartofacilWrap = $('pedidosRepartoFacilWrap');
 
         if (pantallaActiva === 'repartofacil') {
             if (faltantesWrap) faltantesWrap.style.display = 'none';
             if (auditoriaWrap) auditoriaWrap.style.display = 'none';
+            if (historialWrap) historialWrap.style.display = 'none';
             if (repartofacilWrap) {
                 repartofacilWrap.style.display = 'block';
                 if (global.RepartoFacilDespacho && global.RepartoFacilDespacho.iniciar) {
                     global.RepartoFacilDespacho.iniciar();
                 }
             }
+        } else if (pantallaActiva === 'historial-pedidos') {
+            if (faltantesWrap) faltantesWrap.style.display = 'none';
+            if (auditoriaWrap) auditoriaWrap.style.display = 'none';
+            if (repartofacilWrap) repartofacilWrap.style.display = 'none';
+            if (historialWrap) {
+                historialWrap.style.display = 'block';
+                if (global.RepartoFacilDespacho && global.RepartoFacilDespacho.renderizarHistorial) {
+                    global.RepartoFacilDespacho.renderizarHistorial();
+                }
+            }
         } else if (pantallaActiva === 'auditoria') {
             if (repartofacilWrap) repartofacilWrap.style.display = 'none';
+            if (historialWrap) historialWrap.style.display = 'none';
             if (faltantesWrap) faltantesWrap.style.display = 'none';
             if (auditoriaWrap) {
                 auditoriaWrap.style.display = 'block';
@@ -250,6 +263,7 @@
             actualizarIconoFiltroHeader();
         } else {
             if (repartofacilWrap) repartofacilWrap.style.display = 'none';
+            if (historialWrap) historialWrap.style.display = 'none';
             if (auditoriaWrap) auditoriaWrap.style.display = 'none';
             if (faltantesWrap) faltantesWrap.style.display = 'block';
             const refresh = $('btnRefresh');

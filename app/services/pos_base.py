@@ -1322,7 +1322,7 @@ def preparar_vista(
                     " FROM pos_base p, elegido e"
                     " WHERE p.empresa_id = ? AND (((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
                     " AND (p.dia = e.dia OR p.dia IS NULL OR p.dia = ''))"
-                    " OR p.tabla IN ('clientes', 'productos', 'configuracion')))"
+                    " OR p.tabla IN ('clientes', 'productos', 'configuracion', 'cuenta_corriente', 'movimientos_caja', 'gastos', 'cobros_digitales', 'mp_pagos')))"
                     " ORDER BY p.tabla, p.sucursal_id, p.parte",
                     (eid, desde, eid, eid),
                 ).fetchall()
@@ -1337,7 +1337,7 @@ def preparar_vista(
                     " FROM pos_base p, elegido e"
                     " WHERE p.empresa_id = ? AND (((p.tabla IN ('ventas', 'ventas_items', 'detalles_ventas', 'detalle_ventas')"
                     " AND (p.dia = e.dia OR p.dia IS NULL OR p.dia = ''))"
-                    " OR p.tabla IN ('clientes', 'productos', 'configuracion')))"
+                    " OR p.tabla IN ('clientes', 'productos', 'configuracion', 'cuenta_corriente', 'movimientos_caja', 'gastos', 'cobros_digitales', 'mp_pagos')))"
                     " AND p.sucursal_id = ?"
                     " ORDER BY p.tabla, p.sucursal_id, p.parte",
                     (eid, sid, desde, eid, sid, eid, sid),
@@ -1354,7 +1354,7 @@ def preparar_vista(
             ).fetchall()
             partes += conn.execute(
                 "SELECT tabla, sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en, parte "
-                f"FROM pos_base WHERE empresa_id = ? AND tabla IN ('clientes', 'productos', 'configuracion'){suc}",
+                f"FROM pos_base WHERE empresa_id = ? AND tabla IN ('clientes', 'productos', 'configuracion', 'cuenta_corriente', 'movimientos_caja', 'gastos', 'cobros_digitales', 'mp_pagos'){suc}",
                 tuple([eid, *(([sid]) if sid is not None else [])]),
             ).fetchall()
     por_tabla: dict[str, list] = {}

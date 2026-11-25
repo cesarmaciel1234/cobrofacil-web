@@ -425,6 +425,124 @@
         }
 
         actualizarBotonSonido();
+        actualizarBadgeChatGlobal();
+    }
+
+    // Actualiza el badge del botón de Mensajería Global superior derecho
+    function actualizarBadgeChatGlobal() {
+        const unreadTotal = pedidosLista.reduce((acc, p) => acc + (Number(p.unread_chat_count) || 0), 0);
+        const badgeTop = $('badgeChatGlobalTop');
+        if (badgeTop) {
+            if (unreadTotal > 0) {
+                badgeTop.textContent = unreadTotal > 99 ? '99+' : String(unreadTotal);
+                badgeTop.style.display = 'flex';
+            } else {
+                badgeTop.style.display = 'none';
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // MENSAJERÍA GLOBAL (Panel con todas las conversaciones de pedidos)
+    // -------------------------------------------------------------------------
+    function abrirMensajeriaGlobal() {
+        let modal = $('rfMensajeriaGlobalModal');
+        if (!modal) {
+            modal = document.createElement('div');
+            modal.id = 'rfMensajeriaGlobalModal';
+            document.body.appendChild(modal);
+        }
+
+        const unreadTotal = pedidosLista.reduce((acc, p) => acc + (Number(p.unread_chat_count) || 0), 0);
+
+        // Orden: primero los pedidos con mensajes no leídos, luego los más recientes
+        const chats = [...pedidosLista].sort((a, b) => {
+            const uA = Number(a.unread_chat_count) || 0;
+            const uB = Number(b.unread_chat_count) || 0;
+            if (uA !== uB) return uB - uA;
+            return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        });
+
+        modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:99999; display:flex; align-items:center; justify-content:center; padding:12px; box-sizing:border-box; backdrop-filter:blur(3px);';
+
+        modal.innerHTML = `
+            <div style="background:#ffffff; border-radius:18px; width:100%; max-width:440px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 12px 30px rgba(0,0,0,0.25); overflow:hidden; border:1px solid #E5E7EB;">
+                <!-- Header -->
+                <div style="padding:14px 16px; background:#f8fafc; border-bottom:1px solid #E5E7EB; display:flex; align-items:center; justify-content:space-between;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:18px;">💬</span>
+                        <div>
+                            <h3 style="margin:0; font-size:15px; font-weight:800; color:#1e293b; display:flex; align-items:center; gap:6px;">
+                                Mensajería Global
+                                ${unreadTotal > 0 ? `<span style="background:#ef4444; color:#fff; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">${unreadTotal} no leídos</span>` : ''}
+                            </h3>
+                            <small style="color:#64748b; font-size:11px;">${chats.length} pedidos con canal de chat</small>
+                        </div>
+                    </div>
+                    <button type="button" onclick="window.RepartoFacilDespacho.cerrarMensajeriaGlobal()" aria-label="Cerrar mensajería" style="background:transparent; border:none; font-size:18px; color:#64748b; cursor:pointer; padding:4px 8px; border-radius:8px; line-height:1;">✕</button>
+                </div>
+
+                <!-- Lista de conversaciones -->
+                <div style="padding:8px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:6px;">
+                    ${chats.length === 0 ? `
+                        <div style="text-align:center; padding:36px 16px; color:#64748b; font-size:13px;">
+                            <div style="font-size:24px; margin-bottom:8px;">📭</div>
+                            <div style="font-weight:700; color:#1e293b;">No hay pedidos con conversaciones</div>
+                            <div style="font-size:11.5px; color:#64748b; margin-top:2px;">Cuando entren pedidos web, podrás chatear con clientes y choferes desde acá.</div>
+                        </div>
+                    ` : chats.map(p => {
+                        const unread = Number(p.unread_chat_count) || 0;
+                        const shortId = formatearIdCorto(p.id);
+                        const nombre = escaparTextoChat(p.cliente_nombre || 'Cliente Web');
+                        const total = plataJefe(p.total || 0);
+                        const esRetiro = esModalidadRetiro(p);
+                        const hora = formatearHoraLocal(p.created_at);
+                        const esFinal = esPedidoFinalizado(p);
+
+                        return `
+                            <div onclick="window.RepartoFacilDespacho.abrirChatDesdeGlobal('${escaparTextoChat(p.id)}', '${escaparTextoChat(p.cliente_nombre || 'Cliente')}')"
+                                style="background:${unread > 0 ? '#eff6ff' : '#ffffff'}; border:1px solid ${unread > 0 ? '#93c5fd' : '#E5E7EB'}; border-radius:12px; padding:10px 12px; cursor:pointer; display:flex; align-items:center; justify-content:space-between; gap:10px; transition:background 0.15s ease;">
+                                <div style="display:flex; align-items:center; gap:10px; min-width:0;">
+                                    <div style="width:36px; height:36px; border-radius:50%; background:${unread > 0 ? '#2D3277' : '#f1f5f9'}; color:${unread > 0 ? '#ffffff' : '#475569'}; display:flex; align-items:center; justify-content:center; font-weight:800; font-size:14px; flex-shrink:0;">
+                                        ${nombre.charAt(0).toUpperCase()}
+                                    </div>
+                                    <div style="min-width:0;">
+                                        <div style="display:flex; align-items:center; gap:6px;">
+                                            <span style="font-weight:800; font-size:13px; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${nombre}</span>
+                                            <span style="font-size:11px; font-weight:700; color:#64748b;">${shortId}</span>
+                                        </div>
+                                        <div style="display:flex; align-items:center; gap:6px; margin-top:2px;">
+                                            <span style="font-size:10px; font-weight:700; color:#475569; background:#f1f5f9; padding:1px 5px; border-radius:4px;">${esRetiro ? 'Retiro' : 'Delivery'}</span>
+                                            <span style="font-size:11px; color:#64748b;">${hora || ''} · ${total}</span>
+                                            ${esFinal ? `<span style="font-size:9.5px; font-weight:700; color:#94a3b8;">(Historial)</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:4px; flex-shrink:0;">
+                                    ${unread > 0 ? `
+                                        <span style="background:#ef4444; color:#fff; font-size:10.5px; font-weight:900; padding:2px 7px; border-radius:999px;">
+                                            ${unread} nuevo${unread === 1 ? '' : 's'}
+                                        </span>
+                                    ` : `
+                                        <span style="color:#2D3277; font-size:11.5px; font-weight:700;">Abrir 💬</span>
+                                    `}
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function cerrarMensajeriaGlobal() {
+        const modal = $('rfMensajeriaGlobalModal');
+        if (modal) modal.remove();
+    }
+
+    function abrirChatDesdeGlobal(orderId, clienteNombre) {
+        cerrarMensajeriaGlobal();
+        abrirChat(orderId, clienteNombre);
     }
 
     // Funciones de control de Pestañas
@@ -517,57 +635,13 @@
         w.document.close();
     }
 
-    // Renderizar barra de pestañas (Activos, Nuevos, Retira, Delivery, Historial)
+    // Pestañas ocultas en bandeja principal (el historial se accede desde el menú lateral)
     function renderizarTabs(countActivos, countNuevos, countRetira, countDelivery, countHistorial) {
         let host = $('repartoFacilFiltrosTabs');
-        if (!host) {
-            const banner = $('repartoFacilOmnicanalBanner');
-            if (banner && banner.parentNode) {
-                host = document.createElement('div');
-                host.id = 'repartoFacilFiltrosTabs';
-                host.style.marginBottom = '12px';
-                banner.parentNode.insertBefore(host, $('repartoFacilCardsContenedor'));
-            }
+        if (host) {
+            host.style.display = 'none';
+            host.innerHTML = '';
         }
-        if (!host) return;
-
-        const tabs = [
-            { id: 'activos', label: 'Activos', count: countActivos },
-            { id: 'nuevos', label: 'Nuevos', count: countNuevos, alert: countNuevos > 0 },
-            { id: 'retira', label: 'Retira', count: countRetira },
-            { id: 'delivery', label: 'Delivery', count: countDelivery },
-            { id: 'historial', label: 'Historial', count: countHistorial },
-        ];
-
-        host.innerHTML = `
-            <div class="rf-tabs-scroll-bar" style="display:flex; align-items:center; gap:8px; overflow-x:auto; overflow-y:hidden; padding:4px 2px 8px 2px; -webkit-overflow-scrolling:touch; scrollbar-width:thin; white-space:nowrap; width:100%; box-sizing:border-box;">
-                ${tabs.map(t => {
-                    const isActive = tabPedidos === t.id;
-                    const bg = isActive ? '#2D3277' : '#ffffff';
-                    const color = isActive ? '#ffffff' : '#334155';
-                    const border = isActive ? '#2D3277' : '#cbd5e1';
-                    const badgeBg = isActive ? '#FFE600' : (t.alert ? '#ef4444' : '#f1f5f9');
-                    const badgeColor = isActive ? '#2D3277' : (t.alert ? '#ffffff' : '#475569');
-                    return `
-                        <button type="button" onclick="window.RepartoFacilDespacho.setTab('${t.id}')"
-                            style="background:${bg}; color:${color}; border:1.5px solid ${border}; border-radius:999px; padding:7px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; white-space:nowrap; flex-shrink:0; box-shadow:${isActive ? '0 2px 6px rgba(45,50,119,0.25)' : 'none'}; transition:all 0.15s ease;">
-                            <span>${t.label}</span>
-                            <span style="background:${badgeBg}; color:${badgeColor}; font-size:10px; font-weight:900; padding:1px 7px; border-radius:999px;">
-                                ${t.count}
-                            </span>
-                        </button>
-                    `;
-                }).join('')}
-            </div>
-            ${tabPedidos === 'historial' ? `
-                <div style="margin-top:8px;">
-                    <input type="search" placeholder="Buscar por #RF o cliente en historial..."
-                        value="${escaparTextoChat(busquedaHistorial)}"
-                        oninput="window.RepartoFacilDespacho.setBusquedaHistorial(this.value)"
-                        style="width:100%; box-sizing:border-box; background:#ffffff; border:1.5px solid #cbd5e1; border-radius:12px; padding:8px 12px; font-size:12.5px; color:#1e293b; outline:none;" />
-                </div>
-            ` : ''}
-        `;
     }
 
     // Funciones auxiliares de filtrado estricto
@@ -590,82 +664,34 @@
         return st === 'pending' || st === 'pending_store';
     }
 
-    // Renderizar tarjetas de clientes (COMPACTAS 1-2 LÍNEAS, SIN ACORDEÓN INLINE)
+    // Renderizar tarjetas de clientes en vivo (BANDEJA PRINCIPAL: SOLO PEDIDOS ACTIVOS EN CURSO)
     function renderizarCards() {
         const contenedor = $('repartoFacilCardsContenedor');
         if (!contenedor) return;
 
         if (!Array.isArray(pedidosLista)) pedidosLista = [];
 
-        // 1. Calcular conteos para todas las pestañas
-        let countActivos = 0;
-        let countNuevos = 0;
-        let countRetira = 0;
-        let countDelivery = 0;
-        let countHistorial = 0;
-
-        pedidosLista.forEach((p) => {
-            if (esPedidoNuevo(p)) countNuevos++;
-            if (esPedidoActivo(p)) {
-                countActivos++;
-                if (esModalidadRetiro(p)) countRetira++;
-                else countDelivery++;
-            } else if (esPedidoFinalizado(p)) {
-                countHistorial++;
-            }
-        });
-
-        // 2. Renderizar barra de pestañas y sincronizar métricas omnicanal con pedidosLista
-        renderizarTabs(countActivos, countNuevos, countRetira, countDelivery, countHistorial);
+        // Ocultar barra de tabs de la bandeja principal
+        renderizarTabs();
         cargarMetricasOmnicanal();
 
-        // 3. Filtrar lista ANTES de renderizar
-        let pedidosFiltrados = [];
-        if (tabPedidos === 'activos') {
-            pedidosFiltrados = pedidosLista.filter(p => esPedidoActivo(p));
-        } else if (tabPedidos === 'nuevos') {
-            pedidosFiltrados = pedidosLista.filter(p => esPedidoNuevo(p));
-        } else if (tabPedidos === 'retira') {
-            pedidosFiltrados = pedidosLista.filter(p => esPedidoActivo(p) && esModalidadRetiro(p));
-        } else if (tabPedidos === 'delivery') {
-            pedidosFiltrados = pedidosLista.filter(p => esPedidoActivo(p) && !esModalidadRetiro(p));
-        } else if (tabPedidos === 'historial') {
-            pedidosFiltrados = pedidosLista.filter(p => {
-                if (!esPedidoFinalizado(p)) return false;
-                if (busquedaHistorial) {
-                    const q = busquedaHistorial.toLowerCase();
-                    const pool = `${p.id || ''} ${p.cliente_nombre || ''} ${p.ticket_id || ''}`.toLowerCase();
-                    return pool.includes(q);
-                }
-                return true;
-            });
+        // Si la pantalla de historial está activa o visible, refrescarla también
+        const histWrap = $('pedidosHistorialWrap');
+        if (histWrap && histWrap.style.display !== 'none') {
+            renderizarHistorial();
         }
 
-        if (pedidosFiltrados.length === 0) {
-            let msgTitulo = 'No hay pedidos en esta pestaña';
-            let msgSub = 'Los pedidos entrarán en vivo automáticamente aquí.';
-            if (tabPedidos === 'nuevos') {
-                msgTitulo = 'No hay pedidos nuevos pendientes';
-                msgSub = 'Cuando un cliente haga una orden web, sonará la alerta y aparecerá aquí.';
-            } else if (tabPedidos === 'historial') {
-                msgTitulo = 'Historial vacío';
-                msgSub = busquedaHistorial ? 'No se encontraron pedidos con ese criterio de búsqueda.' : 'Los pedidos entregados y cancelados se archivarán acá.';
-            } else if (tabPedidos === 'retira') {
-                msgTitulo = 'Sin pedidos para retiro en mostrador';
-                msgSub = 'Las compras donde el comprador retira en local aparecerán acá.';
-            } else if (tabPedidos === 'delivery') {
-                msgTitulo = 'Sin pedidos con envío delivery';
-                msgSub = 'Las compras con entrega a domicilio por chofer aparecerán acá.';
-            }
+        // Mostrar ÚNICAMENTE pedidos en curso / en vivo (NUEVO, ASIGNANDO/PREPARANDO, EMBALADO, EN CAMINO)
+        const pedidosFiltrados = pedidosLista.filter(p => esPedidoActivo(p));
 
+        if (pedidosFiltrados.length === 0) {
             contenedor.innerHTML = `
                 <div style="text-align:center; padding:36px 20px; background:#fff; border-radius:18px; border:1px dashed #cbd5e1; margin-top:4px;">
                     <div style="margin-bottom:8px; display:flex; justify-content:center; color:#94a3b8;">${SVG_ICONOS.box}</div>
-                    <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:#1e293b;">${msgTitulo}</h4>
-                    <p style="margin:0; font-size:12px; color:#64748b; max-width:300px; margin:0 auto;">${msgSub}</p>
+                    <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:#1e293b;">No hay pedidos en curso</h4>
+                    <p style="margin:0; font-size:12px; color:#64748b; max-width:320px; margin:0 auto; line-height:1.4;">Cuando un cliente realice una orden web, sonará la alerta y aparecerá aquí automáticamente.</p>
                 </div>
             `;
-            // Asegurar que si hay modal activo se mantenga
             renderizarComandaModal();
             return;
         }
@@ -877,6 +903,208 @@
 
         // Si hay comanda modal abierta, asegurar renderizado actualizado
         renderizarComandaModal();
+    }
+
+    // -------------------------------------------------------------------------
+    // HISTORIAL DE PEDIDOS FINALIZADOS (Menú Lateral)
+    // -------------------------------------------------------------------------
+    let filtroHistorial = 'todos'; // 'todos' | 'entregados' | 'rechazados'
+
+    function setFiltroHistorial(f) {
+        filtroHistorial = f || 'todos';
+        renderizarHistorial();
+    }
+
+    function renderizarHistorial(hostId = 'pedidosHistorialWrap') {
+        const wrap = $(hostId);
+        if (!wrap) return;
+
+        if (!Array.isArray(pedidosLista)) pedidosLista = [];
+
+        // Filtrar pedidos finalizados
+        const finalizados = pedidosLista.filter(p => esPedidoFinalizado(p));
+        const entregados = finalizados.filter(p => String(p.estado || '').toLowerCase() === 'delivered');
+        const rechazados = finalizados.filter(p => {
+            const st = String(p.estado || '').toLowerCase();
+            return st === 'rejected' || st === 'cancelled' || st === 'cancelled_by_client' || st === 'cancelled_timeout';
+        });
+
+        let filtrados = finalizados;
+        if (filtroHistorial === 'entregados') filtrados = entregados;
+        else if (filtroHistorial === 'rechazados') filtrados = rechazados;
+
+        if (busquedaHistorial) {
+            const q = busquedaHistorial.toLowerCase();
+            filtrados = filtrados.filter(p => {
+                const pool = `${p.id || ''} ${p.cliente_nombre || ''} ${p.ticket_id || ''} ${formatearIdCorto(p.id)}`.toLowerCase();
+                return pool.includes(q);
+            });
+        }
+
+        wrap.innerHTML = `
+            <div style="display:flex; flex-direction:column; gap:12px; margin-bottom:14px;">
+                <!-- Título y contador -->
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size:20px;">📜</span>
+                        <div>
+                            <h3 style="margin:0; font-size:16px; font-weight:800; color:#1e293b;">Historial de pedidos</h3>
+                            <small style="color:#64748b; font-size:11.5px;">Pedidos archivados y completados</small>
+                        </div>
+                    </div>
+                    <span style="background:#f1f5f9; color:#475569; font-size:11.5px; font-weight:800; padding:3px 9px; border-radius:999px;">
+                        ${finalizados.length} total
+                    </span>
+                </div>
+
+                <!-- Buscador rápido -->
+                <div style="position:relative;">
+                    <input type="search" placeholder="Buscar por código #RF o cliente..."
+                        value="${escaparTextoChat(busquedaHistorial)}"
+                        oninput="window.RepartoFacilDespacho.setBusquedaHistorial(this.value)"
+                        style="width:100%; box-sizing:border-box; background:#ffffff; border:1.5px solid #cbd5e1; border-radius:12px; padding:9px 12px 9px 36px; font-size:13px; color:#1e293b; outline:none;" />
+                    <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:14px; color:#94a3b8; pointer-events:none;">🔍</span>
+                </div>
+
+                <!-- Filtros rápidos de Historial -->
+                <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;">
+                    <button type="button" onclick="window.RepartoFacilDespacho.setFiltroHistorial('todos')"
+                        style="background:${filtroHistorial === 'todos' ? '#2D3277' : '#ffffff'}; color:${filtroHistorial === 'todos' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'todos' ? '#2D3277' : '#cbd5e1'}; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+                        <span>Todos</span>
+                        <span style="background:${filtroHistorial === 'todos' ? '#FFE600' : '#f1f5f9'}; color:${filtroHistorial === 'todos' ? '#2D3277' : '#475569'}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
+                            ${finalizados.length}
+                        </span>
+                    </button>
+                    <button type="button" onclick="window.RepartoFacilDespacho.setFiltroHistorial('entregados')"
+                        style="background:${filtroHistorial === 'entregados' ? '#047857' : '#ffffff'}; color:${filtroHistorial === 'entregados' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'entregados' ? '#047857' : '#cbd5e1'}; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+                        <span>Entregados</span>
+                        <span style="background:${filtroHistorial === 'entregados' ? '#ffffff' : '#ecfdf5'}; color:${filtroHistorial === 'entregados' ? '#047857' : '#047857'}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
+                            ${entregados.length}
+                        </span>
+                    </button>
+                    <button type="button" onclick="window.RepartoFacilDespacho.setFiltroHistorial('rechazados')"
+                        style="background:${filtroHistorial === 'rechazados' ? '#b91c1c' : '#ffffff'}; color:${filtroHistorial === 'rechazados' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'rechazados' ? '#b91c1c' : '#cbd5e1'}; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+                        <span>Rechazados</span>
+                        <span style="background:${filtroHistorial === 'rechazados' ? '#ffffff' : '#fee2e2'}; color:${filtroHistorial === 'rechazados' ? '#b91c1c' : '#b91c1c'}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
+                            ${rechazados.length}
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Listado de tarjetas de historial -->
+            <div id="rfHistorialCardsContenedor" style="display:flex; flex-direction:column; gap:12px; padding-bottom:30px;">
+                ${filtrados.length === 0 ? `
+                    <div style="text-align:center; padding:36px 20px; background:#fff; border-radius:18px; border:1px dashed #cbd5e1;">
+                        <div style="margin-bottom:8px; display:flex; justify-content:center; color:#94a3b8;">${SVG_ICONOS.box}</div>
+                        <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:#1e293b;">Historial vacío</h4>
+                        <p style="margin:0; font-size:12px; color:#64748b;">${busquedaHistorial ? 'No se encontraron pedidos con ese criterio de búsqueda.' : 'Los pedidos entregados y cancelados se archivarán acá.'}</p>
+                    </div>
+                ` : filtrados.map(p => renderizarTarjetaPedidoHistorial(p)).join('')}
+            </div>
+        `;
+    }
+
+    function renderizarTarjetaPedidoHistorial(p) {
+        const estadoLower = (p.estado || '').toLowerCase();
+        const esEntregado = estadoLower === 'delivered';
+        const esRechazado = estadoLower === 'rejected' || estadoLower === 'cancelled' || estadoLower === 'cancelled_by_client' || estadoLower === 'cancelled_timeout';
+        const esRetiroEnTienda = esModalidadRetiro(p);
+
+        const badgeTipoEntrega = esRetiroEnTienda
+            ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">${SVG_ICONOS.store}<span>Retira</span></span>`
+            : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">${SVG_ICONOS.bike}<span>Delivery</span></span>`;
+
+        let badgeEstadoHtml = '';
+        if (esEntregado) {
+            badgeEstadoHtml = `<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">✓ ${esRetiroEnTienda ? 'RETIRADO' : 'ENTREGADO'}</span>`;
+        } else {
+            badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONOS.cruz} <span>RECHAZADO</span></span>`;
+        }
+
+        const metodoLower = String(p.metodo_pago || 'cash').toLowerCase();
+        const esTransfer = metodoLower.includes('transfer');
+        const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
+        const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online');
+
+        let pagoBadgeTexto = 'Efectivo';
+        let pagoBadgeBg = '#fef3c7';
+        let pagoBadgeColor = '#92400e';
+        let pagoBadgeBorder = '#fde68a';
+
+        if (esTransfer) {
+            pagoBadgeTexto = 'Transf.';
+            pagoBadgeBg = '#eff6ff';
+            pagoBadgeColor = '#1e40af';
+            pagoBadgeBorder = '#bfdbfe';
+        } else if (esTarj) {
+            pagoBadgeTexto = 'Tarjeta';
+            pagoBadgeBg = '#f0fdf4';
+            pagoBadgeColor = '#166534';
+            pagoBadgeBorder = '#bbf7d0';
+        } else if (esMP) {
+            pagoBadgeTexto = 'MPago';
+            pagoBadgeBg = '#ecfdf5';
+            pagoBadgeColor = '#065f46';
+            pagoBadgeBorder = '#a7f3d0';
+        }
+
+        const barraLateralColor = esEntregado ? '#94a3b8' : '#ef4444';
+
+        return `
+            <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" onclick="window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
+                style="background:#ffffff; border-radius:14px; border:1px solid #E5E7EB; border-left:4px solid ${barraLateralColor}; box-shadow:0 1px 3px rgba(0,0,0,0.03); padding:10px 12px; cursor:pointer; transition:transform 0.1s ease, box-shadow 0.1s ease; box-sizing:border-box;">
+                
+                <!-- LÍNEA 1: #RF, HORA, CLIENTE Y BADGES -->
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
+                        <b style="font-size:12px; color:#2D3277; font-family:monospace; flex-shrink:0;">
+                            #${formatearIdCorto(p.id).toUpperCase()}
+                        </b>
+                        <span style="font-size:11px; color:#64748b; font-weight:700; flex-shrink:0;">
+                            ${formatFecha(p.created_at)}
+                        </span>
+                        <span style="font-size:13px; font-weight:800; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                            ${escaparTextoChat(capitalizarNombre(p.cliente_nombre || 'Cliente'))}
+                        </span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+                        ${badgeTipoEntrega}
+                        ${badgeEstadoHtml}
+                    </div>
+                </div>
+
+                <!-- LÍNEA 2: MONTO + MEDIO DE PAGO -->
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:10px; padding-top:2px;">
+                    <div style="display:flex; align-items:center; gap:6px;">
+                        <span style="background:${pagoBadgeBg}; color:${pagoBadgeColor}; border:1px solid ${pagoBadgeBorder}; font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; white-space:nowrap;">
+                            ${pagoBadgeTexto}
+                        </span>
+                    </div>
+                    <b style="font-size:15px; font-weight:900; color:#0f172a; font-family:monospace; white-space:nowrap;">
+                        ${formatMoney(p.total)}
+                    </b>
+                </div>
+
+                <!-- LÍNEA 3: BOTONES AL 100% EN GRID DE 2 COLUMNAS (Ticket y Chat) -->
+                <div class="rf-card-botones" style="display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; width:100%; box-sizing:border-box;" onclick="event.stopPropagation()">
+                    <!-- Botón 1: Ticket -->
+                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})" title="Ver Comanda completa"
+                        style="width:100%; height:40px; background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:10px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap; box-sizing:border-box;">
+                        ${SVG_ICONOS.ticket}
+                        <span>Ticket</span>
+                    </button>
+
+                    <!-- Botón 2: Chat -->
+                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" title="Ver chat con cliente"
+                        style="width:100%; height:40px; background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; border-radius:10px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap; box-sizing:border-box;">
+                        ${SVG_ICONOS.chat}
+                        <span>Chat</span>
+                    </button>
+                </div>
+
+            </div>
+        `;
     }
 
     // Modal centrado fixed/overlay con la comanda completa del pedido seleccionado
@@ -1984,6 +2212,12 @@
         toggleDetalle,
         setTab,
         setBusquedaHistorial,
+        setFiltroHistorial,
+        renderizarHistorial,
+        abrirMensajeriaGlobal,
+        cerrarMensajeriaGlobal,
+        abrirChatDesdeGlobal,
+        actualizarBadgeChatGlobal,
         abrirModal,
         cerrarModal,
         imprimirComanda,

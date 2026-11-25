@@ -8,6 +8,7 @@ window.BarraModulos.push({
     pantalla: 'Pedidos Reparto Fácil',
     herramientas: [
         { id: 'repartofacil', titulo: 'Pedidos Reparto Fácil', tipo: 'pantalla', icono: '🛵', desc: 'Recepción en vivo de pedidos de clientes y embalado' },
+        { id: 'historial-pedidos', titulo: 'Historial de pedidos', tipo: 'pantalla', icono: '📜', desc: 'Historial de pedidos entregados y cancelados' },
         { id: 'faltantes', titulo: 'Faltantes y reposición', tipo: 'pantalla', icono: '📦', desc: 'Sugerido de compra por quiebre de stock' },
         { id: 'auditoria', titulo: 'Inventario', tipo: 'pantalla', icono: '📋', desc: 'Catálogo, alta rápida, conteo físico y escáner' },
         { id: 'whatsapp', titulo: 'Mensaje al frigorífico', tipo: 'bloque' }

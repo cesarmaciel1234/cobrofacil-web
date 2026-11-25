@@ -4337,9 +4337,9 @@ const $ = id => document.getElementById(id);
 
         function cruzarConEspejo(panel, dato) {
             dato = dato || {};
-            if (dato.nodo) return dato;
+            if (dato.nodo && panel !== 'contabilidad') return dato;
             const libro = window.Espejo && Espejo.ventas ? Espejo.ventas() : null;
-            if (!espejoTieneFilas(libro)) return dato;
+            if (!espejoTieneFilas(libro) && panel !== 'contabilidad') return dato;
             const serverMasNuevo = !!(libro.sello && dato.actualizado_en && libro.sello < dato.actualizado_en);
             if (panel === 'reporte' || panel === 'jefe') {
                 if (serverMasNuevo && dato.vitrina && dato.vitrina.tickets && Number(dato.vitrina.tickets.cant) > 0) return dato;
@@ -4886,30 +4886,51 @@ const $ = id => document.getElementById(id);
                 }
                 const caja = name === 'contabilidad';
                 const digital = caja && cajaPantalla === 'digital';
-                const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja || name === 'cartera';
-                refresh.classList.toggle('es-filtro', filtrar);
-                if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
-                else if (name === 'pedidos') {
-                    const esAuditoria = (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual && window.AuditoriaInventario.pantallaActual() === 'auditoria');
-                    if (esAuditoria) {
-                        refresh.classList.toggle('filtrando', !!(window.AuditoriaInventario.filtroActivo && window.AuditoriaInventario.filtroActivo()));
-                    } else {
-                        refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
+                const pActivaPedidos = (name === 'pedidos' && window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual) ? window.AuditoriaInventario.pantallaActual() : 'repartofacil';
+                const esPedidosChat = (name === 'pedidos' && (pActivaPedidos === 'repartofacil' || pActivaPedidos === 'historial-pedidos'));
+
+                if (esPedidosChat) {
+                    refresh.classList.remove('es-filtro', 'filtrando');
+                    refresh.classList.add('es-mensajeria-global');
+                    refresh.style.position = 'relative';
+                    refresh.setAttribute('aria-label', 'Mensajería Global');
+                    refresh.title = 'Mensajería Global';
+                    refresh.innerHTML = `
+                        <svg class="ico-chat-global" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                        </svg>
+                        <span id="badgeChatGlobalTop" style="display:none; position:absolute; top:-4px; right:-4px; background:#ef4444; color:#ffffff; font-size:10px; font-weight:900; min-width:17px; height:17px; border-radius:999px; align-items:center; justify-content:center; padding:0 3px; border:1.5px solid #ffffff; box-shadow:0 1px 3px rgba(0,0,0,0.3); pointer-events:none;">0</span>
+                    `;
+                    if (window.RepartoFacilDespacho && window.RepartoFacilDespacho.actualizarBadgeChatGlobal) {
+                        window.RepartoFacilDespacho.actualizarBadgeChatGlobal();
                     }
-                }
-                else if (name === 'reporte') refresh.classList.toggle('filtrando', (window.vitrinaPeriodo || 'Hoy') !== 'Hoy');
-                else if (digital) refresh.classList.toggle('filtrando', periodoDigital !== 'Semana');
-                else if (caja) refresh.classList.toggle('filtrando', (periodoCaja || 'Hoy') !== 'Hoy');
-                else if (name === 'cartera') refresh.classList.toggle('filtrando', !!(window.CarteraLibro?.filtroActivo?.()));
-                else refresh.classList.remove('filtrando');
-                const esAuditoria = (name === 'pedidos' && window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual && window.AuditoriaInventario.pantallaActual() === 'auditoria');
-                const etiqueta = name === 'cartera' ? 'Filtrar cartera' : (name === 'pedidos' ? (esAuditoria ? 'Filtrar inventario' : 'Filtrar proveedor') : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar')));
-                refresh.setAttribute('aria-label', etiqueta);
-                refresh.title = etiqueta;
-                const icono = refresh.querySelector('svg');
-                if (icono && !icono.classList.contains('ico-filtro')) icono.classList.add('ico-refresh');
-                if (!refresh.querySelector('.ico-filtro')) {
-                    refresh.insertAdjacentHTML('beforeend', '<svg class="ico-filtro" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5z"/></svg>');
+                } else {
+                    refresh.classList.remove('es-mensajeria-global');
+                    const filtrar = name === 'pedidos' || name === 'ticket' || name === 'reporte' || caja || name === 'cartera';
+                    refresh.classList.toggle('es-filtro', filtrar);
+                    if (name === 'ticket') refresh.classList.toggle('filtrando', filtroVentasActivo());
+                    else if (name === 'pedidos') {
+                        const esAuditoria = pActivaPedidos === 'auditoria';
+                        if (esAuditoria) {
+                            refresh.classList.toggle('filtrando', !!(window.AuditoriaInventario.filtroActivo && window.AuditoriaInventario.filtroActivo()));
+                        } else {
+                            refresh.classList.toggle('filtrando', !!filtroProveedorPedido);
+                        }
+                    }
+                    else if (name === 'reporte') refresh.classList.toggle('filtrando', (window.vitrinaPeriodo || 'Hoy') !== 'Hoy');
+                    else if (digital) refresh.classList.toggle('filtrando', periodoDigital !== 'Semana');
+                    else if (caja) refresh.classList.toggle('filtrando', (periodoCaja || 'Hoy') !== 'Hoy');
+                    else if (name === 'cartera') refresh.classList.toggle('filtrando', !!(window.CarteraLibro?.filtroActivo?.()));
+                    else refresh.classList.remove('filtrando');
+                    const esAuditoria = (name === 'pedidos' && pActivaPedidos === 'auditoria');
+                    const etiqueta = name === 'cartera' ? 'Filtrar cartera' : (name === 'pedidos' ? (esAuditoria ? 'Filtrar inventario' : 'Filtrar proveedor') : (name === 'ticket' ? 'Filtrar ventas' : ((name === 'reporte' || caja) ? 'Filtrar período' : 'Actualizar')));
+                    refresh.setAttribute('aria-label', etiqueta);
+                    refresh.title = etiqueta;
+                    const icono = refresh.querySelector('svg');
+                    if (icono && !icono.classList.contains('ico-filtro')) icono.classList.add('ico-refresh');
+                    if (!refresh.querySelector('.ico-filtro')) {
+                        refresh.innerHTML = '<svg class="ico-filtro" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 5h16l-6 7v6l-4 2v-8L4 5z"/></svg>';
+                    }
                 }
             }
             pintarCarritoFlotante();
@@ -5107,6 +5128,23 @@ const $ = id => document.getElementById(id);
             if (btn.classList.contains('es-editar-cliente')) {
                 if (window.CarteraLibro && window.CarteraLibro.abrirPerfil) {
                     window.CarteraLibro.abrirPerfil();
+                    return;
+                }
+            }
+            if (btn.classList.contains('es-mensajeria-global')) {
+                if (window.RepartoFacilDespacho && window.RepartoFacilDespacho.abrirMensajeriaGlobal) {
+                    window.RepartoFacilDespacho.abrirMensajeriaGlobal();
+                }
+                return;
+            }
+            const vistaActual = document.querySelector('.view.active');
+            const nomVista = vistaActual && vistaActual.id.startsWith('view-') ? vistaActual.id.slice(5) : '';
+            if (nomVista === 'pedidos') {
+                const pActiva = (window.AuditoriaInventario && window.AuditoriaInventario.pantallaActual) ? window.AuditoriaInventario.pantallaActual() : 'repartofacil';
+                if (pActiva === 'repartofacil' || pActiva === 'historial-pedidos') {
+                    if (window.RepartoFacilDespacho && window.RepartoFacilDespacho.abrirMensajeriaGlobal) {
+                        window.RepartoFacilDespacho.abrirMensajeriaGlobal();
+                    }
                     return;
                 }
             }

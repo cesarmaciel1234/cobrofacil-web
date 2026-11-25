@@ -702,15 +702,16 @@
         let etiqueta = periodo || 'Hoy';
 
         const esHoy = (!periodo || String(periodo).toLowerCase() === 'hoy');
+        let diaBase = '';
         if (esHoy) {
             const hoy = hoyDe();
             let maxDia = '';
             const allV = filasVentas(copias.ventas || memoria, sucursalId);
             allV.forEach((v) => { if (v.dia && v.dia > maxDia) maxDia = v.dia; });
-            const diaBase = maxDia || hoy;
+            diaBase = maxDia || hoy;
             etiqueta = 'Hoy · ' + diaBase;
-            corteIni = diaBase < hoy ? diaBase : hoy;
-            corteFin = diaBase > hoy ? diaBase : hoy;
+            corteIni = diaBase <= hoy ? diaBase : hoy;
+            corteFin = diaBase >= hoy ? diaBase : hoy;
         }
 
         let vFilas = elegir(copias.ventas || memoria, ini, fin, sucursalId);
@@ -753,10 +754,7 @@
         let totalCobros = 0;
         let cantCobros = 0;
         const cobrosPorMedio = {};
-        ccFilas.forEach((c) => {
-            const dia = diaDe(c.fecha);
-            if (corteIni && dia && dia < corteIni) return;
-            if (corteFin && dia && dia > corteFin) return;
+        function procesarFilaCC(c) {
             const tipo = String(c.tipo || '').toUpperCase();
             if (tipo === 'ABONO' || Number(c.haber) > 0) {
                 const m = Number(c.monto || c.haber) || 0;
@@ -778,7 +776,21 @@
                     cobrosPorMedio[medio].cant += 1;
                 }
             }
+        }
+        ccFilas.forEach((c) => {
+            const dia = diaDe(c.fecha);
+            if (corteIni && dia && dia < corteIni) return;
+            if (corteFin && dia && dia > corteFin) return;
+            procesarFilaCC(c);
         });
+        if (esHoy && totalCobros === 0 && diaBase) {
+            ccFilas.forEach((c) => {
+                const dia = diaDe(c.fecha);
+                if (dia === diaBase) {
+                    procesarFilaCC(c);
+                }
+            });
+        }
 
         const cjFilas = filasTabla('movimientos_caja', sucursalId);
         const porTipoCaja = {};
