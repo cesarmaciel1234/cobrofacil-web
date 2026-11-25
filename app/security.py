@@ -200,9 +200,7 @@ def register_security(app):
             path in PUBLIC_PATHS 
             or path.startswith("/api/repartofacil/") 
             or path.startswith("/api/sucursales/publicas/")
-            or path.startswith("/api/pos/terminal/")
-            or path.startswith("/api/pos/tickets/")
-            or path.startswith("/api/pos/inventario/")
+            or path.startswith("/api/pos/")
         ):
             return None
         if is_authenticated():
@@ -220,9 +218,7 @@ def register_security(app):
         if (
             not request.path.startswith("/api/")
             or request.path.startswith("/api/repartofacil/")
-            or request.path.startswith("/api/pos/terminal/")
-            or request.path.startswith("/api/pos/tickets/")
-            or request.path.startswith("/api/pos/inventario/")
+            or request.path.startswith("/api/pos/")
         ):
             return None
         if current_role() == "visor":
