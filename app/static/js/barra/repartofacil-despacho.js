@@ -338,6 +338,10 @@
                     localStorage.setItem(getCacheKey(), JSON.stringify(pedidosLista));
                 } catch(e) {}
                 renderizarCards();
+                const wrapHist = $('pedidosHistorialWrap');
+                if (wrapHist && wrapHist.style.display !== 'none') {
+                    renderizarHistorial();
+                }
                 actualizarBadge();
                 cargarMetricasOmnicanal();
             } else if (!silencioso) {
@@ -346,6 +350,10 @@
                     try {
                         pedidosLista = JSON.parse(cache);
                         renderizarCards();
+                        const wrapHist = $('pedidosHistorialWrap');
+                        if (wrapHist && wrapHist.style.display !== 'none') {
+                            renderizarHistorial();
+                        }
                         actualizarBadge();
                         return;
                     } catch(e) {}
@@ -496,7 +504,7 @@
                         const nombre = escaparTextoChat(p.cliente_nombre || 'Cliente Web');
                         const total = plataJefe(p.total || 0);
                         const esRetiro = esModalidadRetiro(p);
-                        const hora = formatearHoraLocal(p.created_at);
+                        const hora = formatFecha(p.created_at);
                         const esFinal = esPedidoFinalizado(p);
 
                         return `
@@ -921,6 +929,11 @@
 
         if (!Array.isArray(pedidosLista)) pedidosLista = [];
 
+        // Si la lista de pedidos aún no cargó en memoria, cargar en segundo plano
+        if (pedidosLista.length === 0) {
+            void cargarPedidos(true);
+        }
+
         // Filtrar pedidos finalizados
         const finalizados = pedidosLista.filter(p => esPedidoFinalizado(p));
         const entregados = finalizados.filter(p => String(p.estado || '').toLowerCase() === 'delivered');
@@ -966,24 +979,24 @@
                     <span style="position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:14px; color:#94a3b8; pointer-events:none;">🔍</span>
                 </div>
 
-                <!-- Filtros rápidos de Historial -->
-                <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px; -webkit-overflow-scrolling:touch;">
+                <!-- Filtros rápidos de Historial (responsive con flex-wrap para pantallas angostas) -->
+                <div style="display:flex; gap:6px; flex-wrap:wrap; padding-bottom:4px;">
                     <button type="button" onclick="window.RepartoFacilDespacho.setFiltroHistorial('todos')"
-                        style="background:${filtroHistorial === 'todos' ? '#2D3277' : '#ffffff'}; color:${filtroHistorial === 'todos' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'todos' ? '#2D3277' : '#cbd5e1'}; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+                        style="background:${filtroHistorial === 'todos' ? '#2D3277' : '#ffffff'}; color:${filtroHistorial === 'todos' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'todos' ? '#2D3277' : '#cbd5e1'}; border-radius:999px; padding:5px 12px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; flex-shrink:0;">
                         <span>Todos</span>
                         <span style="background:${filtroHistorial === 'todos' ? '#FFE600' : '#f1f5f9'}; color:${filtroHistorial === 'todos' ? '#2D3277' : '#475569'}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
                             ${finalizados.length}
                         </span>
                     </button>
                     <button type="button" onclick="window.RepartoFacilDespacho.setFiltroHistorial('entregados')"
-                        style="background:${filtroHistorial === 'entregados' ? '#047857' : '#ffffff'}; color:${filtroHistorial === 'entregados' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'entregados' ? '#047857' : '#cbd5e1'}; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+                        style="background:${filtroHistorial === 'entregados' ? '#047857' : '#ffffff'}; color:${filtroHistorial === 'entregados' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'entregados' ? '#047857' : '#cbd5e1'}; border-radius:999px; padding:5px 12px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; flex-shrink:0;">
                         <span>Entregados</span>
                         <span style="background:${filtroHistorial === 'entregados' ? '#ffffff' : '#ecfdf5'}; color:${filtroHistorial === 'entregados' ? '#047857' : '#047857'}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
                             ${entregados.length}
                         </span>
                     </button>
                     <button type="button" onclick="window.RepartoFacilDespacho.setFiltroHistorial('rechazados')"
-                        style="background:${filtroHistorial === 'rechazados' ? '#b91c1c' : '#ffffff'}; color:${filtroHistorial === 'rechazados' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'rechazados' ? '#b91c1c' : '#cbd5e1'}; border-radius:999px; padding:6px 14px; font-size:12px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:6px; flex-shrink:0;">
+                        style="background:${filtroHistorial === 'rechazados' ? '#b91c1c' : '#ffffff'}; color:${filtroHistorial === 'rechazados' ? '#ffffff' : '#334155'}; border:1px solid ${filtroHistorial === 'rechazados' ? '#b91c1c' : '#cbd5e1'}; border-radius:999px; padding:5px 12px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:5px; flex-shrink:0;">
                         <span>Rechazados</span>
                         <span style="background:${filtroHistorial === 'rechazados' ? '#ffffff' : '#fee2e2'}; color:${filtroHistorial === 'rechazados' ? '#b91c1c' : '#b91c1c'}; font-size:10px; font-weight:900; padding:1px 6px; border-radius:999px;">
                             ${rechazados.length}
