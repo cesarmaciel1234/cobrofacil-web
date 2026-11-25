@@ -231,10 +231,11 @@ def _claves_en(conn, tabla: str, sid: int | None, ajenas: bool) -> tuple[set, di
 
 
 def _omitir_copias(conn, tabla: str, columnas: list, filas: list, sid: int | None, modo: str, parte: int) -> list:
-    """La copia de otra PC no se agrega. La que ya está en el libro se queda."""
+    """Aislamiento absoluto e inquebrantable por sucursal.
+    NUNCA descarta registros por coincidir con otra sucursal: cada sucursal es 100% soberana e independiente.
+    Solo evita duplicaciones intra-lote o sobreescritura accidental dentro de la MISMA sucursal."""
     if tabla not in ("clientes", "ventas", "detalles_ventas", "ventas_items", "cuenta_corriente"):
         return filas
-    ajenas, _ = _claves_en(conn, tabla, sid, True)
     propias: set = set()
     duenos: dict = {}
     if not (modo == "reemplazo" and parte == 1):
@@ -246,7 +247,7 @@ def _omitir_copias(conn, tabla: str, columnas: list, filas: list, sid: int | Non
         if not clave:
             salida.append(fila)
             continue
-        if clave in ajenas or clave in vistas:
+        if clave in vistas:
             continue
         if clave in propias and modo == "reemplazo":
             continue
@@ -411,17 +412,20 @@ def unir_clientes(columnas: list, filas: list) -> tuple[list, list]:
 
 
 def _sin_copias(tabla: str, columnas: list, filas: list) -> list:
-    """En el consolidado, el ticket que ya vino de otra PC no se cuenta otra vez."""
+    """En el consolidado, garantiza que no haya filas duplicadas pero preserva íntegras todas las sucursales."""
     if tabla not in ("ventas", "detalles_ventas", "ventas_items", "cuenta_corriente"):
         return filas
+    suc_i = _columna(columnas, "sucursal_id", "sid")
     vistas: set = set()
     salida = []
     for fila in filas:
+        sid_val = fila[suc_i] if suc_i is not None and suc_i < len(fila) else None
         clave = _armar_clave(tabla, columnas, fila)
         if clave:
-            if clave in vistas:
+            clave_completa = (sid_val, clave)
+            if clave_completa in vistas:
                 continue
-            vistas.add(clave)
+            vistas.add(clave_completa)
         salida.append(fila)
     return salida
 
@@ -503,11 +507,13 @@ def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | N
     sucursal_nombre = _nombre_que_ya_tiene(conn, sid, sucursal_nombre, eid=eid)
     _borrar_partes(conn, tabla, sid, eid=eid)
     for numero, (dia, bloque) in enumerate(_bloques_por_dia(columnas, filas), start=1):
+        # Firma única para blindar datos: empresa_id:sucursal_id:tabla:parte
+        firma_unica = f"{eid}:{sid or 0}:{tabla}:{numero}"
         conn.execute(
             """
             INSERT INTO pos_base
-            (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia, firma_unica)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 eid,
@@ -520,6 +526,7 @@ def _escribir_partes(conn, tabla: str, sid: int | None, sucursal_nombre: str | N
                 len(bloque),
                 ahora,
                 dia or _dia_de_filas(columnas, bloque),
+                firma_unica,
             ),
         )
 
@@ -651,11 +658,12 @@ def guardar_parte(
                     "DELETE FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ? AND parte = ?",
                     (eid, tabla, sid, parte),
                 )
+        firma_unica = f"{eid}:{sid or 0}:{tabla}:{parte}"
         conn.execute(
             """
             INSERT INTO pos_base
-            (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            (empresa_id, sucursal_id, sucursal_nombre, tabla, parte, columnas, filas, cantidad, actualizado_en, dia, firma_unica)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 eid,
@@ -668,6 +676,7 @@ def guardar_parte(
                 len(limpias),
                 _utc_now(),
                 _dia_de_filas(columnas, limpias),
+                firma_unica,
             ),
         )
     _olvidar_tabla(tabla)
@@ -932,28 +941,16 @@ def ultima_carga(sucursal_id: int | str | None = None, empresa_id: int | None = 
 
 
 def consolidar_sucursales(conn) -> None:
-    """Unifica terminales registradas con el hostname del equipo si se duplicó el nodo."""
-    try:
-        conn.execute(
-            """
-            DELETE FROM pos_base
-            WHERE sucursal_id = 2 AND empresa_id = 1
-              AND (tabla, parte) IN (
-                  SELECT tabla, parte FROM pos_base WHERE sucursal_id = 1 AND empresa_id = 1
-              )
-            """
-        )
-        conn.execute(
-            """
-            UPDATE pos_base
-            SET sucursal_id = 1, sucursal_nombre = 'Casa Central - Alfaro 1964'
-            WHERE sucursal_id = 2 AND empresa_id = 1
-            """
-        )
-        if hasattr(conn, "commit"):
-            conn.commit()
-    except Exception as exc:
-        logger.warning("consolidar_sucursales: %s", exc)
+    """UNIFICACIÓN DESACTIVADA - Esta función borraba datos de sucursal_id=2 cuando detectaba duplicados.
+
+    ANTES: Forzaba que todos los datos de sucursal_id=2 en empresa_id=1 se convirtieran a sucursal_id=1.
+    PROBLEMA: Borraba ventas legítimas de la sucursal 2, causando pérdida de datos (de ~1.3M a ~7K).
+
+    AHORA: No hace nada. Las sucursales deben mantenerse separadas.
+    Si se necesita consolidar por duplicación real de nodos, debe hacerse manualmente con criterio.
+    """
+    # Función desactivada para evitar pérdida de datos
+    pass
 
 
 def _empresa_activa(empresa_id: int | None = None) -> int:
@@ -1022,7 +1019,7 @@ def listar_sucursales(empresa_id: int | None = None) -> list[dict]:
 
     with get_db(eid) as conn:
         ensure_tenant_migrations(conn)
-        consolidar_sucursales(conn)
+        # consolidar_sucursales(conn)  # DESACTIVADO - causaba pérdida de datos
         rows = conn.execute(
             """
             SELECT DISTINCT sucursal_id, sucursal_nombre

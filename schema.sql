@@ -205,9 +205,12 @@ CREATE TABLE IF NOT EXISTS pos_base (
     columnas TEXT NOT NULL,
     filas TEXT NOT NULL,
     cantidad INTEGER NOT NULL DEFAULT 0,
-    actualizado_en TEXT
+    actualizado_en TEXT,
+    firma_unica TEXT
 );
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_firma
+    ON pos_base(firma_unica);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
     ON pos_base(COALESCE(sucursal_id, 0), tabla, parte);
 

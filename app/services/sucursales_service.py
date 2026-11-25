@@ -190,13 +190,25 @@ def vincular_terminal(empresa_id, sucursal_id, datos):
 
 def resolver_sucursal_terminal(empresa_id, identificador_pc, sucursal_id_sugerido=None):
     """
-    Resuelve a qué sucursal pertenece una terminal/PC.
-    Si la PC ya está registrada en una sucursal, devuelve su sucursal_id oficial.
-    Si es una PC nueva, la auto-asigna a la sucursal sugerida o a la Casa Central (id 1).
+    Resuelve a qué sucursal pertenece una terminal/PC de forma blindada.
+    1. Si la terminal/PC envía explícitamente sucursal_id_sugerido (configurado en el TPV),
+       esa es la sucursal soberana asignada a los datos. Se actualiza o registra la PC en esa sucursal.
+    2. Si la PC no especifica sucursal, consulta su registro oficial en `terminales`.
+    3. Si es una PC no registrada sin sugerencia, se asigna a la primera sucursal activa.
+    NUNCA secuestra ni sobreescribe la sucursal enviada explícitamente por el cliente TPV.
     """
     id_pc = str(identificador_pc or "").strip()
+    
+    # Si viene sugerido explícitamente, validar
+    sid_sugerido = None
+    if sucursal_id_sugerido not in (None, ""):
+        try:
+            sid_sugerido = int(sucursal_id_sugerido)
+        except (ValueError, TypeError):
+            sid_sugerido = None
+
     if not id_pc:
-        return int(sucursal_id_sugerido) if sucursal_id_sugerido not in (None, "") else 1
+        return sid_sugerido if sid_sugerido is not None else 1
 
     with get_db(empresa_id=0) as conn:
         term = conn.execute(
@@ -207,6 +219,31 @@ def resolver_sucursal_terminal(empresa_id, identificador_pc, sucursal_id_sugerid
             (empresa_id, id_pc),
         ).fetchone()
 
+        if sid_sugerido is not None:
+            # La terminal especifica explícitamente su sucursal de origen: respetarla de forma inquebrantable
+            if term:
+                if term["sucursal_id"] != sid_sugerido:
+                    conn.execute(
+                        f"UPDATE {_tabla('terminales')} SET sucursal_id = ?, ultimo_sync = CURRENT_TIMESTAMP WHERE id = ?",
+                        (sid_sugerido, term["id"]),
+                    )
+                else:
+                    conn.execute(
+                        f"UPDATE {_tabla('terminales')} SET ultimo_sync = CURRENT_TIMESTAMP WHERE id = ?",
+                        (term["id"],),
+                    )
+            else:
+                conn.execute(
+                    f"""INSERT INTO {_tabla('terminales')}
+                       (sucursal_id, empresa_id, nombre, identificador_pc, descripcion, activo, ultimo_sync)
+                       VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)""",
+                    (sid_sugerido, empresa_id, f"Caja {id_pc}", id_pc, "Terminal auto-detectada TPV"),
+                )
+            if hasattr(conn, "commit"):
+                conn.commit()
+            return sid_sugerido
+
+        # Si no vino sugerido, usar el que ya tiene la terminal
         if term and term["sucursal_id"]:
             conn.execute(
                 f"UPDATE {_tabla('terminales')} SET ultimo_sync = CURRENT_TIMESTAMP WHERE id = ?",
@@ -216,22 +253,13 @@ def resolver_sucursal_terminal(empresa_id, identificador_pc, sucursal_id_sugerid
                 conn.commit()
             return int(term["sucursal_id"])
 
-        # Si no existe, buscamos sucursal sugerida o la primera activa
-        sid_target = 1
-        if sucursal_id_sugerido:
-            try:
-                sid_target = int(sucursal_id_sugerido)
-            except (ValueError, TypeError):
-                sid_target = 1
-        else:
-            primera_suc = conn.execute(
-                f"SELECT id FROM {_tabla('sucursales')} WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC LIMIT 1",
-                (empresa_id,),
-            ).fetchone()
-            if primera_suc:
-                sid_target = int(primera_suc["id"])
+        # Si es una PC nueva sin sucursal sugerida, buscar la primera activa
+        primera_suc = conn.execute(
+            f"SELECT id FROM {_tabla('sucursales')} WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC LIMIT 1",
+            (empresa_id,),
+        ).fetchone()
+        sid_target = int(primera_suc["id"]) if primera_suc else 1
 
-        # Auto-registrar la nueva PC en esa sucursal
         conn.execute(
             f"""INSERT INTO {_tabla('terminales')}
                (sucursal_id, empresa_id, nombre, identificador_pc, descripcion, activo, ultimo_sync)

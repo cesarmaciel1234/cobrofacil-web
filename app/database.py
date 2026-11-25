@@ -587,6 +587,9 @@ def _run_migrations(conn):
             conn.execute("ALTER TABLE pos_base ADD COLUMN dia TEXT")
         if "empresa_id" not in columnas_base:
             conn.execute("ALTER TABLE pos_base ADD COLUMN empresa_id INTEGER NOT NULL DEFAULT 1")
+        if "firma_unica" not in columnas_base:
+            conn.execute("ALTER TABLE pos_base ADD COLUMN firma_unica TEXT")
+            conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_firma ON pos_base(firma_unica)")
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_pos_base_dia ON pos_base(tabla, dia)"
         )
@@ -949,9 +952,12 @@ def _run_migrations(conn):
             columnas TEXT NOT NULL,
             filas TEXT NOT NULL,
             cantidad INTEGER NOT NULL DEFAULT 0,
-            actualizado_en TEXT
+            actualizado_en TEXT,
+            firma_unica TEXT
         );
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_firma
+            ON pos_base(firma_unica);
+        CREATE INDEX IF NOT EXISTS idx_pos_base_parte
             ON pos_base(empresa_id, COALESCE(sucursal_id, 0), tabla, parte);
         CREATE INDEX IF NOT EXISTS idx_pos_base_tabla
             ON pos_base(empresa_id, tabla, sucursal_id);
