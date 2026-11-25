@@ -4972,6 +4972,7 @@ const $ = id => document.getElementById(id);
             if (!titles[name]) return;
             document.querySelectorAll('.nav-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === name));
             document.querySelectorAll('.view').forEach(v => v.classList.toggle('active', v.id === 'view-' + name));
+            document.body.classList.toggle('vista-pedidos', name === 'pedidos');
             document.querySelectorAll('.pwa-nav-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.pwaView === (name === 'ticket' ? 'contabilidad' : name));
             });

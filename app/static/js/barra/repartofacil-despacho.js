@@ -246,6 +246,7 @@
 
     // Iniciar el módulo cuando se entra a la pantalla
     function iniciar() {
+        document.body.classList.add('vista-pedidos');
         const wrap = $('pedidosRepartoFacilWrap');
         if (!wrap) return;
         cargarPedidos();
@@ -266,6 +267,7 @@
 
     // Detener polling
     function detener() {
+        document.body.classList.remove('vista-pedidos');
         if (timerPolling) {
             clearInterval(timerPolling);
             timerPolling = null;
@@ -722,12 +724,12 @@
                 pagoBadgeBorder = '#a7f3d0';
             }
 
-            // Botón de acción rápida (Botón 3)
+            // Botón de acción rápida (Botón 3 en grid inferior con altura 40px)
             let botonAccionRapidaHtml = '';
             if (esNuevoPendiente) {
                 botonAccionRapidaHtml = `
                     <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.aceptarPedido(${argumentoPedido(p.id)})"
-                        style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(234,179,8,0.25);">
+                        style="width:100%; height:40px; background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:11.5px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-shadow:0 2px 5px rgba(234,179,8,0.25); white-space:nowrap; box-sizing:border-box;">
                         ${SVG_ICONOS.check}
                         <span>Aceptar</span>
                     </button>
@@ -735,7 +737,7 @@
             } else if (esConfirmado) {
                 botonAccionRapidaHtml = `
                     <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)"
-                        style="background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(16,185,129,0.25);">
+                        style="width:100%; height:40px; background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:10px; font-size:11.5px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-shadow:0 2px 5px rgba(16,185,129,0.25); white-space:nowrap; box-sizing:border-box;">
                         ${SVG_ICONOS.box}
                         <span>${esRetiroEnTienda ? 'Listo' : 'Embalar'}</span>
                     </button>
@@ -743,7 +745,7 @@
             } else if (esEmbalado && esRetiroEnTienda) {
                 botonAccionRapidaHtml = `
                     <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})"
-                        style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(2,132,199,0.25);">
+                        style="width:100%; height:40px; background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:10px; font-size:11.5px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; box-shadow:0 2px 5px rgba(2,132,199,0.25); white-space:nowrap; box-sizing:border-box;">
                         ${SVG_ICONOS.check}
                         <span>Entregar</span>
                     </button>
@@ -751,26 +753,53 @@
             } else if (esEmbalado && !esRetiroEnTienda) {
                 botonAccionRapidaHtml = `
                     <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
-                        style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:8px; padding:5px 8px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
+                        style="width:100%; height:40px; background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:10px; font-size:11.5px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap; box-sizing:border-box;">
                         ${SVG_ICONOS.bike}
                         <span>Despacho</span>
                     </button>
                 `;
             } else if (esEntregado) {
-                botonAccionRapidaHtml = `<span style="color:#059669; font-size:10.5px; font-weight:800; padding:4px 6px;">✓ Listo</span>`;
+                botonAccionRapidaHtml = `
+                    <div style="width:100%; height:40px; background:#f8fafc; color:#059669; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; white-space:nowrap; box-sizing:border-box;">
+                        ${SVG_ICONOS.check} <span style="margin-left:3px;">Listo</span>
+                    </div>
+                `;
             } else if (esRechazado) {
-                botonAccionRapidaHtml = `<span style="color:#dc2626; font-size:10.5px; font-weight:800; padding:4px 6px;">Archivado</span>`;
+                botonAccionRapidaHtml = `
+                    <div style="width:100%; height:40px; background:#f8fafc; color:#dc2626; border:1px solid #cbd5e1; border-radius:10px; font-size:11px; font-weight:800; display:flex; align-items:center; justify-content:center; white-space:nowrap; box-sizing:border-box;">
+                        ${SVG_ICONOS.cruz} <span style="margin-left:3px;">Archivado</span>
+                    </div>
+                `;
+            } else {
+                botonAccionRapidaHtml = `
+                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
+                        style="width:100%; height:40px; background:#fef9c3; color:#854d0e; border:1px solid #facc15; border-radius:10px; font-size:11.5px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap; box-sizing:border-box;">
+                        ${SVG_ICONOS.bike}
+                        <span>En viaje</span>
+                    </button>
+                `;
             }
 
-            const cardBorder = esNuevoPendiente ? '#FFE600' : (esRechazado ? '#fca5a5' : '#e2e8f0');
-            const cardBg = esNuevoPendiente ? '#fffef8' : '#ffffff';
+            // Barra lateral finita de 4px según estado (ámbar = NUEVO, naranja = ASIGNANDO, verde = EMBALADO)
+            let barraLateralColor = '#f59e0b'; // Ámbar = NUEVO por defecto
+            if (esNuevoPendiente) {
+                barraLateralColor = '#f59e0b'; // Ámbar
+            } else if (esConfirmado || (p.repartidor_nombre || p.repartidor_id)) {
+                barraLateralColor = '#f97316'; // Naranja (ASIGNANDO / PREPARANDO / EN VIAJE)
+            } else if (esEmbalado) {
+                barraLateralColor = '#10b981'; // Verde (EMBALADO / LISTO)
+            } else if (esEntregado) {
+                barraLateralColor = '#94a3b8'; // Gris suave (ENTREGADO)
+            } else if (esRechazado) {
+                barraLateralColor = '#ef4444'; // Rojo suave (CANCELADO / RECHAZADO)
+            }
 
             html += `
                 <div class="card rf-order-card" data-order-id="${escaparTextoChat(p.id)}" onclick="window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
-                    style="background:${cardBg}; border-radius:14px; border:1.5px solid ${cardBorder}; box-shadow:0 2px 6px rgba(15,23,42,0.04); padding:9px 12px; cursor:pointer; transition:transform 0.1s ease, box-shadow 0.1s ease;">
+                    style="background:#ffffff; border-radius:14px; border:1px solid #E5E7EB; border-left:4px solid ${barraLateralColor}; box-shadow:0 1px 3px rgba(0,0,0,0.03); padding:10px 12px; cursor:pointer; transition:transform 0.1s ease, box-shadow 0.1s ease; box-sizing:border-box;">
                     
                     <!-- LÍNEA 1: #RF, HORA, CLIENTE, BADGE MODALIDAD Y ESTADO -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:5px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:6px;">
                         <div style="display:flex; align-items:center; gap:6px; min-width:0; overflow:hidden;">
                             <b style="font-size:12px; color:#2D3277; font-family:monospace; flex-shrink:0;">
                                 #${formatearIdCorto(p.id).toUpperCase()}
@@ -788,36 +817,37 @@
                         </div>
                     </div>
 
-                    <!-- LÍNEA 2: PAGO, MONTO TOTAL Y BOTONES CON FLEX-WRAP Y GAP-2 -->
-                    <div class="rf-card-linea2" style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
-                        <div style="display:flex; align-items:center; gap:6px; min-width:0;">
-                            <span style="background:${pagoBadgeBg}; color:${pagoBadgeColor}; border:1px solid ${pagoBadgeBorder}; font-size:10px; font-weight:800; padding:2px 6px; border-radius:6px; white-space:nowrap;">
+                    <!-- LÍNEA 2: MONTO + MEDIO DE PAGO EN SU PROPIA LÍNEA SUPERIOR (SEPARADA DE LOS BOTONES) -->
+                    <div style="display:flex; align-items:center; justify-content:space-between; gap:6px; margin-bottom:10px; padding-top:2px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <span style="background:${pagoBadgeBg}; color:${pagoBadgeColor}; border:1px solid ${pagoBadgeBorder}; font-size:10px; font-weight:800; padding:2px 7px; border-radius:6px; white-space:nowrap;">
                                 ${pagoBadgeTexto}
                             </span>
-                            <b style="font-size:14px; font-weight:900; color:#2D3277; font-family:monospace; white-space:nowrap;">
-                                ${formatMoney(p.total)}
-                            </b>
                         </div>
+                        <b style="font-size:15px; font-weight:900; color:#0f172a; font-family:monospace; white-space:nowrap;">
+                            ${formatMoney(p.total)}
+                        </b>
+                    </div>
 
-                        <div class="rf-card-botones" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;" onclick="event.stopPropagation()">
-                            <!-- Botón 1: Ver Ticket / Comanda (ícono SVG limpio) -->
-                            <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})" title="Ver Comanda completa"
-                                style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap;">
-                                ${SVG_ICONOS.ticket}
-                                <span>Ticket</span>
-                            </button>
+                    <!-- LÍNEA 3: FILA INFERIOR SEPARADA CON LOS 3 BOTONES AL 100% DEL ANCHO (GRID COLS 3, GAP 2, H-10) -->
+                    <div class="rf-card-botones" style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:8px; width:100%; box-sizing:border-box;" onclick="event.stopPropagation()">
+                        <!-- Botón 1: Ver Ticket / Comanda (ícono SVG limpio) -->
+                        <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})" title="Ver Comanda completa"
+                            style="width:100%; height:40px; background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:10px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap; box-sizing:border-box;">
+                            ${SVG_ICONOS.ticket}
+                            <span>Ticket</span>
+                        </button>
 
-                            <!-- Botón 2: Chat (con contador numérico) -->
-                            <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" title="Chat con cliente"
-                                style="background:${p.unread_chat_count > 0 ? '#ef4444' : '#eff6ff'}; color:${p.unread_chat_count > 0 ? '#ffffff' : '#1d4ed8'}; border:1px solid ${p.unread_chat_count > 0 ? '#dc2626' : '#bfdbfe'}; border-radius:8px; padding:6px 10px; font-size:11px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap;">
-                                ${SVG_ICONOS.chat}
-                                <span>Chat</span>
-                                ${p.unread_chat_count > 0 ? `<span style="background:#ffffff; color:#ef4444; font-size:9.5px; font-weight:900; padding:0 5px; border-radius:999px;">${p.unread_chat_count}</span>` : ''}
-                            </button>
+                        <!-- Botón 2: Chat (con contador numérico) -->
+                        <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirChat(${argumentoPedido(p.id)}, ${argumentoPedido(p.cliente_nombre || 'Cliente')})" title="Chat con cliente"
+                            style="width:100%; height:40px; background:${p.unread_chat_count > 0 ? '#ef4444' : '#eff6ff'}; color:${p.unread_chat_count > 0 ? '#ffffff' : '#1d4ed8'}; border:1px solid ${p.unread_chat_count > 0 ? '#dc2626' : '#bfdbfe'}; border-radius:10px; font-size:11.5px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:5px; box-shadow:0 1px 2px rgba(0,0,0,0.03); white-space:nowrap; box-sizing:border-box;">
+                            ${SVG_ICONOS.chat}
+                            <span>Chat</span>
+                            ${p.unread_chat_count > 0 ? `<span style="background:#ffffff; color:#ef4444; font-size:9.5px; font-weight:900; padding:1px 5px; border-radius:999px;">${p.unread_chat_count}</span>` : ''}
+                        </button>
 
-                            <!-- Botón 3: Acción Principal -->
-                            ${botonAccionRapidaHtml}
-                        </div>
+                        <!-- Botón 3: Acción Principal -->
+                        ${botonAccionRapidaHtml}
                     </div>
 
                 </div>
@@ -1818,59 +1848,59 @@
             const formatMoneyNum = (num) => '$' + Math.round(Number(num || 0)).toLocaleString('es-AR');
 
             host.innerHTML = `
-                <div style="background:#ffffff; border:2px solid #FFE600; border-radius:18px; padding:12px 14px; box-shadow:0 3px 12px rgba(234,179,8,0.1); display:flex; flex-direction:column; gap:10px;">
+                <div style="background:#ffffff; border:1px solid #E5E7EB; border-radius:16px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,0.03); display:flex; flex-direction:column; gap:10px;">
                     <!-- Fila Superior: Enlace con Servidor de la Tienda Física + Controles de Pedidos -->
-                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px dashed #fde047; padding-bottom:8px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px solid #F3F4F6; padding-bottom:8px;">
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
                             <span style="display:inline-block; width:9px; height:9px; border-radius:999px; background:#10b981; box-shadow:0 0 6px rgba(16,185,129,0.8); animation:pulse 2s infinite;"></span>
-                            <span style="font-size:11.5px; font-weight:900; color:#2D3277; text-transform:uppercase; letter-spacing:0.3px;">
+                            <span style="font-size:11.5px; font-weight:900; color:#1e293b; text-transform:uppercase; letter-spacing:0.3px;">
                                 SERVIDOR EN LÍNEA
                             </span>
                             <span id="repartoFacilCountBadge" style="display:none; background:#ef4444; color:#ffffff; border:1px solid #dc2626; font-size:10px; font-weight:900; padding:1px 7px; border-radius:999px; box-shadow:0 2px 5px rgba(239,68,68,0.4);">0</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <button type="button" id="btnToggleSonidoReparto" onclick="window.RepartoFacilDespacho.toggleSonido()" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:11px; padding:5px 8px; cursor:pointer; color:#2D3277; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Activar / Silenciar timbre">
+                            <button type="button" id="btnToggleSonidoReparto" onclick="window.RepartoFacilDespacho.toggleSonido()" style="background:#ffffff; border:1px solid #E5E7EB; border-radius:8px; font-size:11px; padding:5px 8px; cursor:pointer; color:#1e293b; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.02);" title="Activar / Silenciar timbre">
                                 <span id="iconoSonidoReparto">${sonidoHabilitado ? SVG_ICONOS.bell : SVG_ICONOS.bellOff}</span>
                                 <span id="lblSonidoReparto" style="font-size:10px; font-weight:900;">${sonidoHabilitado ? 'ON' : 'OFF'}</span>
                             </button>
-                            <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos(true)" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:13px; font-weight:900; padding:5px 8px; cursor:pointer; color:#2D3277; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:inline-flex; align-items:center; justify-content:center;" title="Refrescar pedidos">
+                            <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos(true)" style="background:#ffffff; border:1px solid #E5E7EB; border-radius:8px; font-size:13px; font-weight:900; padding:5px 8px; cursor:pointer; color:#1e293b; box-shadow:0 1px 2px rgba(0,0,0,0.02); display:inline-flex; align-items:center; justify-content:center;" title="Refrescar pedidos">
                                 ${SVG_ICONOS.refresh}
                             </button>
-                            <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:10.5px; font-weight:900; padding:5px 9px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(234,179,8,0.25);">
+                            <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#f8fafc; color:#1e293b; border:1px solid #E5E7EB; border-radius:8px; font-size:10.5px; font-weight:800; padding:5px 9px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
                                 ${SVG_ICONOS.sync}
                                 <span>Sincronizar Stock</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Fila Inferior: Las 3 tarjetas de Pedidos Web calculadas directamente de pedidosLista -->
-                    <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; text-align:center;">
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
-                            <span style="font-size:9px; color:#64748b; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">RETIRO LOCAL</span>
-                            <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <!-- Fila Inferior: Las 3 tarjetas de Pedidos Web en BLANCO LIMPIO con texto oscuro de buen contraste -->
+                    <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:6px; text-align:center;">
+                        <div style="background:#ffffff; border:1px solid #E5E7EB; border-radius:12px; padding:8px 4px; min-width:0; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="font-size:9.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.3px;">RETIRO LOCAL</span>
+                            <b style="font-size:13px; font-weight:900; color:#0f172a; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.retiro_local_monto)}
                             </b>
-                            <small style="font-size:8.5px; color:#854d0e; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
+                            <small style="font-size:9px; color:#64748b; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
                                 ${data.retiro_local_cant} ped. (${data.retiro_local_activos} act.)
                             </small>
                         </div>
 
-                        <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
-                            <span style="font-size:9px; color:#64748b; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">CON DELIVERY</span>
-                            <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        <div style="background:#ffffff; border:1px solid #E5E7EB; border-radius:12px; padding:8px 4px; min-width:0; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="font-size:9.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.3px;">CON DELIVERY</span>
+                            <b style="font-size:13px; font-weight:900; color:#0f172a; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.delivery_monto)}
                             </b>
-                            <small style="font-size:8.5px; color:#854d0e; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
+                            <small style="font-size:9px; color:#64748b; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
                                 ${data.delivery_cant} ped. (${data.delivery_activos} act.)
                             </small>
                         </div>
 
-                        <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:12px; padding:7px 2px; min-width:0; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
-                            <span style="font-size:9px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">PEDIDOS WEB</span>
-                            <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        <div style="background:#ffffff; border:1px solid #E5E7EB; border-radius:12px; padding:8px 4px; min-width:0; box-shadow:0 1px 2px rgba(0,0,0,0.02);">
+                            <span style="font-size:9.5px; color:#0f172a; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; letter-spacing:0.3px;">PEDIDOS WEB</span>
+                            <b style="font-size:13px; font-weight:900; color:#0f172a; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.total_web_monto)}
                             </b>
-                            <small style="font-size:8.5px; color:#2D3277; font-weight:900; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
+                            <small style="font-size:9px; color:#475569; font-weight:800; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
                                 ${data.total_web_cant} ped. (${data.total_web_activos} act.)
                             </small>
                         </div>

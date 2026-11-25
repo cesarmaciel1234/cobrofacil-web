@@ -110,10 +110,10 @@
 
             .neural-orb-btn {
                 position: fixed;
-                bottom: calc(76px + env(safe-area-inset-bottom, 0px));
+                bottom: calc(84px + env(safe-area-inset-bottom, 0px));
                 right: 14px;
-                width: 58px;
-                height: 58px;
+                width: 50px;
+                height: 50px;
                 border-radius: 999px;
                 background: radial-gradient(circle, #0f172a 0%, #020617 100%);
                 border: 2px solid #00f2fe;
@@ -124,13 +124,31 @@
                 justify-content: center;
                 animation: arcPulse 3s infinite ease-in-out;
                 user-select: none;
-                transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+                transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.2s ease;
             }
             @media (max-width: 640px) {
                 .neural-orb-btn {
-                    bottom: calc(76px + env(safe-area-inset-bottom, 0px)) !important;
-                    right: 12px;
+                    width: 44px !important;
+                    height: 44px !important;
+                    bottom: calc(84px + env(safe-area-inset-bottom, 0px)) !important;
+                    right: 12px !important;
                 }
+                .neural-orb-btn .neural-orb-core {
+                    width: 20px !important;
+                    height: 20px !important;
+                }
+                .neural-orb-btn span[style*="font-size:18px"] {
+                    font-size: 14px !important;
+                }
+                .neural-orb-btn .neural-orb-badge {
+                    font-size: 8px !important;
+                    padding: 1px 4px !important;
+                    top: -3px !important;
+                    right: -3px !important;
+                }
+            }
+            body.vista-pedidos .neural-orb-btn {
+                display: none !important;
             }
             .neural-orb-btn:hover {
                 transform: scale(1.1);
