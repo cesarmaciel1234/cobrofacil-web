@@ -138,12 +138,27 @@ def api_pos_clientes_lote_sync():
     if not isinstance(clientes, list):
         return jsonify({"error": "clientes debe ser una lista"}), 400
 
+    machine_id = str(data.get("machine_id") or "").strip()
     sucursal_id = data.get("sucursal_id")
     sucursal_nombre = data.get("sucursal") or data.get("sucursal_nombre")
+    if machine_id:
+        emp_id = _resolver_empresa_id(data)
+        from app.database import get_db
+        try:
+            with get_db(emp_id) as conn:
+                term = conn.execute(
+                    f"SELECT id, sucursal_id, nombre FROM {_tabla_pos('terminales')} WHERE empresa_id = ? AND identificador_pc = ? LIMIT 1",
+                    (emp_id, machine_id)
+                ).fetchone()
+                if term and term["sucursal_id"]:
+                    sucursal_id = term["sucursal_id"]
+        except Exception:
+            pass
+
     for cliente in clientes:
         if not isinstance(cliente, dict):
             continue
-        if sucursal_id not in (None, "") and cliente.get("sucursal_id") in (None, ""):
+        if sucursal_id not in (None, ""):
             cliente["sucursal_id"] = sucursal_id
         if sucursal_nombre and not cliente.get("sucursal") and not cliente.get("sucursal_nombre"):
             cliente["sucursal"] = sucursal_nombre
@@ -1308,6 +1323,79 @@ def api_pos_alertas_sync():
     sid = _resolver_sid(suc_raw)
     alertas = obtener_alertas_sync(emp_id, sid)
     return jsonify({"ok": True, **alertas})
+
+
+@api_bp.route("/pos/cuenta-corriente/incremental", methods=["POST"])
+def api_pos_cuenta_corriente_incremental():
+    """
+    Subida incremental de Movimientos de Cuenta Corriente (Pagos/Abonos/Cargos).
+    Paso 4 del nuevo protocolo:
+    - Incluye pagos de clientes (ABONOS), cargos y créditos realizados en mostrador.
+    - Asigna y blinda estrictamente por la sucursal de la terminal conectada.
+    """
+    data = request.get_json(silent=True) or {}
+    machine_id = str(data.get("machine_id") or "").strip()
+    movimientos = data.get("movimientos") or []
+    
+    if not machine_id:
+        return jsonify({"error": "Falta machine_id"}), 400
+        
+    emp_id = _resolver_empresa_id(data)
+    
+    from app.database import get_db
+    with get_db(emp_id) as conn:
+        term = conn.execute(
+            f"""SELECT id, sucursal_id, activo
+               FROM {_tabla_pos('terminales')}
+               WHERE empresa_id = ? AND identificador_pc = ?
+               LIMIT 1""",
+            (emp_id, machine_id)
+        ).fetchone()
+        
+        if not term or term["activo"] != 1 or not term["sucursal_id"]:
+            return jsonify({"error": "Terminal no autorizada", "habilitada": False}), 403
+            
+        sid = term["sucursal_id"]
+
+    from app.services.pos_base import guardar_parte
+
+    cols_cc = [
+        "id", "cliente_id", "fecha", "tipo", "monto", "saldo_resultante",
+        "descripcion", "venta_id", "medio_pago", "perfil", "registrado_por"
+    ]
+    
+    filas_cc = []
+    for m in movimientos:
+        mid = m.get("id")
+        cid = m.get("cliente_id")
+        fecha = str(m.get("fecha") or "")
+        tipo = str(m.get("tipo") or "ABONO").upper()
+        monto = float(m.get("monto") or 0.0)
+        saldo_res = float(m.get("saldo_resultante") or 0.0)
+        desc = str(m.get("descripcion") or "")
+        vid = m.get("venta_id")
+        mp = str(m.get("medio_pago") or "")
+        perfil = str(m.get("perfil") or "")
+        reg_por = str(m.get("registrado_por") or "")
+        filas_cc.append([
+            mid, cid, fecha, tipo, monto, saldo_res, desc, vid, mp, perfil, reg_por
+        ])
+        
+    if filas_cc:
+        guardar_parte("cuenta_corriente", cols_cc, filas_cc, 1, 1, sid, modo="delta", empresa_id=emp_id)
+
+    try:
+        from app.services.signal_bus import broadcast_refresh
+        broadcast_refresh()
+    except Exception:
+        pass
+
+    return jsonify({
+        "ok": True,
+        "movimientos_procesados": len(filas_cc),
+        "sucursal_id": sid
+    })
+
 
 
 

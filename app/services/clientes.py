@@ -53,9 +53,20 @@ def registrar_cliente(
     # 4. Le devuelve al Mozo el "número de cliente" para que le entregue su tarjeta
     return cliente_id
 
-def list_clientes(limit: int | None = None, offset: int = 0, *, solo_con_saldo: bool = False) -> list[dict]:
+def list_clientes(limit: int | None = None, offset: int = 0, *, solo_con_saldo: bool = False, sucursal_id: int | str | None = None) -> list[dict]:
     import datetime
-    saldo_filter = "WHERE c.saldo_actual > 0" if solo_con_saldo else ""
+    conds = []
+    params = []
+    if solo_con_saldo:
+        conds.append("c.saldo_actual > 0")
+    if sucursal_id not in (None, "", "null", "all", "Todas", "todas"):
+        try:
+            sid_int = int(sucursal_id)
+            conds.append("c.sucursal_id = ?")
+            params.append(sid_int)
+        except (ValueError, TypeError):
+            pass
+    where_clause = f"WHERE {' AND '.join(conds)}" if conds else ""
     limit_clause = ""
     if limit is not None:
         offset = max(0, int(offset))
@@ -72,14 +83,15 @@ def list_clientes(limit: int | None = None, offset: int = 0, *, solo_con_saldo: 
                    MIN(r.fecha) as oldest_unpaid
             FROM clientes c
             LEFT JOIN remitos_carga r ON c.id = r.cliente_id AND r.pagado = 0
-            {saldo_filter}
+            {where_clause}
             GROUP BY c.id, c.nombre, c.scoring, c.techo_deuda, c.saldo_actual, c.saldo_inicial, c.created_at, c.fecha_ultimo_pago,
                      c.telefono, c.cuit, c.direccion, c.email,
                      c.deuda_pos, c.tipo_cliente, c.estado_cuenta, c.pos_id, c.pos_uid,
                      c.sucursal_id, c.sucursal_nombre, c.plazo_dias
             ORDER BY c.nombre ASC
             {limit_clause}
-            """
+            """,
+            tuple(params)
         ).fetchall()
         
         # Obtener los remitos impagos para calcular los vencidos en Python de forma dialécticamente neutra

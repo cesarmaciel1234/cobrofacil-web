@@ -16,7 +16,8 @@ def api_clientes_endpoint():
     if request.method == "GET":
         limit = request.args.get("limit", type=int)
         offset = request.args.get("offset", 0, type=int)
-        return jsonify(list_clientes(limit=limit, offset=offset))
+        sucursal_id = request.args.get("sucursal_id") or request.args.get("branch_id")
+        return jsonify(list_clientes(limit=limit, offset=offset, sucursal_id=sucursal_id))
 
     d = request.get_json(silent=True) or {}
     try:
