@@ -80,3 +80,33 @@ def get_sucursales_publicas(empresa_id):
         return jsonify({"success": True, **data})
     except Exception as e:
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/terminales/<int:terminal_id>", methods=["PUT"])
+def put_terminal(terminal_id):
+    empresa_id, error = _sesion_empresa(escritura=True)
+    if error:
+        return error
+    try:
+        datos = request.get_json(silent=True) or {}
+        resultado = sucursales_service.actualizar_terminal(empresa_id, terminal_id, datos)
+        return jsonify({"success": True, **resultado})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@api_bp.route("/terminales/<int:terminal_id>", methods=["DELETE"])
+def delete_terminal(terminal_id):
+    empresa_id, error = _sesion_empresa(escritura=True)
+    if error:
+        return error
+    try:
+        resultado = sucursales_service.eliminar_terminal(empresa_id, terminal_id)
+        return jsonify({"success": True, **resultado})
+    except ValueError as e:
+        return jsonify({"success": False, "error": str(e)}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+

@@ -561,6 +561,9 @@
     // =========================================================================
     // 🏢 GESTIÓN PIRAMIDAL DE SUCURSALES Y TERMINALES / CAJAS (TPV)
     // =========================================================================
+    let sucursalesDisponibles = [];
+    let terminalesDisponibles = [];
+
     function textoSeguro(str) {
         if (!str) return '';
         const d = document.createElement('div');
@@ -591,12 +594,52 @@
                     : `${sucursales.length} locales activos · Red Multi-sucursal`;
             }
 
-            if (sucursales.length === 0) {
+            // Recopilar todas las terminales para consulta rápida
+            terminalesDisponibles = [];
+            sucursales.forEach(s => {
+                if (Array.isArray(s.terminales)) {
+                    s.terminales.forEach(t => terminalesDisponibles.push(t));
+                }
+            });
+            const pendientes = Array.isArray(data.terminales_pendientes) ? data.terminales_pendientes : [];
+            pendientes.forEach(p => terminalesDisponibles.push(p));
+
+            if (sucursales.length === 0 && pendientes.length === 0) {
                 listaCont.innerHTML = '<p style="color:#64748b; font-size:13px; padding:10px 0;">No hay sucursales registradas.</p>';
                 return;
             }
 
             let html = '';
+
+            // ⚠️ Alerta de PCs esperando asignación
+            if (pendientes.length > 0) {
+                html += `
+                <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:14px; padding:12px 14px; margin-bottom:12px;">
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+                        <div>
+                            <strong style="color:#b45309; font-size:13px; display:flex; align-items:center; gap:6px;">
+                                ⚠️ PCs esperando asignación (${pendientes.length})
+                            </strong>
+                            <small style="color:#92400e; font-size:11px;">Equipos TPV que saludaron pero aún no fueron asociados a un local.</small>
+                        </div>
+                    </div>
+                    <div style="display:flex; flex-direction:column; gap:6px;">
+                        ${pendientes.map(pt => `
+                            <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #fef08a; border-radius:8px; padding:6px 10px; font-size:11px;">
+                                <div style="display:flex; align-items:center; gap:6px;">
+                                    <span style="font-size:14px;">💻</span>
+                                    <strong style="color:#1e293b;">${textoSeguro(pt.nombre || 'PC sin asignar')}</strong>
+                                    <code style="background:#fef9c3; padding:1px 5px; border-radius:4px; font-size:10px; color:#854d0e;">${textoSeguro(pt.identificador_pc)}</code>
+                                </div>
+                                <button type="button" class="btn-asignar-terminal" data-tid="${pt.id}" style="background:#FFE600; border:none; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:800; color:#2D3277; cursor:pointer;">
+                                    + Asignar a Sucursal
+                                </button>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            }
+
             sucursales.forEach((suc) => {
                 const terms = suc.terminales || [];
                 const badgeUnico = esUnico ? '<span style="background:#e0f2fe; color:#0369a1; font-size:10px; font-weight:800; padding:2px 8px; border-radius:12px; margin-left:6px;">⭐ LOCAL ÚNICO</span>' : '';
@@ -629,19 +672,29 @@
                         </span>
                         <div style="margin-top:4px; display:flex; flex-direction:column; gap:4px;">
                             ${terms.length === 0 ? '<span style="font-size:11px; color:#94a3b8; font-style:italic;">⚠️ Sin cajas TPV vinculadas aún</span>' : ''}
-                            ${terms.map(t => `
-                                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:4px 10px; font-size:11px;">
+                            ${terms.map(t => {
+                                let statusBadge = '<span style="display:inline-flex; align-items:center; gap:4px; color:#16a34a; font-weight:700; font-size:10px;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#16a34a;"></span>En vivo</span>';
+                                if (t.activo === 0) {
+                                    statusBadge = '<span style="display:inline-flex; align-items:center; gap:4px; color:#d97706; font-weight:700; font-size:10px;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#d97706;"></span>Pausada</span>';
+                                } else if (t.activo === -1) {
+                                    statusBadge = '<span style="display:inline-flex; align-items:center; gap:4px; color:#dc2626; font-weight:700; font-size:10px;"><span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#dc2626;"></span>Bloqueada</span>';
+                                }
+                                return `
+                                <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:5px 10px; font-size:11px;">
                                     <div style="display:flex; align-items:center; gap:6px;">
                                         <span style="font-size:13px;">💻</span>
                                         <strong style="color:#1e293b;">${textoSeguro(t.nombre)}</strong>
-                                        <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px; font-size:10px; color:#64748b;">${textoSeguro(t.identificador_pc)}</code>
+                                        <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px; font-size:10px; color:#64748b;" title="${textoSeguro(t.identificador_pc)}">${textoSeguro(t.identificador_pc.length > 18 ? t.identificador_pc.substring(0, 16) + '...' : t.identificador_pc)}</code>
                                     </div>
-                                    <span style="display:inline-flex; align-items:center; gap:4px; color:#16a34a; font-weight:700; font-size:10px;">
-                                        <span style="display:inline-block; width:6px; height:6px; border-radius:50%; background:#16a34a;"></span>
-                                        En vivo
-                                    </span>
+                                    <div style="display:flex; align-items:center; gap:8px;">
+                                        ${statusBadge}
+                                        <button type="button" class="btn-editar-terminal" data-tid="${t.id}" title="Mover a otra sucursal o editar" style="background:#f8fafc; border:1px solid #cbd5e1; border-radius:6px; padding:2px 8px; font-size:10px; font-weight:700; color:#334155; cursor:pointer;">
+                                            ✎ Mover / Editar
+                                        </button>
+                                    </div>
                                 </div>
-                            `).join('')}
+                                `;
+                            }).join('')}
                         </div>
                     </div>
                 </div>`;
@@ -654,6 +707,14 @@
                     const sid = Number(btn.dataset.id);
                     const suc = sucursales.find(s => s.id === sid);
                     if (suc) abrirModalSucursal(suc);
+                };
+            });
+
+            listaCont.querySelectorAll('.btn-editar-terminal, .btn-asignar-terminal').forEach(btn => {
+                btn.onclick = () => {
+                    const tid = Number(btn.dataset.tid);
+                    const term = terminalesDisponibles.find(t => t.id === tid);
+                    if (term) abrirModalTerminal(term);
                 };
             });
         } catch (e) {
@@ -681,9 +742,96 @@
         if (modal) modal.style.display = 'none';
     }
 
+    function abrirModalTerminal(term) {
+        const modal = document.getElementById('modalTerminal');
+        if (!modal) return;
+        document.getElementById('terminalFormId').value = term.id;
+        document.getElementById('terminalFormIdentificador').textContent = term.identificador_pc || '-';
+        document.getElementById('terminalFormUltimoSync').textContent = term.ultimo_sync ? term.ultimo_sync.replace('T', ' ').substring(0, 19) : 'Sin contacto';
+        document.getElementById('terminalFormNombre').value = term.nombre || '';
+
+        // Poblar select de sucursales
+        const selectSuc = document.getElementById('terminalFormSucursal');
+        if (selectSuc) {
+            selectSuc.innerHTML = sucursalesDisponibles.map(s => `
+                <option value="${s.id}" ${s.id === term.sucursal_id ? 'selected' : ''}>${textoSeguro(s.nombre)}</option>
+            `).join('');
+        }
+
+        const selectActivo = document.getElementById('terminalFormActivo');
+        if (selectActivo) {
+            selectActivo.value = term.activo != null ? String(term.activo) : '1';
+        }
+
+        modal.style.display = 'block';
+    }
+
+    function cerrarModalTerminal() {
+        const modal = document.getElementById('modalTerminal');
+        if (modal) modal.style.display = 'none';
+    }
+
     document.getElementById('empresaBtnNuevaSucursal')?.addEventListener('click', () => abrirModalSucursal());
     document.getElementById('modalSucursalCerrar')?.addEventListener('click', cerrarModalSucursal);
     document.getElementById('modalSucursalCancelar')?.addEventListener('click', cerrarModalSucursal);
+
+    document.getElementById('modalTerminalCerrar')?.addEventListener('click', cerrarModalTerminal);
+    document.getElementById('modalTerminalCancelar')?.addEventListener('click', cerrarModalTerminal);
+
+    document.getElementById('formTerminal')?.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const f = e.target;
+        const tid = f.elements['id'].value;
+        const nombre = f.elements['nombre'].value.trim();
+        const sucursal_id = f.elements['sucursal_id'].value;
+        const activo = f.elements['activo'].value;
+
+        if (!tid) return;
+
+        try {
+            const res = await fetch(`/api/terminales/${tid}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nombre: nombre,
+                    sucursal_id: sucursal_id ? parseInt(sucursal_id, 10) : null,
+                    activo: parseInt(activo, 10)
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalTerminal();
+                cargarSucursales();
+            } else {
+                alert(data.error || 'Error al actualizar la caja');
+            }
+        } catch (err) {
+            alert('Error de red al actualizar la caja');
+        }
+    });
+
+    document.getElementById('modalTerminalEliminar')?.addEventListener('click', async () => {
+        const tid = document.getElementById('terminalFormId')?.value;
+        if (!tid) return;
+        if (!confirm('¿Estás seguro de desvincular esta caja TPV? Dejará de pertenecer a la empresa hasta que vuelva a sincronizar.')) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/terminales/${tid}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success) {
+                cerrarModalTerminal();
+                cargarSucursales();
+            } else {
+                alert(data.error || 'Error al desvincular la caja');
+            }
+        } catch (err) {
+            alert('Error de red al desvincular la caja');
+        }
+    });
 
     document.getElementById('formSucursal')?.addEventListener('submit', async (e) => {
         e.preventDefault();

@@ -22,12 +22,11 @@ def listar_sucursales(empresa_id):
         sucursales_list = []
         for s in sucs:
             s_dict = dict(s)
-            # Traer terminales asociadas
             terms = conn.execute(
                 f"""SELECT id, sucursal_id, empresa_id, nombre, identificador_pc, descripcion,
                           ip_local, activo, ultimo_sync
                    FROM {_tabla('terminales')}
-                   WHERE sucursal_id = ? AND activo = 1
+                   WHERE sucursal_id = ? AND activo >= 0
                    ORDER BY id ASC""",
                 (s["id"],),
             ).fetchall()
@@ -35,13 +34,73 @@ def listar_sucursales(empresa_id):
             s_dict["cantidad_terminales"] = len(s_dict["terminales"])
             sucursales_list.append(s_dict)
 
+        # Terminales pendientes de asignación o sin sucursal
+        pendientes = conn.execute(
+            f"""SELECT id, sucursal_id, empresa_id, nombre, identificador_pc, descripcion,
+                      ip_local, activo, ultimo_sync
+               FROM {_tabla('terminales')}
+               WHERE empresa_id = ? AND (sucursal_id IS NULL OR sucursal_id = 0 OR activo = 0)
+               ORDER BY id ASC""",
+            (empresa_id,),
+        ).fetchall()
+        pendientes_list = [dict(t) for t in pendientes]
+
     es_unico = len(sucursales_list) <= 1
     return {
         "empresa_id": empresa_id,
         "sucursales": sucursales_list,
+        "terminales_pendientes": pendientes_list,
         "es_negocio_unico": es_unico,
         "cantidad": len(sucursales_list),
     }
+
+
+def actualizar_terminal(empresa_id: int, terminal_id: int, datos: dict) -> dict:
+    """Actualiza sucursal, nombre o estado de una terminal."""
+    with get_db(empresa_id=0) as conn:
+        term = conn.execute(
+            f"SELECT id, sucursal_id, empresa_id FROM {_tabla('terminales')} WHERE id = ? AND empresa_id = ?",
+            (terminal_id, empresa_id)
+        ).fetchone()
+        if not term:
+            raise ValueError("Terminal no encontrada.")
+
+        nombre = datos.get("nombre")
+        sucursal_id = datos.get("sucursal_id")
+        activo = datos.get("activo")
+
+        updates = ["updated_at = CURRENT_TIMESTAMP"]
+        params = []
+        if nombre is not None:
+            updates.append("nombre = ?")
+            params.append(str(nombre).strip()[:100])
+        if sucursal_id is not None:
+            updates.append("sucursal_id = ?")
+            params.append(int(sucursal_id) if sucursal_id else None)
+        if activo is not None:
+            updates.append("activo = ?")
+            params.append(int(activo))
+
+        params.extend([terminal_id, empresa_id])
+        conn.execute(
+            f"UPDATE {_tabla('terminales')} SET {', '.join(updates)} WHERE id = ? AND empresa_id = ?",
+            tuple(params)
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
+    return {"success": True, "terminal_id": terminal_id}
+
+
+def eliminar_terminal(empresa_id: int, terminal_id: int) -> dict:
+    """Elimina o desvincula una terminal."""
+    with get_db(empresa_id=0) as conn:
+        conn.execute(
+            f"DELETE FROM {_tabla('terminales')} WHERE id = ? AND empresa_id = ?",
+            (terminal_id, empresa_id)
+        )
+        if hasattr(conn, "commit"):
+            conn.commit()
+    return {"success": True}
 
 
 def guardar_sucursal(empresa_id, datos):

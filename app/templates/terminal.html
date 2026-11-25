@@ -834,6 +834,58 @@
         </div>
     </div>
 
+    <!-- Modal para Gestionar / Asignar Terminal (PC TPV) -->
+    <div id="modalTerminal" class="pedido-sheet-back" style="display:none; z-index:9999;">
+        <div class="pedido-sheet" style="max-height:85vh; overflow-y:auto; padding:20px; background:#ffffff; border-radius:24px 24px 0 0; box-shadow:0 -4px 24px rgba(0,0,0,0.15);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
+                <strong id="modalTerminalTitulo" style="font-size:16px; font-weight:800; color:#2D3277;">💻 Administrar Caja TPV</strong>
+                <button type="button" id="modalTerminalCerrar" style="background:none; border:none; font-size:24px; font-weight:bold; color:#94a3b8; cursor:pointer; line-height:1;">&times;</button>
+            </div>
+            <form id="formTerminal" style="display:flex; flex-direction:column; gap:12px;">
+                <input type="hidden" name="id" id="terminalFormId">
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Identificador / Machine ID:</span>
+                        <code id="terminalFormIdentificador" style="font-size:11px; background:#e2e8f0; padding:2px 6px; border-radius:4px; color:#1e293b; word-break:break-all;">-</code>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                        <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Último contacto:</span>
+                        <span id="terminalFormUltimoSync" style="font-size:11px; color:#475569;">-</span>
+                    </div>
+                </div>
+
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px;">Nombre descriptivo de la Caja *</label>
+                    <input type="text" name="nombre" id="terminalFormNombre" required class="buscar" placeholder="Ej: Caja Principal 1" style="width:100%;">
+                </div>
+
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px;">Sucursal Asignada *</label>
+                    <select name="sucursal_id" id="terminalFormSucursal" required class="buscar" style="width:100%;">
+                        <!-- Opciones dinámicas de sucursales -->
+                    </select>
+                </div>
+
+                <div>
+                    <label style="display:block; font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase; margin-bottom:4px;">Estado de Sincronización</label>
+                    <select name="activo" id="terminalFormActivo" class="buscar" style="width:100%;">
+                        <option value="1">● En vivo / Habilitada (Sube tickets e inventario)</option>
+                        <option value="0">⏸️ Pausada (En espera de reactivación)</option>
+                        <option value="-1">🚫 Revocada / Desconectada (Bloquea subida)</option>
+                    </select>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
+                    <button type="button" id="modalTerminalEliminar" class="btn btn-ghost" style="color:#ef4444; border-radius:10px; font-weight:700; border:1px solid #fee2e2;">🗑️ Desvincular</button>
+                    <div style="display:flex; gap:8px;">
+                        <button type="button" id="modalTerminalCancelar" class="btn btn-ghost" style="border-radius:10px; font-weight:700;">Cancelar</button>
+                        <button type="submit" id="modalTerminalGuardar" class="btn btn-primary" style="background:#FFE600; color:#2D3277; font-weight:800; border-radius:10px; padding:8px 16px;">Guardar Cambios</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Modal para Crear / Editar Colaborador -->
     <div id="modalColaborador" class="pedido-sheet-back" style="display:none; z-index:9999;">
         <div class="pedido-sheet" style="max-height:85vh; overflow-y:auto; padding:20px; background:#ffffff; border-radius:24px 24px 0 0; box-shadow:0 -4px 24px rgba(0,0,0,0.15);">
@@ -912,7 +964,7 @@
     <script src="/static/js/barra/cobros.js?v=7.7"></script>
     <script src="/static/js/barra/caja.js?v=7.9"></script>
     <script src="/static/vendor/leaflet.js?v=1.9.4"></script>
-    <script src="/static/js/barra/mi-empresa.js?v=8.1"></script>
+    <script src="/static/js/barra/mi-empresa.js?v=8.2"></script>
     <script src="/static/js/barra/cartera.js?v=7.7"></script>
     <script src="/static/js/barra/pedidos.js?v=7.8"></script>
     <script src="/static/js/barra/armar.js?v=8.0"></script>
