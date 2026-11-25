@@ -695,9 +695,28 @@
      */
     function contabilidad(periodo, desde, hasta, sucursalId) {
         const rango = rangoPeriodo(periodo, desde, hasta);
-        const ini = rango[0];
-        const fin = rango[1];
-        const vFilas = elegir(copias.ventas || memoria, ini, fin, sucursalId);
+        let ini = rango[0];
+        let fin = rango[1];
+        let corteIni = ini;
+        let corteFin = fin;
+        let etiqueta = periodo || 'Hoy';
+
+        const esHoy = (!periodo || String(periodo).toLowerCase() === 'hoy');
+        if (esHoy) {
+            const hoy = hoyDe();
+            let maxDia = '';
+            const allV = filasVentas(copias.ventas || memoria, sucursalId);
+            allV.forEach((v) => { if (v.dia && v.dia > maxDia) maxDia = v.dia; });
+            const diaBase = maxDia || hoy;
+            etiqueta = 'Hoy · ' + diaBase;
+            corteIni = diaBase < hoy ? diaBase : hoy;
+            corteFin = diaBase > hoy ? diaBase : hoy;
+        }
+
+        let vFilas = elegir(copias.ventas || memoria, ini, fin, sucursalId);
+        if (esHoy && vFilas.length === 0 && corteIni) {
+            vFilas = elegir(copias.ventas || memoria, corteIni, corteFin, sucursalId);
+        }
 
         const porMedio = {};
         let totalVentas = 0;
@@ -717,8 +736,8 @@
         const detalleGastos = [];
         gFilas.forEach((g) => {
             const dia = diaDe(g.fecha);
-            if (ini && dia && dia < ini) return;
-            if (fin && dia && dia > fin) return;
+            if (corteIni && dia && dia < corteIni) return;
+            if (corteFin && dia && dia > corteFin) return;
             const st = String(g.estado || g.status || '').toUpperCase();
             if (CANCELADAS[st]) return;
             const m = Number(g.monto) || 0;
@@ -736,8 +755,8 @@
         const cobrosPorMedio = {};
         ccFilas.forEach((c) => {
             const dia = diaDe(c.fecha);
-            if (ini && dia && dia < ini) return;
-            if (fin && dia && dia > fin) return;
+            if (corteIni && dia && dia < corteIni) return;
+            if (corteFin && dia && dia > corteFin) return;
             const tipo = String(c.tipo || '').toUpperCase();
             if (tipo === 'ABONO' || Number(c.haber) > 0) {
                 const m = Number(c.monto || c.haber) || 0;
@@ -784,6 +803,7 @@
             libro: true,
             panel: 'contabilidad',
             contabilidad: {
+                etiqueta: etiqueta,
                 ventas: Math.round(totalVentas * 100) / 100,
                 tickets: tickets,
                 medios_pago: mediosLista,

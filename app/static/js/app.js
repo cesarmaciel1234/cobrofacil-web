@@ -4389,6 +4389,25 @@ const $ = id => document.getElementById(id);
                     }
                 }
             }
+            if (panel === 'contabilidad') {
+                const c = dato.contabilidad || {};
+                const cobrosServer = Number(c.cobros) || 0;
+                if (window.Espejo && Espejo.contabilidad) {
+                    const cEsp = Espejo.contabilidad(periodoCaja || 'Hoy', periodoCajaDesde, periodoCajaHasta, activeSucursalId);
+                    if (cEsp && cEsp.contabilidad) {
+                        const espCobros = Number(cEsp.contabilidad.cobros) || 0;
+                        if (espCobros > 0 && cobrosServer === 0) {
+                            c.cobros = espCobros;
+                            c.cobros_cant = cEsp.contabilidad.cobros_cant || 1;
+                            c.cobros_por_medio = cEsp.contabilidad.cobros_por_medio || {};
+                            c.resultado = Math.round(((Number(c.ventas) || 0) + espCobros - (Number(c.gastos) || 0)) * 100) / 100;
+                            dato.contabilidad = c;
+                        } else if (espCobros > 0 && cEsp.contabilidad.cobros_por_medio && (!c.cobros_por_medio || Object.keys(c.cobros_por_medio).length === 0)) {
+                            c.cobros_por_medio = cEsp.contabilidad.cobros_por_medio;
+                        }
+                    }
+                }
+            }
             return dato;
         }
 
@@ -4430,6 +4449,10 @@ const $ = id => document.getElementById(id);
                     const cobrosTotal = Number(c.cobros) || 0;
                     const cobrosCant = Number(c.cobros_cant) || 0;
                     const cobrosPorMedio = c.cobros_por_medio || {};
+                    // Si hay cobros registrados pero cobros_por_medio vino vacío, asignar por defecto a Efectivo
+                    if (cobrosTotal > 0 && Object.keys(cobrosPorMedio).length === 0) {
+                        cobrosPorMedio['Efectivo'] = { monto: cobrosTotal, cant: cobrosCant || 1 };
+                    }
                     const sumaMedios = medios.reduce((acc, m) => acc + (Number(m.monto != null ? m.monto : m.total) || 0), 0);
                     const totalMedios = sumaMedios || 1;
                     pintarChipPeriodo('cajaPeriodo', periodoCaja || 'Hoy');
@@ -4448,10 +4471,10 @@ const $ = id => document.getElementById(id);
 
                             // Extra por cobro de deuda de cliente
                             let extraCobro = 0;
-                            const nmLower = nombreMedio.toLowerCase();
+                            const nmLower = nombreMedio.trim().toLowerCase();
                             for (const [k, v] of Object.entries(cobrosPorMedio)) {
-                                if (k.toLowerCase() === nmLower) {
-                                    extraCobro += Number(v.monto || v) || 0;
+                                if (String(k).trim().toLowerCase() === nmLower) {
+                                    extraCobro += Number(v.monto != null ? v.monto : v) || 0;
                                 }
                             }
                             const badgeExtra = extraCobro > 0

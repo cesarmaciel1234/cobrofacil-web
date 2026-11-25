@@ -1489,7 +1489,8 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
         }
 
     corte_ini, corte_fin = ini, fin
-    if str(etiqueta or "").strip().startswith("Hoy"):
+    etiq = str(etiqueta or "").strip().lower()
+    if etiq.startswith("hoy") or etiq.startswith("día") or etiq.startswith("dia"):
         hoy_real = datetime.now(_ZONA).date().isoformat()
         corte_ini = min(ini, hoy_real) if ini else hoy_real
         corte_fin = max(fin, hoy_real) if fin else hoy_real
@@ -1525,6 +1526,9 @@ def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, suc
                 "descripcion": desc,
                 "medio": medio,
             })
+
+    if cobros > 0 and not cobros_por_medio:
+        cobros_por_medio["Efectivo"] = {"monto": round(cobros, 2), "cant": len(detalle_cobros) or 1}
 
     idx_g, gastos = _filas_en_rango("gastos", corte_ini, corte_fin, sucursal_id)
     lista_gastos = []
