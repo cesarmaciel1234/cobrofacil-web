@@ -66,6 +66,9 @@
             let url = `/api/pos/jefe?panel=financiero&periodo=${encodeURIComponent(periodoActual)}`;
             if (compararActual) url += '&comparar=1';
             if (sucursalId) url += `&sucursal_id=${encodeURIComponent(sucursalId)}`;
+            if (window.location.search && window.location.search.includes('simular_alertas=1')) {
+                url += '&simular_alertas=1';
+            }
             const res = await fetch(url);
             if (res.status === 401) {
                 window.location.href = '/login';

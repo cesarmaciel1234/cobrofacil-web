@@ -3953,6 +3953,9 @@ const $ = id => document.getElementById(id);
                 if (activeSucursalId !== null && activeSucursalId !== undefined) {
                     url += '&sucursal_id=' + encodeURIComponent(activeSucursalId);
                 }
+                if (window.location.search && window.location.search.includes('simular_alertas=1')) {
+                    url += '&simular_alertas=1';
+                }
                 const res = await fetch(url, { signal: ctrl.signal });
                 if (!res.ok) throw new Error('panel');
                 dato = await res.json();

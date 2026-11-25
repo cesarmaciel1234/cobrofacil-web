@@ -179,12 +179,61 @@ def obtener_alertas_sync(empresa_id: int = 1, sucursal_id: int | str | None = No
     - Tickets faltantes
     - Discrepancias de precio entre cajas TPV de la misma sucursal
     """
+    from flask import request, has_request_context
+
+    simular = False
+    if has_request_context():
+        simular = request.args.get("simular_alertas") in ("1", "true", "si")
+
     sid = None
     if sucursal_id is not None and str(sucursal_id).isdigit():
         sid = int(sucursal_id)
 
     tickets_faltantes: list[dict[str, Any]] = []
     discrepancias_precios: list[dict[str, Any]] = []
+
+    if simular:
+        tickets_faltantes = [
+            {
+                "nro_ticket": 105,
+                "sucursal_id": sid or 1,
+                "sucursal_nombre": "Alfaro 1964",
+                "terminal_id": 1,
+                "terminal_nombre": "Caja 1",
+                "machine_id": "DESKTOP-ABC",
+            },
+            {
+                "nro_ticket": 106,
+                "sucursal_id": sid or 1,
+                "sucursal_nombre": "Alfaro 1964",
+                "terminal_id": 1,
+                "terminal_nombre": "Caja 1",
+                "machine_id": "DESKTOP-ABC",
+            },
+        ]
+        discrepancias_precios = [
+            {
+                "producto_id": "101",
+                "nombre": "Asado Especial",
+                "codigo": "7791234",
+                "sucursal_id": sid or 1,
+                "sucursal_nombre": "Alfaro 1964",
+                "precios": [
+                    {"terminal": "Caja 1", "precio": 8500.0},
+                    {"terminal": "Caja cesar", "precio": 8900.0},
+                ],
+                "diferencia": 400.0,
+            }
+        ]
+        return {
+            "tiene_alertas": True,
+            "tickets_faltantes": tickets_faltantes,
+            "numeros_faltantes": [105, 106],
+            "discrepancias_precios": discrepancias_precios,
+            "total_faltantes": 2,
+            "total_discrepancias": 1,
+            "total_alertas": 3,
+        }
 
     try:
         with get_db(empresa_id) as conn:
