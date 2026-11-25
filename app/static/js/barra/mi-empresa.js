@@ -611,34 +611,46 @@
 
             let html = '';
 
-            // ⚠️ Alerta de PCs esperando asignación
-            if (pendientes.length > 0) {
-                html += `
-                <div style="background:#fffbeb; border:1.5px solid #fde68a; border-radius:14px; padding:12px 14px; margin-bottom:12px;">
-                    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
-                        <div>
-                            <strong style="color:#b45309; font-size:13px; display:flex; align-items:center; gap:6px;">
-                                ⚠️ PCs esperando asignación (${pendientes.length})
-                            </strong>
-                            <small style="color:#92400e; font-size:11px;">Equipos TPV que saludaron pero aún no fueron asociados a un local.</small>
-                        </div>
+            // 💻 Sección: PCs Pendientes / Sin Asignar
+            html += `
+            <div class="sucursal-card" style="border:1.5px solid ${pendientes.length > 0 ? '#fde68a' : '#e2e8f0'}; border-radius:14px; padding:12px 14px; background:${pendientes.length > 0 ? '#fffbeb' : '#ffffff'}; margin-bottom:12px;">
+                <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <strong style="font-size:13px; color:${pendientes.length > 0 ? '#b45309' : '#1e293b'};">
+                            💻 PCs Pendientes / Sin Asignar
+                        </strong>
+                        <span style="background:${pendientes.length > 0 ? '#fef08a' : '#f1f5f9'}; color:${pendientes.length > 0 ? '#854d0e' : '#64748b'}; font-size:10px; font-weight:800; padding:2px 8px; border-radius:12px;">
+                            ${pendientes.length}
+                        </span>
                     </div>
-                    <div style="display:flex; flex-direction:column; gap:6px;">
-                        ${pendientes.map(pt => `
-                            <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #fef08a; border-radius:8px; padding:6px 10px; font-size:11px;">
+                </div>
+                <p style="margin:0 0 ${pendientes.length > 0 ? '8px' : '0'} 0; font-size:11px; color:${pendientes.length > 0 ? '#92400e' : '#64748b'};">
+                    ${pendientes.length > 0
+                        ? 'Equipos TPV que enviaron saludo por primera vez y están esperando asignación de sucursal para comenzar a sincronizar tickets y stock.'
+                        : '✓ No hay PCs esperando asignación. Cualquier equipo nuevo que inicie enviará su saludo y aparecerá aquí automáticamente.'}
+                </p>
+                ${pendientes.length > 0 ? `
+                <div style="display:flex; flex-direction:column; gap:6px;">
+                    ${pendientes.map(pt => `
+                        <div style="display:flex; align-items:center; justify-content:space-between; background:#ffffff; border:1px solid #fef08a; border-radius:8px; padding:8px 12px; font-size:11px;">
+                            <div style="display:flex; flex-direction:column; gap:2px;">
                                 <div style="display:flex; align-items:center; gap:6px;">
-                                    <span style="font-size:14px;">💻</span>
-                                    <strong style="color:#1e293b;">${textoSeguro(pt.nombre || 'PC sin asignar')}</strong>
-                                    <code style="background:#fef9c3; padding:1px 5px; border-radius:4px; font-size:10px; color:#854d0e;">${textoSeguro(pt.identificador_pc)}</code>
+                                    <span style="font-size:14px;">🖥️</span>
+                                    <strong style="color:#1e293b;">${textoSeguro(pt.nombre || 'PC Nueva')}</strong>
+                                    <span style="background:#fef9c3; color:#a16207; font-size:9px; font-weight:800; padding:1px 6px; border-radius:4px;">PENDIENTE</span>
                                 </div>
-                                <button type="button" class="btn-asignar-terminal" data-tid="${pt.id}" style="background:#FFE600; border:none; border-radius:6px; padding:4px 10px; font-size:11px; font-weight:800; color:#2D3277; cursor:pointer;">
-                                    + Asignar a Sucursal
-                                </button>
+                                <small style="color:#64748b; font-size:10px;">
+                                    ID: <code style="background:#f1f5f9; padding:1px 4px; border-radius:4px;">${textoSeguro(pt.identificador_pc)}</code>
+                                    ${pt.ultimo_sync ? ` · Último saludo: ${pt.ultimo_sync.replace('T', ' ').substring(0, 16)}` : ''}
+                                </small>
                             </div>
-                        `).join('')}
-                    </div>
-                </div>`;
-            }
+                            <button type="button" class="btn-asignar-terminal" data-tid="${pt.id}" style="background:#FFE600; border:none; border-radius:8px; padding:6px 12px; font-size:11px; font-weight:800; color:#2D3277; cursor:pointer; white-space:nowrap; box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+                                + Asignar a Sucursal
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>` : ''}
+            </div>`;
 
             sucursales.forEach((suc) => {
                 const terms = suc.terminales || [];
@@ -744,11 +756,17 @@
 
     function abrirModalTerminal(term) {
         const modal = document.getElementById('modalTerminal');
+        const tit = document.getElementById('modalTerminalTitulo');
         if (!modal) return;
         document.getElementById('terminalFormId').value = term.id;
         document.getElementById('terminalFormIdentificador').textContent = term.identificador_pc || '-';
         document.getElementById('terminalFormUltimoSync').textContent = term.ultimo_sync ? term.ultimo_sync.replace('T', ' ').substring(0, 19) : 'Sin contacto';
         document.getElementById('terminalFormNombre').value = term.nombre || '';
+
+        // Título dinámico
+        if (tit) {
+            tit.textContent = (!term.sucursal_id || term.sucursal_id === 0) ? '📥 Asignar PC a Sucursal' : '💻 Administrar Caja TPV';
+        }
 
         // Poblar select de sucursales
         const selectSuc = document.getElementById('terminalFormSucursal');
@@ -760,7 +778,11 @@
 
         const selectActivo = document.getElementById('terminalFormActivo');
         if (selectActivo) {
-            selectActivo.value = term.activo != null ? String(term.activo) : '1';
+            if (!term.sucursal_id || term.sucursal_id === 0) {
+                selectActivo.value = '1'; // Al asignar por primera vez, sugerir habilitada
+            } else {
+                selectActivo.value = term.activo != null ? String(term.activo) : '1';
+            }
         }
 
         modal.style.display = 'block';

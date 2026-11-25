@@ -1065,36 +1065,20 @@ def api_pos_terminal_saludo():
                     "machine_id": machine_id
                 })
         else:
-            sucs = conn.execute(
-                f"SELECT id, nombre FROM {_tabla_pos('sucursales')} WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC",
-                (emp_id,)
-            ).fetchall()
-            
-            sid_defecto = None
-            for s in sucs:
-                if "alfaro" in s["nombre"].lower():
-                    sid_defecto = s["id"]
-                    break
-            if not sid_defecto and sucs:
-                sid_defecto = sucs[0]["id"]
-                
-            caja_nombre = f"Caja {nombre_pc}" if nombre_pc else "Caja Nueva"
+            caja_nombre = f"Caja {nombre_pc}" if nombre_pc else f"PC {machine_id[:8]}"
             cur = conn.execute(
                 f"""INSERT INTO {_tabla_pos('terminales')}
                    (sucursal_id, empresa_id, nombre, identificador_pc, descripcion, activo, ultimo_sync)
-                   VALUES (?, ?, ?, ?, ?, 1, CURRENT_TIMESTAMP)
+                   VALUES (NULL, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
                    RETURNING id""",
-                (sid_defecto or 1, emp_id, caja_nombre, machine_id, f"PC: {nombre_pc} | v{version_pos}")
+                (emp_id, caja_nombre, machine_id, f"PC: {nombre_pc} | v{version_pos}")
             )
             if hasattr(conn, "commit"):
                 conn.commit()
-                
-            suc_target = next((s for s in sucs if s["id"] == (sid_defecto or 1)), None)
+
             return jsonify({
-                "habilitada": True,
-                "sucursal_id": sid_defecto or 1,
-                "nombre_sucursal": suc_target["nombre"] if suc_target else "Casa Central",
-                "caja_nombre": caja_nombre,
+                "habilitada": False,
+                "mensaje": "Terminal nueva registrada en espera de asignación de sucursal en Cobro Fácil",
                 "machine_id": machine_id
             })
 

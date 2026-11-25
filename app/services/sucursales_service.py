@@ -39,7 +39,7 @@ def listar_sucursales(empresa_id):
             f"""SELECT id, sucursal_id, empresa_id, nombre, identificador_pc, descripcion,
                       ip_local, activo, ultimo_sync
                FROM {_tabla('terminales')}
-               WHERE empresa_id = ? AND (sucursal_id IS NULL OR sucursal_id = 0 OR activo = 0)
+               WHERE empresa_id = ? AND (sucursal_id IS NULL OR sucursal_id = 0) AND activo >= 0
                ORDER BY id ASC""",
             (empresa_id,),
         ).fetchall()
