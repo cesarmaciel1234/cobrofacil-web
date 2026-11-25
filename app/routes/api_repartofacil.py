@@ -453,6 +453,17 @@ def get_repartofacil_pedidos():
                             pass
                 d["unread_chat_count"] = int(d.get("unread_chat_count") or 0)
 
+                # Formatear created_at en ISO con zona horaria de Argentina
+                cat_ped = d.get("created_at")
+                if isinstance(cat_ped, datetime):
+                    if _ZONA_ARG:
+                        if cat_ped.tzinfo is None:
+                            from zoneinfo import ZoneInfo
+                            cat_ped = cat_ped.replace(tzinfo=ZoneInfo("UTC")).astimezone(_ZONA_ARG)
+                        else:
+                            cat_ped = cat_ped.astimezone(_ZONA_ARG)
+                    d["created_at"] = cat_ped.isoformat()
+
                 # Método de pago normalizado y descriptivo
                 pago_raw = str(d.get("metodo_pago") or "cash").strip().lower()
                 if pago_raw in ("cash", "efectivo"):
@@ -1169,7 +1180,22 @@ def get_repartofacil_chat(order_id):
             rows = conn.execute(sql, (f"store-{empresa_id}", order_id, empresa_id)).fetchall()
             if not rows:
                 return jsonify({"success": False, "error": "Conversación no disponible."}), 404
-            mensajes = [dict(r) for r in rows if r["id"] is not None]
+            mensajes = []
+            for r in rows:
+                if r["id"] is None:
+                    continue
+                d = dict(r)
+                cat_msg = d.get("created_at")
+                if isinstance(cat_msg, datetime):
+                    if _ZONA_ARG:
+                        if cat_msg.tzinfo is None:
+                            from zoneinfo import ZoneInfo
+                            cat_msg = cat_msg.replace(tzinfo=ZoneInfo("UTC")).astimezone(_ZONA_ARG)
+                        else:
+                            cat_msg = cat_msg.astimezone(_ZONA_ARG)
+                    d["timestamp_str"] = cat_msg.strftime("%H:%M")
+                    d["created_at"] = cat_msg.isoformat()
+                mensajes.append(d)
             return jsonify({"success": True, "order_id": order_id, "mensajes": mensajes})
     except Exception:
         current_app.logger.exception("No se pudo consultar el chat de Reparto Fácil")

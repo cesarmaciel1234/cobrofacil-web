@@ -103,9 +103,11 @@
     function formatFecha(fechaStr) {
         if (!fechaStr) return '';
         try {
-            const str = String(fechaStr).trim();
-            const iso = (str.includes('Z') || str.includes('+')) ? str : (str.replace(' ', 'T') + 'Z');
-            const d = new Date(iso);
+            let d = new Date(fechaStr);
+            if (isNaN(d.getTime())) {
+                const str = String(fechaStr).trim();
+                d = new Date((str.includes('Z') || str.includes('+')) ? str : (str.replace(' ', 'T') + 'Z'));
+            }
             if (!isNaN(d.getTime())) {
                 return d.toLocaleTimeString('es-AR', {
                     timeZone: 'America/Argentina/Buenos_Aires',
@@ -121,19 +123,8 @@
     function formatHoraChat(m) {
         if (!m) return '';
         if (m.created_at) {
-            try {
-                const str = String(m.created_at).trim();
-                const iso = (str.includes('Z') || str.includes('+')) ? str : (str.replace(' ', 'T') + 'Z');
-                const d = new Date(iso);
-                if (!isNaN(d.getTime())) {
-                    return d.toLocaleTimeString('es-AR', {
-                        timeZone: 'America/Argentina/Buenos_Aires',
-                        hour: '2-digit',
-                        minute: '2-digit',
-                        hour12: false
-                    });
-                }
-            } catch (e) {}
+            const h = formatFecha(m.created_at);
+            if (h) return h;
         }
         return m.timestamp_str || '';
     }
