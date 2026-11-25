@@ -985,8 +985,8 @@
                         </div>
                     </div>
                     <button type="button" onclick="window.RepartoFacilDespacho.cerrarModal()" aria-label="Cerrar comanda"
-                        style="background:rgba(255,255,255,0.15); border:none; border-radius:999px; width:28px; height:28px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#ffffff; transition:all 0.15s ease;">
-                        ${SVG_ICONOS.cruz}
+                        style="background:rgba(255,255,255,0.22); border:1px solid rgba(255,255,255,0.35); border-radius:999px; width:30px; height:30px; display:flex; align-items:center; justify-content:center; cursor:pointer; color:#ffffff; transition:all 0.15s ease;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="display:block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
                     </button>
                 </div>
 
