@@ -594,8 +594,9 @@
             }
         });
 
-        // 2. Renderizar barra de pestañas
+        // 2. Renderizar barra de pestañas y sincronizar métricas omnicanal con pedidosLista
         renderizarTabs(countActivos, countNuevos, countRetira, countDelivery, countHistorial);
+        cargarMetricasOmnicanal();
 
         // 3. Filtrar lista ANTES de renderizar
         let pedidosFiltrados = [];
@@ -1763,16 +1764,59 @@
         }
     }
 
-    // Cargar métricas consolidadas omnicanal (Tienda Física + E-Commerce)
-    async function cargarMetricasOmnicanal() {
+    // Calcular métricas directamente desde el array pedidosLista (mismo estado que pestañas)
+    function calcularMetricasDesdePedidos() {
+        const lista = Array.isArray(pedidosLista) ? pedidosLista : [];
+        let retiro_monto = 0;
+        let retiro_cant = 0;
+        let retiro_activos = 0;
+
+        let delivery_monto = 0;
+        let delivery_cant = 0;
+        let delivery_activos = 0;
+
+        lista.forEach(p => {
+            const esRetiro = esModalidadRetiro(p);
+            const esActivo = esPedidoActivo(p);
+            const st = String((p && p.estado) || '').toLowerCase();
+            const esCancelado = st === 'rejected' || st === 'cancelled' || st === 'cancelled_by_client' || st === 'cancelled_timeout';
+            const tot = Number(p.total || 0);
+
+            if (esRetiro) {
+                retiro_cant++;
+                if (!esCancelado) retiro_monto += tot;
+                if (esActivo) retiro_activos++;
+            } else {
+                delivery_cant++;
+                if (!esCancelado) delivery_monto += tot;
+                if (esActivo) delivery_activos++;
+            }
+        });
+
+        const total_web_monto = retiro_monto + delivery_monto;
+        const total_web_cant = retiro_cant + delivery_cant;
+        const total_web_activos = retiro_activos + delivery_activos;
+
+        return {
+            retiro_local_monto: retiro_monto,
+            retiro_local_cant: retiro_cant,
+            retiro_local_activos: retiro_activos,
+            delivery_monto: delivery_monto,
+            delivery_cant: delivery_cant,
+            delivery_activos: delivery_activos,
+            total_web_monto: total_web_monto,
+            total_web_cant: total_web_cant,
+            total_web_activos: total_web_activos
+        };
+    }
+
+    // Cargar métricas consolidadas omnicanal directamente conectadas al estado pedidosLista
+    function cargarMetricasOmnicanal() {
         const host = $('repartoFacilOmnicanalBanner');
         if (!host) return;
 
         try {
-            const resp = await fetch('/api/repartofacil/metricas-omnicanal');
-            const data = await resp.json();
-            if (!data || !data.success) return;
-
+            const data = calcularMetricasDesdePedidos();
             const formatMoneyNum = (num) => '$' + Math.round(Number(num || 0)).toLocaleString('es-AR');
 
             host.innerHTML = `
@@ -1801,35 +1845,35 @@
                         </div>
                     </div>
 
-                    <!-- Fila Inferior: Las 3 tarjetas de Pedidos Web exclusivas -->
+                    <!-- Fila Inferior: Las 3 tarjetas de Pedidos Web calculadas directamente de pedidosLista -->
                     <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; text-align:center;">
                         <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
                             <span style="font-size:9px; color:#64748b; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">RETIRO LOCAL</span>
                             <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${formatMoneyNum(data.retiro_local_monto || 0)}
+                                ${formatMoneyNum(data.retiro_local_monto)}
                             </b>
                             <small style="font-size:8.5px; color:#854d0e; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
-                                ${data.retiro_local_cant || 0} ped. (${data.retiro_local_activos || 0} act.)
+                                ${data.retiro_local_cant} ped. (${data.retiro_local_activos} act.)
                             </small>
                         </div>
 
                         <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
                             <span style="font-size:9px; color:#64748b; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">CON DELIVERY</span>
                             <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${formatMoneyNum(data.delivery_monto || 0)}
+                                ${formatMoneyNum(data.delivery_monto)}
                             </b>
                             <small style="font-size:8.5px; color:#854d0e; font-weight:700; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
-                                ${data.delivery_cant || 0} ped. (${data.delivery_activos || 0} act.)
+                                ${data.delivery_cant} ped. (${data.delivery_activos} act.)
                             </small>
                         </div>
 
                         <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:12px; padding:7px 2px; min-width:0; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
                             <span style="font-size:9px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">PEDIDOS WEB</span>
                             <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                                ${formatMoneyNum(data.total_web_monto != null ? data.total_web_monto : data.monto_web_total)}
+                                ${formatMoneyNum(data.total_web_monto)}
                             </b>
                             <small style="font-size:8.5px; color:#2D3277; font-weight:900; white-space:nowrap; display:block; overflow:hidden; text-overflow:ellipsis;">
-                                ${data.total_web_cant != null ? data.total_web_cant : (data.cant_pedidos_web_hoy || 0)} ped. (${data.total_web_activos != null ? data.total_web_activos : (data.pedidos_activos_web || 0)} act.)
+                                ${data.total_web_cant} ped. (${data.total_web_activos} act.)
                             </small>
                         </div>
                     </div>
@@ -1837,7 +1881,7 @@
             `;
             actualizarBadge();
         } catch (e) {
-            console.warn('[RepartoFacil] No se pudieron cargar métricas omnicanal:', e);
+            console.warn('[RepartoFacil] Error al calcular métricas omnicanal:', e);
         }
     }
 
