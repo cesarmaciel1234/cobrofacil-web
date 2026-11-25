@@ -843,13 +843,13 @@
             </div>
             <form id="formTerminal" style="display:flex; flex-direction:column; gap:12px;">
                 <input type="hidden" name="id" id="terminalFormId">
-                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px;">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Identificador / Machine ID:</span>
-                        <code id="terminalFormIdentificador" style="font-size:11px; background:#e2e8f0; padding:2px 6px; border-radius:4px; color:#1e293b; word-break:break-all;">-</code>
+                <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:10px; display:flex; flex-direction:column; gap:6px;">
+                    <div>
+                        <span style="display:block; font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Identificador / Machine ID:</span>
+                        <code id="terminalFormIdentificador" style="display:block; font-size:11px; background:#e2e8f0; padding:3px 6px; border-radius:4px; color:#1e293b; word-break:break-all; margin-top:2px;">-</code>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
-                        <span style="font-size:11px; font-weight:700; color:#64748b; text-transform:uppercase;">Último contacto:</span>
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:4px;">
+                        <span style="font-size:10px; font-weight:700; color:#64748b; text-transform:uppercase;">Último contacto:</span>
                         <span id="terminalFormUltimoSync" style="font-size:11px; color:#475569;">-</span>
                     </div>
                 </div>
@@ -875,12 +875,12 @@
                     </select>
                 </div>
 
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:14px;">
-                    <button type="button" id="modalTerminalEliminar" class="btn btn-ghost" style="color:#ef4444; border-radius:10px; font-weight:700; border:1px solid #fee2e2;">🗑️ Desvincular</button>
-                    <div style="display:flex; gap:8px;">
-                        <button type="button" id="modalTerminalCancelar" class="btn btn-ghost" style="border-radius:10px; font-weight:700;">Cancelar</button>
-                        <button type="submit" id="modalTerminalGuardar" class="btn btn-primary" style="background:#FFE600; color:#2D3277; font-weight:800; border-radius:10px; padding:8px 16px;">Guardar Cambios</button>
+                <div style="display:flex; flex-direction:column; gap:8px; margin-top:14px;">
+                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+                        <button type="button" id="modalTerminalCancelar" class="btn btn-ghost" style="border-radius:10px; font-weight:700; padding:10px;">Cancelar</button>
+                        <button type="submit" id="modalTerminalGuardar" class="btn btn-primary" style="background:#FFE600; color:#2D3277; font-weight:800; border-radius:10px; padding:10px;">Guardar</button>
                     </div>
+                    <button type="button" id="modalTerminalEliminar" class="btn btn-ghost" style="color:#ef4444; border-radius:10px; font-weight:700; border:1px solid #fee2e2; padding:6px; font-size:11px;">🗑️ Desvincular de la empresa</button>
                 </div>
             </form>
         </div>
