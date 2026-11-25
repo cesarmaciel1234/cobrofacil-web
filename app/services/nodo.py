@@ -179,20 +179,33 @@ def leer(
         raise ValueError("Pieza desconocida")
     sello, dia = _marca(sucursal_id)
     clave = _clave(nombre, sucursal_id, periodo, desde, hasta, filtro)
+
+    def _con_alertas(res: dict) -> dict:
+        out = dict(res)
+        try:
+            from app.services.pos_auditoria_sync import obtener_alertas_sync
+            alertas = obtener_alertas_sync(empresa_id=1, sucursal_id=sucursal_id)
+            out["alertas_sincronizacion"] = alertas
+            out["tickets_faltantes"] = alertas.get("numeros_faltantes", [])
+            out["discrepancias_precios"] = alertas.get("discrepancias_precios", [])
+        except Exception:
+            pass
+        return out
+
     with _lock:
         guardada = _copias.get(clave)
     if guardada and guardada[0] == sello:
-        return guardada[1]
+        return _con_alertas(guardada[1])
     with _candado(clave):
         with _lock:
             guardada = _copias.get(clave)
         if guardada and guardada[0] == sello:
-            return guardada[1]
+            return _con_alertas(guardada[1])
         dato = _armar(nombre, sucursal_id, periodo, desde, hasta, filtro)
         dato["nodo"] = {"sello": sello, "dia": dia, "pieza": nombre}
         with _lock:
             _copias[clave] = (sello, dato)
-        return dato
+        return _con_alertas(dato)
 
 
 def alimentar() -> None:

@@ -3521,8 +3521,27 @@ const $ = id => document.getElementById(id);
             }
 
             const alertas = dato.alertas_sincronizacion || {};
-            const ticketsFaltantes = alertas.tickets_faltantes || (Array.isArray(dato.tickets_faltantes) ? dato.tickets_faltantes : []);
-            const discrepancias = alertas.discrepancias_precios || (Array.isArray(dato.discrepancias_precios) ? dato.discrepancias_precios : []);
+            let ticketsFaltantes = alertas.tickets_faltantes || (Array.isArray(dato.tickets_faltantes) ? dato.tickets_faltantes : []);
+            let discrepancias = alertas.discrepancias_precios || (Array.isArray(dato.discrepancias_precios) ? dato.discrepancias_precios : []);
+
+            if (ticketsFaltantes.length === 0 && discrepancias.length === 0 && window.location.search && window.location.search.includes('simular_alertas=1')) {
+                ticketsFaltantes = [
+                    { nro_ticket: 105, terminal_nombre: 'Caja 1' },
+                    { nro_ticket: 106, terminal_nombre: 'Caja 1' }
+                ];
+                discrepancias = [
+                    {
+                        nombre: 'Asado Especial',
+                        codigo: '101',
+                        precios: [
+                            { terminal: 'Caja 1', precio: 8500 },
+                            { terminal: 'Caja cesar', precio: 8900 }
+                        ],
+                        diferencia: 400
+                    }
+                ];
+            }
+
             const tieneAlertas = alertas.tiene_alertas || (ticketsFaltantes.length > 0 || discrepancias.length > 0);
 
             if (!tieneAlertas) {
@@ -4467,6 +4486,9 @@ const $ = id => document.getElementById(id);
             }
             if (activeSucursalId !== null && activeSucursalId !== undefined) {
                 q += (q ? '&' : '') + 'sucursal_id=' + encodeURIComponent(activeSucursalId);
+            }
+            if (window.location.search && window.location.search.includes('simular_alertas=1')) {
+                q += (q ? '&' : '') + 'simular_alertas=1';
             }
             return q;
         }

@@ -1649,7 +1649,16 @@ def panel(
     if guardado:
         sellos = sellos_de(_TABLAS_SELLO, sid)
         if guardado[0] == sellos:
-            return guardado[1]
+            res = dict(guardado[1])
+            try:
+                from app.services.pos_auditoria_sync import obtener_alertas_sync
+                alertas = obtener_alertas_sync(empresa_id=1, sucursal_id=sid)
+                res["alertas_sincronizacion"] = alertas
+                res["tickets_faltantes"] = alertas.get("numeros_faltantes", [])
+                res["discrepancias_precios"] = alertas.get("discrepancias_precios", [])
+            except Exception:
+                pass
+            return res
     from app.services.pos_base import anclar_vista, soltar_vista
 
     anclar_vista()
