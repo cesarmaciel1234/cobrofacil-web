@@ -1192,6 +1192,13 @@ def api_pos_tickets_incremental():
             for num in range(min_n, max_n + 1):
                 if num not in recibidos_set and num not in no_encontrados:
                     faltantes.append(num)
+
+    try:
+        from app.services.pos_auditoria_sync import registrar_tickets_sync
+        term_id = term["id"] if term else None
+        registrar_tickets_sync(emp_id, sid, term_id, machine_id, faltantes, numeros_recibidos, no_encontrados)
+    except Exception as exc:
+        current_app.logger.warning("registrar_tickets_sync error: %s", exc)
                     
     try:
         from app.services.signal_bus import broadcast_refresh
@@ -1273,6 +1280,13 @@ def api_pos_inventario_sync():
         guardar_parte("productos", cols_productos, filas_productos, 1, 1, sid, modo="delta", empresa_id=emp_id)
         
     try:
+        from app.services.pos_auditoria_sync import registrar_precios_sync
+        term_id = term["id"] if term else None
+        registrar_precios_sync(emp_id, sid, term_id, machine_id, articulos)
+    except Exception as exc:
+        current_app.logger.warning("registrar_precios_sync error: %s", exc)
+
+    try:
         from app.services.signal_bus import broadcast_refresh
         broadcast_refresh()
     except Exception:
@@ -1283,6 +1297,18 @@ def api_pos_inventario_sync():
         "articulos_procesados": len(filas_productos),
         "sucursal_id": sid
     })
+
+
+@api_bp.route("/pos/alertas-sync", methods=["GET"])
+def api_pos_alertas_sync():
+    """Retorna tickets faltantes y discrepancias de precios entre terminales activas."""
+    from app.services.pos_auditoria_sync import obtener_alertas_sync
+    emp_id = _resolver_empresa_id({})
+    suc_raw = request.args.get("sucursal_id") or request.args.get("branch_id")
+    sid = _resolver_sid(suc_raw)
+    alertas = obtener_alertas_sync(emp_id, sid)
+    return jsonify({"ok": True, **alertas})
+
 
 
 

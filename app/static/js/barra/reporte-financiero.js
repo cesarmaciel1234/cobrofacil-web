@@ -85,6 +85,10 @@
     function renderFinanciero(data) {
         if (!data || !data.ok) return;
 
+        if (window.renderAlertaSync) {
+            window.renderAlertaSync('alertaSyncFinanciero', data);
+        }
+
         // 1. Título
         const tit = $('rfTitulo');
         if (tit) tit.textContent = data.titulo || `Resumen de Ventas (${periodoActual})`;

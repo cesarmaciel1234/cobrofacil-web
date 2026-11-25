@@ -56,6 +56,73 @@
     <link rel="stylesheet" href="/static/css/auditoria.css?v=8.7">
     <link rel="stylesheet" href="/static/vendor/leaflet.css?v=1.9.4">
     <link rel="stylesheet" href="/static/css/perfil-empresa.css?v=8.7">
+    <style>
+        .alerta-sync-banner {
+            background: #fffbeb;
+            border: 1px solid #f59e0b;
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #92400e;
+            font-size: 13px;
+            box-shadow: 0 2px 6px rgba(245, 158, 11, 0.08);
+            animation: fadeInSync 0.3s ease;
+        }
+        @keyframes fadeInSync {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (prefers-color-scheme: dark) {
+            .alerta-sync-banner {
+                background: rgba(245, 158, 11, 0.12);
+                border-color: rgba(245, 158, 11, 0.4);
+                color: #fde68a;
+            }
+        }
+        .alerta-sync-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-weight: 700;
+            font-size: 13.5px;
+            margin-bottom: 6px;
+        }
+        .alerta-sync-badge {
+            background: #f59e0b;
+            color: #fff;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .alerta-sync-seccion {
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px dashed rgba(245, 158, 11, 0.3);
+        }
+        .alerta-sync-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 12.5px;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+        .alerta-sync-chips-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 4px;
+        }
+        .alerta-sync-chip {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid rgba(245, 158, 11, 0.4);
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-weight: 700;
+            font-size: 12px;
+        }
+    </style>
 </head>
 <body>
     <div class="app-loader" id="appLoader"><div class="loader-ring"></div><div class="loader-text">Cargando datos…</div></div>
@@ -327,6 +394,7 @@
                         <p id="reporteDia" class="periodo-chip" style="margin:0;">Hoy</p>
                         <div class="sucursal-selector-slot" data-pantalla="vitrina"></div>
                     </div>
+                    <div id="alertaSyncReporte" class="alerta-sync-banner" style="display:none; margin-bottom:12px;"></div>
                     <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">
                         <div class="vitrina-wrap">
                             <div class="vitrina-banner" style="opacity: 0.75;">
@@ -354,6 +422,7 @@
                         </div>
                         <div class="sucursal-selector-slot" data-pantalla="reporte"></div>
                     </div>
+                    <div id="alertaSyncFinanciero" class="alerta-sync-banner" style="display:none; margin:10px 0;"></div>
 
                     <!-- Períodos y Comparativa -->
                     <div class="rf-controls-row">
@@ -466,6 +535,7 @@
                     <p id="cajaPeriodo" class="periodo-chip" style="margin:0;">Hoy</p>
                     <div class="sucursal-selector-slot" data-pantalla="caja"></div>
                 </div>
+                <div id="alertaSyncCaja" class="alerta-sync-banner" style="display:none; margin-bottom:12px;"></div>
                 <div class="card">
                     <div class="card-body" id="contaCuerpo">Cargando el libro…</div>
                 </div>
@@ -985,7 +1055,7 @@
     <script src="/static/js/barra/armar.js?v=8.0"></script>
     <script src="/static/js/barra/toque.js?v=8.0"></script>
     <script src="/static/js/modulo-panel.js?v=7.9"></script>
-    <script src="/static/js/barra/reporte-financiero.js?v=8.7"></script>
+    <script src="/static/js/barra/reporte-financiero.js?v=8.8"></script>
     <script src="/static/js/barra/cartera-libro.js?v=8.7"></script>
     <script src="/static/js/barra/auditoria-inventario.js?v=8.9"></script>
     <script src="/static/js/barra/repartofacil-despacho.js?v=10.2"></script>
@@ -993,6 +1063,6 @@
     <script src="/static/js/espejo-engine.js?v=7.7"></script>
     <script src="/static/js/nodo.js?v=7.7"></script>
     <script src="/static/js/barra/neural-hud.js?v=10.2"></script>
-    <script src="/static/js/app.js?v=9.3"></script>
+    <script src="/static/js/app.js?v=9.4"></script>
 </body>
 </html>

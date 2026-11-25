@@ -1667,6 +1667,17 @@ def panel(
         soltar_vista()
     marcas = [sello[0] for sello in sellos if sello and sello[0]]
     dato["actualizado_en"] = max(marcas) if marcas else None
+
+    # Auditoría de sincronización entre cajas TPV (tickets faltantes y diferencias de precios)
+    try:
+        from app.services.pos_auditoria_sync import obtener_alertas_sync
+        alertas = obtener_alertas_sync(empresa_id=1, sucursal_id=sid)
+        dato["alertas_sincronizacion"] = alertas
+        dato["tickets_faltantes"] = alertas.get("numeros_faltantes", [])
+        dato["discrepancias_precios"] = alertas.get("discrepancias_precios", [])
+    except Exception:
+        pass
+
     with _panel_lock:
         _panel_cache[clave] = (sellos, dato)
     return dato

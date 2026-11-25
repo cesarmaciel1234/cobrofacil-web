@@ -3511,6 +3511,83 @@ const $ = id => document.getElementById(id);
             }
         }
 
+        window.renderAlertaSync = function(containerId, dato) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            if (!dato) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+                return;
+            }
+
+            const alertas = dato.alertas_sincronizacion || {};
+            const ticketsFaltantes = alertas.tickets_faltantes || (Array.isArray(dato.tickets_faltantes) ? dato.tickets_faltantes : []);
+            const discrepancias = alertas.discrepancias_precios || (Array.isArray(dato.discrepancias_precios) ? dato.discrepancias_precios : []);
+            const tieneAlertas = alertas.tiene_alertas || (ticketsFaltantes.length > 0 || discrepancias.length > 0);
+
+            if (!tieneAlertas) {
+                el.style.display = 'none';
+                el.innerHTML = '';
+                return;
+            }
+
+            const totalAlertas = ticketsFaltantes.length + discrepancias.length;
+            let html = `
+                <div class="alerta-sync-header">
+                    <span style="display:flex; align-items:center; gap:6px;">
+                        <span style="font-size:16px;">⚠️</span>
+                        <span>Alerta de Sincronización entre Cajas TPV</span>
+                    </span>
+                    <span class="alerta-sync-badge">${totalAlertas} pendiente${totalAlertas > 1 ? 's' : ''}</span>
+                </div>
+            `;
+
+            if (ticketsFaltantes.length > 0) {
+                const nums = ticketsFaltantes.map(t => (typeof t === 'object' && t !== null) ? t.nro_ticket : t);
+                html += `
+                    <div class="alerta-sync-seccion">
+                        <div style="font-weight:700; margin-bottom:4px; font-size:12.5px;">
+                            🎫 Tickets faltantes en secuencia (${nums.length}):
+                        </div>
+                        <div class="alerta-sync-chips-list">
+                            ${nums.map(n => `<span class="alerta-sync-chip">#${n}</span>`).join('')}
+                        </div>
+                        <div style="font-size:11.5px; opacity:0.85; margin-top:4px;">
+                            Pendientes de sincronizar con la nube para asegurar correlatividad. El TPV intentará re-enviarlos automáticamente en el próximo ciclo.
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (discrepancias.length > 0) {
+                html += `
+                    <div class="alerta-sync-seccion">
+                        <div style="font-weight:700; margin-bottom:4px; font-size:12.5px;">
+                            🏷️ Diferencia de precios entre terminales (${discrepancias.length}):
+                        </div>
+                        <div style="display:flex; flex-direction:column; gap:4px; margin-top:4px;">
+                            ${discrepancias.map(d => {
+                                const preList = (d.precios || []).map(p => `<b>${p.terminal || 'Caja'}:</b> $${Number(p.precio || 0).toLocaleString('es-AR')}`).join(' vs ');
+                                const dif = d.diferencia ? ` <span style="color:#b45309; font-weight:700;">(Dif: $${Number(d.diferencia).toLocaleString('es-AR')})</span>` : '';
+                                return `
+                                    <div class="alerta-sync-item" style="border-bottom:1px dotted rgba(245, 158, 11, 0.25); padding-bottom:3px;">
+                                        <span>• <b>${textoJefe(d.nombre || 'Artículo')}</b>${d.codigo ? ` <small style="opacity:0.8;">[${d.codigo}]</small>` : ''}</span>
+                                        <span style="font-size:12px;">${preList}${dif}</span>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        <div style="font-size:11.5px; opacity:0.85; margin-top:4px;">
+                            Revisá los precios configurados en las PCs de la sucursal para evitar cobros dispares.
+                        </div>
+                    </div>
+                `;
+            }
+
+            el.innerHTML = html;
+            el.style.display = 'block';
+        };
+
         let jefeCargaToken = 0;
         let jefeVistaEnCurso = '';
         let pinturaCartera = 0;
@@ -4495,6 +4572,7 @@ const $ = id => document.getElementById(id);
 
             // 1. CONTABILIDAD & CAJA
             if (panel === 'contabilidad' && $('contaCuerpo')) {
+                if (window.renderAlertaSync) window.renderAlertaSync('alertaSyncCaja', dato);
                 if (cajaPantalla === 'digital') return;
                 const c = dato.contabilidad || {};
                 if ($('contaDia')) $('contaDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
@@ -4578,6 +4656,7 @@ const $ = id => document.getElementById(id);
 
             // 2. JEFE / REPORTE & VITRINA
             if (panel === 'reporte' && $('reporteCuerpo')) {
+                if (window.renderAlertaSync) window.renderAlertaSync('alertaSyncReporte', dato);
                 const v = dato.vitrina || null;
                 if (!window.vitrinaPeriodo) window.vitrinaPeriodo = 'Hoy';
                 const perActual = window.vitrinaPeriodo;
