@@ -1104,8 +1104,8 @@
                 </div>
 
                 <!-- FOOTER FIJO DE ACCIÓN -->
-                <div style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:10px 14px; display:flex; gap:6px; align-items:center; justify-content:space-between; flex-shrink:0;">
-                    <div style="display:flex; gap:6px;">
+                <div style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:10px 14px; display:flex; gap:8px; align-items:center; justify-content:space-between; flex-shrink:0; flex-wrap:wrap;">
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                         <button type="button" onclick="window.RepartoFacilDespacho.imprimirComanda(${argumentoPedido(p.id)})"
                             style="background:#ffffff; color:#2D3277; border:1px solid #cbd5e1; border-radius:10px; padding:7px 11px; font-size:11.5px; font-weight:800; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
                             ${SVG_ICONOS.print}
@@ -1118,7 +1118,7 @@
                         </button>
                     </div>
 
-                    <div style="display:flex; gap:6px; align-items:center;">
+                    <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
                         ${botonesAccionModal}
                         <button type="button" onclick="window.RepartoFacilDespacho.cerrarModal()"
                             style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; border-radius:10px; padding:7px 10px; font-size:11.5px; font-weight:800; cursor:pointer;">
