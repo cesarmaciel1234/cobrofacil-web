@@ -110,6 +110,9 @@
         if (tabla === 'ventas') {
             memoria = libro;
         }
+        if (libro && Array.isArray(libro.columnas) && Array.isArray(libro.filas) && global.MotorEspejo && typeof global.MotorEspejo.ingerirTablaMatriz === 'function') {
+            try { global.MotorEspejo.ingerirTablaMatriz(tabla, libro.columnas, libro.filas); } catch (_) {}
+        }
         if (!sinAviso) {
             avisar();
         }
@@ -136,6 +139,9 @@
             }
             if (copias.ventas || copias.clientes) {
                 avisar();
+            }
+            if (global.MotorEspejo && typeof global.MotorEspejo.sincronizarDesdeEspejoMemoria === 'function') {
+                try { global.MotorEspejo.sincronizarDesdeEspejoMemoria(); } catch (_) {}
             }
             return copias;
         })();

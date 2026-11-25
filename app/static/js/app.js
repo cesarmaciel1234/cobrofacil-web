@@ -911,12 +911,30 @@ const $ = id => document.getElementById(id);
             if ($('histFiadoSub')) $('histFiadoSub').textContent = [cliente.dni, cliente.telefono, cliente.tipo].filter(Boolean).join(' · ') || 'Libro de la cuenta';
             const cuerpo = $('histFiadoCuerpo');
             if (!cuerpo) return;
-            cuerpo.innerHTML = '<p style="color:#64748b;">Cargando el libro…</p>';
+            
+            // 1. Intentar resolver de inmediato desde MotorEspejo local (0ms sin bloquear)
+            let movs = [];
+            const posIdNum = Number(posId);
+            if (global.MotorEspejo && typeof global.MotorEspejo.getHistorialCliente === 'function') {
+                try {
+                    const localHist = await global.MotorEspejo.getHistorialCliente(posIdNum);
+                    if (localHist && localHist.movimientos && localHist.movimientos.length > 0) {
+                        movs = localHist.movimientos;
+                    }
+                } catch (_) {}
+            }
+
+            if (!movs.length) {
+                cuerpo.innerHTML = '<p style="color:#64748b;">Cargando el libro…</p>';
+            }
+
             try {
                 const deuda = Number(cliente.deuda) || 0;
-                const res = await fetch('/api/pos/historial?pos_id=' + encodeURIComponent(posId) + '&deuda=' + encodeURIComponent(deuda));
-                const dato = await res.json();
-                const movs = dato.movimientos || [];
+                if (!movs.length) {
+                    const res = await fetch('/api/pos/historial?pos_id=' + encodeURIComponent(posId) + '&deuda=' + encodeURIComponent(deuda));
+                    const dato = await res.json();
+                    movs = dato.movimientos || [];
+                }
                 const tel = String(cliente.telefono || '').replace(/\D/g, '');
                 const wsp = tel.length >= 8
                     ? `<a href="https://wa.me/549${tel}?text=${encodeURIComponent('Hola ' + (cliente.nombre || '') + ', te escribimos de la administración. Tu saldo es ' + plataJefe(dato.deuda) + '.')}" target="_blank" style="background:#22c55e; color:#fff; padding:8px 12px; border-radius:10px; font-size:13px; font-weight:800; text-decoration:none;">Cobrar por WhatsApp</a>`

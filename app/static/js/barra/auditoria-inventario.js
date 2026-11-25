@@ -174,8 +174,34 @@
         const wrap = $('pedidosAuditoriaWrap');
         if (!wrap) return;
 
+        const sid = global.activeSucursalId;
+
+        // 1. Carga Local-First instantánea desde MotorEspejo (0ms)
+        if (global.MotorEspejo && typeof global.MotorEspejo.getInventario === 'function') {
+            try {
+                const prodsLocales = await global.MotorEspejo.getInventario(sid);
+                if (prodsLocales && prodsLocales.length > 0) {
+                    catalogo = prodsLocales;
+                    departamentosTpv = extraerDepartamentos(catalogo);
+                    resumen.total_sku = catalogo.length;
+                    resumen.quiebre = catalogo.filter(p => Number(p.stock) <= 0).length;
+                    fuenteConexion = 'local-first';
+                    errorCatalogo = '';
+                    renderAuditoria();
+                } else if (sid !== null && sid !== undefined && sid !== 'all' && sid !== 'Todas' && sid !== 'todas') {
+                    // Sucursal específica sin productos asignados: mostrar 0 en 0ms
+                    catalogo = [];
+                    departamentosTpv = [];
+                    resumen.total_sku = 0;
+                    resumen.quiebre = 0;
+                    fuenteConexion = 'local-first';
+                    errorCatalogo = '';
+                    renderAuditoria();
+                }
+            } catch (_) {}
+        }
+
         try {
-            const sid = global.activeSucursalId;
             const url = '/api/pos/inventario/auditoria' + (sid !== undefined && sid !== null ? ('?sucursal_id=' + encodeURIComponent(sid)) : '');
             const res = await fetch(url);
             if (!res.ok) throw new Error('HTTP ' + res.status);
