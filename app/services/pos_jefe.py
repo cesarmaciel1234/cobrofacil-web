@@ -1823,7 +1823,8 @@ def _armar_panel(
         ini = min(dias) if dias else hoy_real
         fin = max(dias) if dias else hoy_real
     elif nombre_periodo == "Hoy":
-        ini = fin = preparar_vista(sucursal_id, hoy_real, hoy_real, desplazar_hoy=True)
+        preparar_vista(sucursal_id, hoy_real, hoy_real, desplazar_hoy=False)
+        ini = fin = hoy_real
         d0 = datetime.fromisoformat(ini).date()
         ant_ini = (d0 - timedelta(days=1)).isoformat()
         ventas, _idx = _ventas(sucursal_id, desde=ant_ini, hasta=fin)
@@ -1972,7 +1973,7 @@ def _armar_panel(
             pedido["fecha_fin"] = hasta_iso[:10]
             ini, fin = pedido["fecha_ini"], pedido["fecha_fin"]
             if nombre_periodo == "Hoy":
-                ini, fin = libro_ini, libro_fin
+                ini, fin = hoy, hoy
                 pedido["fecha_ini"] = ini
                 pedido["fecha_fin"] = fin
                 etiqueta = "Hoy · " + ini

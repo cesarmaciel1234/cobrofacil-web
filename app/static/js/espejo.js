@@ -705,19 +705,15 @@
         let diaBase = '';
         if (esHoy) {
             const hoy = hoyDe();
-            let maxDia = '';
-            const allV = filasVentas(copias.ventas || memoria, sucursalId);
-            allV.forEach((v) => { if (v.dia && v.dia > maxDia) maxDia = v.dia; });
-            diaBase = maxDia || hoy;
-            etiqueta = 'Hoy · ' + diaBase;
-            corteIni = diaBase <= hoy ? diaBase : hoy;
-            corteFin = diaBase >= hoy ? diaBase : hoy;
+            diaBase = hoy;
+            etiqueta = 'Hoy · ' + hoy;
+            corteIni = hoy;
+            corteFin = hoy;
+            ini = hoy;
+            fin = hoy;
         }
 
         let vFilas = elegir(copias.ventas || memoria, ini, fin, sucursalId);
-        if (esHoy && vFilas.length === 0 && corteIni) {
-            vFilas = elegir(copias.ventas || memoria, corteIni, corteFin, sucursalId);
-        }
 
         const porMedio = {};
         let totalVentas = 0;
@@ -850,19 +846,6 @@
 
         const esHoy = (!periodo || periodo === 'Hoy') && ini === fin && ini === hoyDe();
         let diaReporte = ini === fin ? ini : (ini + ' → ' + fin);
-
-        // Si hoy aún no hubo ventas (tienda recién abriendo), tomar el último día con ventas para la vitrina
-        if (esHoy && delRango.length === 0 && vFilas.length > 0) {
-            let maxDia = '';
-            vFilas.forEach((v) => { if (v.dia && v.dia > maxDia) maxDia = v.dia; });
-            if (maxDia) {
-                const ultimas = vFilas.filter((v) => v.dia === maxDia && !CANCELADAS[String(v.estado || '').toUpperCase()]);
-                if (ultimas.length > 0) {
-                    delRango = ultimas;
-                    diaReporte = maxDia;
-                }
-            }
-        }
 
         let total = 0;
         const porMedio = {};
