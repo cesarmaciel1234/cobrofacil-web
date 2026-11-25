@@ -3295,6 +3295,8 @@ const $ = id => document.getElementById(id);
                 if (activeSucursalId == null) localStorage.removeItem('crm_active_sucursal_id');
                 else localStorage.setItem('crm_active_sucursal_id', String(activeSucursalId));
             } catch (_) {}
+            window.activeSucursalId = activeSucursalId;
+
             const icono = $('topbarIcon');
             const elegida = sucursalesConocidas.find((s) => String(s.id) === String(activeSucursalId));
             if (icono) {
@@ -3302,6 +3304,8 @@ const $ = id => document.getElementById(id);
                 icono.setAttribute('aria-label', elegida ? elegida.nombre : 'Todas las sucursales');
             }
             actualizarNombreEmpresaTopbar();
+            actualizarDropdownsSucursal();
+
             const grid = document.querySelector('.vitrina-grid');
             if (grid) grid.style.opacity = '0.5';
 
@@ -3311,12 +3315,63 @@ const $ = id => document.getElementById(id);
             if (window.ReporteJefe && window.ReporteJefe.setSucursal) {
                 window.ReporteJefe.setSucursal(activeSucursalId);
             }
+            if (window.AuditoriaInventario && window.AuditoriaInventario.recargar) {
+                window.AuditoriaInventario.recargar();
+            }
+            if (window.RepartoFacilDespacho && window.RepartoFacilDespacho.cargarPedidos) {
+                window.RepartoFacilDespacho.cargarPedidos(true);
+            }
+
             const activeView = document.querySelector('.view.active');
             const vName = activeView ? activeView.id.replace('view-', '') : 'reporte';
             if (vName !== 'cartera') {
                 cargarJefe(vName === 'dashboard' ? 'reporte' : vName);
             }
         }
+
+        function renderSucursalSelectors() {
+            const slots = document.querySelectorAll('.sucursal-selector-slot');
+            if (!slots.length) return;
+
+            const sucs = (sucursalesConocidas && sucursalesConocidas.length) ? sucursalesConocidas : [];
+            const fisicas = sucs.filter(s => String(s.id) !== 'web' && !String(s.id).startsWith('web-'));
+            const activeVal = activeSucursalId == null ? '' : String(activeSucursalId);
+
+            slots.forEach(slot => {
+                let html = `
+                <div style="display:inline-flex; align-items:center; gap:5px; background:#ffffff; border:1.5px solid #cbd5e1; border-radius:10px; padding:2px 8px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+                    <span style="font-size:12px;">🏢</span>
+                    <select class="sucursal-filtro-select" style="border:none; background:transparent; font-size:11.5px; font-weight:800; color:#1e293b; outline:none; cursor:pointer; padding:3px 2px;">
+                        <option value="" ${activeVal === '' ? 'selected' : ''}>Todas las Sucursales</option>
+                        ${fisicas.map(s => `
+                            <option value="${s.id}" ${String(s.id) === activeVal ? 'selected' : ''}>${textoJefe(s.nombre || ('Sucursal ' + s.id))}</option>
+                        `).join('')}
+                    </select>
+                </div>`;
+                slot.innerHTML = html;
+
+                const sel = slot.querySelector('.sucursal-filtro-select');
+                if (sel) {
+                    sel.onchange = (e) => {
+                        const val = e.target.value;
+                        aplicarSucursal(val ? parseInt(val, 10) : null);
+                        cargarSucursalesSelector();
+                    };
+                }
+            });
+        }
+
+        function actualizarDropdownsSucursal() {
+            const activeVal = activeSucursalId == null ? '' : String(activeSucursalId);
+            document.querySelectorAll('.sucursal-filtro-select').forEach(sel => {
+                sel.value = activeVal;
+            });
+        }
+
+        window.renderSucursalSelectors = renderSucursalSelectors;
+        window.aplicarSucursal = aplicarSucursal;
+        window.getActiveSucursalId = () => activeSucursalId;
+        window.getSucursalesConocidas = () => sucursalesConocidas;
 
         async function abrirSelectorSucursal() {
             if (sessionUser && sessionUser.sucursal_id != null) {
@@ -3419,6 +3474,7 @@ const $ = id => document.getElementById(id);
                     aplicarSucursal(null);
                 }
                 actualizarNombreEmpresaTopbar();
+                renderSucursalSelectors();
                 const cont = $('sucursalPillsContainer');
                 if (!cont) return;
 
@@ -4997,6 +5053,7 @@ const $ = id => document.getElementById(id);
             document.querySelectorAll('.pwa-nav-btn').forEach(btn => {
                 btn.classList.toggle('active', btn.dataset.pwaView === (name === 'ticket' ? 'contabilidad' : name));
             });
+            if (window.renderSucursalSelectors) window.renderSucursalSelectors();
             
             const jefeVistas = ['dashboard', 'reporte', 'digitales', 'contabilidad', 'admin', 'pedidos', 'proveedor', 'promedio', 'ticket'];
             if ($('dashboardBar')) {

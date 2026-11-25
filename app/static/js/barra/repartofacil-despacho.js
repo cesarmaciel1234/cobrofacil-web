@@ -310,7 +310,9 @@
         }
 
         try {
-            const resp = await fetch('/api/repartofacil/pedidos');
+            const sid = (window.activeSucursalId != null) ? window.activeSucursalId : (window.getActiveSucursalId ? window.getActiveSucursalId() : null);
+            const url = '/api/repartofacil/pedidos' + (sid ? ('?sucursal_id=' + encodeURIComponent(sid)) : '');
+            const resp = await fetch(url);
             const data = await resp.json();
             if (resp.status === 401 || resp.status === 403) {
                 pedidosLista = [];

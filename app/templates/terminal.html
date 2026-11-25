@@ -323,7 +323,10 @@
             </div>
             <div class="view active" id="view-reporte">
                 <div id="reporteVitrina">
-                    <p id="reporteDia" class="periodo-chip">Hoy</p>
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                        <p id="reporteDia" class="periodo-chip" style="margin:0;">Hoy</p>
+                        <div class="sucursal-selector-slot" data-pantalla="vitrina"></div>
+                    </div>
                     <div id="reporteCuerpo" style="padding: 4px 0 20px; line-height: 1.5;">
                         <div class="vitrina-wrap">
                             <div class="vitrina-banner" style="opacity: 0.75;">
@@ -344,11 +347,12 @@
 
                 <!-- VISTA REPORTE FINANCIERO (CEREBRO JEFE & CURVAS) -->
                 <div id="reporteFinanciero" class="card reporte-financiero-card" hidden>
-                    <div class="rf-header-bar">
+                    <div class="rf-header-bar" style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
                         <div class="rf-title-block">
                             <h2 class="rf-main-title" id="rfTitulo">Resumen de Ventas (Semana Actual)</h2>
                             <span class="rf-subtitle" id="rfSubtitulo">Cerebro Jefe · Ventas, costos y ganancia neta</span>
                         </div>
+                        <div class="sucursal-selector-slot" data-pantalla="reporte"></div>
                     </div>
 
                     <!-- Períodos y Comparativa -->
@@ -458,7 +462,10 @@
                 </div>
             </div>
             <div class="view" id="view-contabilidad">
-                <p id="cajaPeriodo" class="periodo-chip">Hoy</p>
+                <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+                    <p id="cajaPeriodo" class="periodo-chip" style="margin:0;">Hoy</p>
+                    <div class="sucursal-selector-slot" data-pantalla="caja"></div>
+                </div>
                 <div class="card">
                     <div class="card-body" id="contaCuerpo">Cargando el libro…</div>
                 </div>
@@ -476,6 +483,11 @@
 
                 <!-- 🛵 MÓDULO REPARTO FÁCIL: RECEPCIÓN DE PEDIDOS Y EMBALADO (ESTÁNDAR BLANCO Y AMARILLO) -->
                 <div id="pedidosRepartoFacilWrap" style="display:block; padding:10px 14px 190px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:10px;">
+                        <strong style="font-size:15px; font-weight:800; color:#2D3277;">🛵 Pedidos Reparto Fácil</strong>
+                        <div class="sucursal-selector-slot" data-pantalla="pedidos"></div>
+                    </div>
+
                     <!-- 📊 PANEL DE CONTROL OMNICANAL: TIENDA FÍSICA + E-COMMERCE EN TIEMPO REAL -->
                     <div id="repartoFacilOmnicanalBanner" style="margin-bottom:12px;"></div>
 
@@ -975,12 +987,12 @@
     <script src="/static/js/modulo-panel.js?v=7.9"></script>
     <script src="/static/js/barra/reporte-financiero.js?v=8.7"></script>
     <script src="/static/js/barra/cartera-libro.js?v=8.7"></script>
-    <script src="/static/js/barra/auditoria-inventario.js?v=8.8"></script>
-    <script src="/static/js/barra/repartofacil-despacho.js?v=10.1"></script>
+    <script src="/static/js/barra/auditoria-inventario.js?v=8.9"></script>
+    <script src="/static/js/barra/repartofacil-despacho.js?v=10.2"></script>
     <script src="/static/js/espejo.js?v=9.1"></script>
     <script src="/static/js/espejo-engine.js?v=7.7"></script>
     <script src="/static/js/nodo.js?v=7.7"></script>
     <script src="/static/js/barra/neural-hud.js?v=10.2"></script>
-    <script src="/static/js/app.js?v=9.2"></script>
+    <script src="/static/js/app.js?v=9.3"></script>
 </body>
 </html>

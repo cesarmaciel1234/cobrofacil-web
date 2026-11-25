@@ -388,7 +388,18 @@ def get_repartofacil_pedidos():
     try:
         with get_db(empresa_id=0) as conn:
             usuario_comercio = f"store-{empresa_actual}"
-            sql = """
+            sid_raw = request.args.get("sucursal_id")
+            filtro_suc = ""
+            params_sql = [usuario_comercio, empresa_actual]
+            if sid_raw and str(sid_raw).strip() not in ("todas", "null", ""):
+                try:
+                    sid_val = int(sid_raw)
+                    filtro_suc = " AND (p.sucursal_id = %s OR p.sucursal_id IS NULL)"
+                    params_sql.append(sid_val)
+                except (ValueError, TypeError):
+                    pass
+
+            sql = f"""
                 SELECT
                     p.id,
                     p.ticket_id,
@@ -430,11 +441,11 @@ def get_repartofacil_pedidos():
                           )
                     ), 0) AS unread_chat_count
                 FROM public.repartofacil_pedidos p
-                WHERE p.empresa_id = %s
+                WHERE p.empresa_id = %s {filtro_suc}
                 ORDER BY p.created_at DESC
                 LIMIT 50
             """
-            rows = conn.execute(sql, (usuario_comercio, empresa_actual)).fetchall()
+            rows = conn.execute(sql, tuple(params_sql)).fetchall()
             pedidos = []
             for r in rows:
                 d = dict(r)

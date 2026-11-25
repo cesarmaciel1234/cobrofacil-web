@@ -494,8 +494,12 @@
                     </button>
                 </div>
 
-                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:14px 0 8px;">
-                    <div><strong style="font-size:16px; color:#0f172a;">Inventario</strong><div style="font-size:11px; color:#64748b;">${fuenteConexion === 'mariadb_maestra' ? 'Lectura del TPV local' : 'Datos replicados; sincronización en vivo'} · Sin stock: cero o negativo</div><div style="font-size:11px; color:#2563eb; font-weight:700;">📍 Filtrado por sucursal activa</div></div>
+                <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin:14px 0 8px; flex-wrap:wrap;">
+                    <div>
+                        <strong style="font-size:16px; color:#0f172a;">Inventario</strong>
+                        <div style="font-size:11px; color:#64748b;">${fuenteConexion === 'mariadb_maestra' ? 'Lectura del TPV local' : 'Datos replicados; sincronización en vivo'} · Sin stock: cero o negativo</div>
+                        <div class="sucursal-selector-slot" data-pantalla="inventario" style="margin-top:6px;"></div>
+                    </div>
                     <button type="button" id="btnReplicarCatalogo" style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:11.5px; font-weight:800; padding:6px 10px; border-radius:8px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; flex-shrink:0;">
                         <span>⚡ Replicar Catálogo</span>
                     </button>
@@ -560,6 +564,7 @@
     // EVENTOS DE LA PANTALLA DE AUDITORÍA
     // -------------------------------------------------------------------------
     function vincularEventosAuditoria() {
+        if (global.renderSucursalSelectors) global.renderSucursalSelectors();
         const wrap = $('pedidosAuditoriaWrap');
         const btnReintentar = $('btnReintentarActualizacionInventario');
         if (btnReintentar) btnReintentar.addEventListener('click', () => cargarCatalogoAuditoria(true));
