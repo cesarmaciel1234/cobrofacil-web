@@ -47,7 +47,7 @@
 
     // Vibración para notificación táctil
     function vibrarUrgente() {
-        if (navigator.vibrate) {
+        if (typeof navigator !== 'undefined' && navigator.vibrate) {
             try {
                 // Patrón: vibración larga, pausa corta, vibración corta
                 navigator.vibrate([300, 100, 150]);
@@ -178,15 +178,31 @@
         }
     }
 
+    // Iconos SVG limpios (evitan cuadros vacíos o caracteres rotos en Android / Windows)
+    const SVG_ICONOS = {
+        cruz: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+        ticket: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>`,
+        chat: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>`,
+        print: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>`,
+        check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><polyline points="20 6 9 17 4 12"/></svg>`,
+        refresh: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`,
+        bell: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`,
+        bellOff: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M8.7 3A6 6 0 0 1 18 8a21.3 21.3 0 0 0 .6 5"/><path d="M17 17H3s3-2 3-9a4.67 4.67 0 0 1 .3-1.7"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`,
+        box: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>`,
+        store: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="m2 7 4.41-4.41A2 2 0 0 1 7.83 2h8.34a2 2 0 0 1 1.42.59L22 7"/><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><path d="M15 22v-4a2 2 0 0 0-2-2h-2a2 2 0 0 0-2 2v4"/><path d="M2 7h20"/></svg>`,
+        bike: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><circle cx="18.5" cy="17.5" r="3.5"/><circle cx="5.5" cy="17.5" r="3.5"/><circle cx="15" cy="5" r="1"/><path d="M12 17.5V14l-3-3 4-3 2 3h2"/></svg>`,
+        sync: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>`
+    };
+
     function toggleSonido() {
         sonidoHabilitado = !sonidoHabilitado;
         localStorage.setItem('cf_rf_sound_enabled', sonidoHabilitado ? '1' : '0');
         actualizarBotonSonido();
         if (sonidoHabilitado) {
             reproducirAlertaSonora();
-            mostrarToast('🔔 Alerta sonora activada para nuevos pedidos y mensajes');
+            mostrarToast('Timbre activado para nuevos pedidos y mensajes');
         } else {
-            mostrarToast('🔕 Alerta sonora silenciada');
+            mostrarToast('Timbre silenciado');
         }
     }
 
@@ -196,19 +212,19 @@
         const lbl = $('lblSonidoReparto');
         if (!btn) return;
         if (sonidoHabilitado) {
-            if (icono) icono.textContent = '🔔';
+            if (icono) icono.innerHTML = SVG_ICONOS.bell;
             if (lbl) lbl.textContent = 'ON';
             btn.style.background = '#ffffff';
             btn.style.borderColor = '#fde047';
             btn.style.color = '#2D3277';
-            btn.title = 'Alerta sonora activada (clic para silenciar)';
+            btn.title = 'Timbre activado (clic para silenciar)';
         } else {
-            if (icono) icono.textContent = '🔕';
-            if (lbl) lbl.textContent = 'MUTE';
+            if (icono) icono.innerHTML = SVG_ICONOS.bellOff;
+            if (lbl) lbl.textContent = 'OFF';
             btn.style.background = '#f1f5f9';
             btn.style.borderColor = '#cbd5e1';
             btn.style.color = '#94a3b8';
-            btn.title = 'Alerta sonora silenciada (clic para activar)';
+            btn.title = 'Timbre silenciado (clic para activar)';
         }
     }
 
@@ -390,16 +406,6 @@
         actualizarBotonSonido();
     }
 
-    // Iconos SVG limpios (evitan cuadros vacíos o caracteres rotos en Android / Windows)
-    const SVG_ICONOS = {
-        cruz: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
-        ticket: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M4 2v20l2-1 2 1 2-1 2 1 2-1 2 1 2-1 2 1V2l-2 1-2-1-2 1-2-1-2 1-2-1-2 1Z"/><path d="M8 7h8M8 11h8M8 15h5"/></svg>`,
-        chat: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="m3 21 1.9-5.7a8.5 8.5 0 1 1 3.8 3.8z"/></svg>`,
-        print: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><path d="M6 14h12v8H6z"/></svg>`,
-        check: `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle; display:inline-block;"><polyline points="20 6 9 17 4 12"/></svg>`,
-        refresh: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>`
-    };
-
     // Funciones de control de Pestañas
     function setTab(nuevaTab) {
         tabPedidos = String(nuevaTab || 'activos').toLowerCase();
@@ -534,7 +540,7 @@
             </div>
             ${tabPedidos === 'historial' ? `
                 <div style="margin-top:8px;">
-                    <input type="search" placeholder="🔍 Buscar por #RF o cliente en historial..."
+                    <input type="search" placeholder="Buscar por #RF o cliente en historial..."
                         value="${escaparTextoChat(busquedaHistorial)}"
                         oninput="window.RepartoFacilDespacho.setBusquedaHistorial(this.value)"
                         style="width:100%; box-sizing:border-box; background:#ffffff; border:1.5px solid #cbd5e1; border-radius:12px; padding:8px 12px; font-size:12.5px; color:#1e293b; outline:none;" />
@@ -543,10 +549,32 @@
         `;
     }
 
+    // Funciones auxiliares de filtrado estricto
+    function esPedidoFinalizado(p) {
+        const st = String((p && p.estado) || 'pending').toLowerCase();
+        return st === 'delivered' || st === 'rejected' || st === 'cancelled' || st === 'cancelled_by_client' || st === 'cancelled_timeout';
+    }
+
+    function esPedidoActivo(p) {
+        return !esPedidoFinalizado(p);
+    }
+
+    function esModalidadRetiro(p) {
+        const tipo = String((p && p.tipo_entrega) || '').toLowerCase();
+        return tipo === 'pickup' || tipo === 'takeaway' || tipo === 'retiro' || tipo === 'tienda' || tipo === 'mostrador';
+    }
+
+    function esPedidoNuevo(p) {
+        const st = String((p && p.estado) || 'pending').toLowerCase();
+        return st === 'pending' || st === 'pending_store';
+    }
+
     // Renderizar tarjetas de clientes (COMPACTAS 1-2 LÍNEAS, SIN ACORDEÓN INLINE)
     function renderizarCards() {
         const contenedor = $('repartoFacilCardsContenedor');
         if (!contenedor) return;
+
+        if (!Array.isArray(pedidosLista)) pedidosLista = [];
 
         // 1. Calcular conteos para todas las pestañas
         let countActivos = 0;
@@ -556,18 +584,12 @@
         let countHistorial = 0;
 
         pedidosLista.forEach((p) => {
-            const st = (p.estado || 'pending').toLowerCase();
-            const esFin = st === 'delivered' || st === 'rejected' || st === 'cancelled' || st === 'cancelled_by_client' || st === 'cancelled_timeout';
-            const esNuevo = st === 'pending' || st === 'pending_store';
-            const tipo = String(p.tipo_entrega || '').toLowerCase();
-            const retira = tipo === 'pickup' || tipo === 'takeaway' || tipo === 'retiro' || tipo === 'tienda' || tipo === 'mostrador';
-
-            if (esNuevo) countNuevos++;
-            if (!esFin) {
+            if (esPedidoNuevo(p)) countNuevos++;
+            if (esPedidoActivo(p)) {
                 countActivos++;
-                if (retira) countRetira++;
+                if (esModalidadRetiro(p)) countRetira++;
                 else countDelivery++;
-            } else {
+            } else if (esPedidoFinalizado(p)) {
                 countHistorial++;
             }
         });
@@ -578,36 +600,16 @@
         // 3. Filtrar lista ANTES de renderizar
         let pedidosFiltrados = [];
         if (tabPedidos === 'activos') {
-            pedidosFiltrados = pedidosLista.filter(p => {
-                const st = (p.estado || 'pending').toLowerCase();
-                return st !== 'delivered' && st !== 'rejected' && st !== 'cancelled' && st !== 'cancelled_by_client' && st !== 'cancelled_timeout';
-            });
+            pedidosFiltrados = pedidosLista.filter(p => esPedidoActivo(p));
         } else if (tabPedidos === 'nuevos') {
-            pedidosFiltrados = pedidosLista.filter(p => {
-                const st = (p.estado || 'pending').toLowerCase();
-                return st === 'pending' || st === 'pending_store';
-            });
+            pedidosFiltrados = pedidosLista.filter(p => esPedidoNuevo(p));
         } else if (tabPedidos === 'retira') {
-            pedidosFiltrados = pedidosLista.filter(p => {
-                const st = (p.estado || 'pending').toLowerCase();
-                const esAct = st !== 'delivered' && st !== 'rejected' && st !== 'cancelled' && st !== 'cancelled_by_client' && st !== 'cancelled_timeout';
-                const tipo = String(p.tipo_entrega || '').toLowerCase();
-                const retira = tipo === 'pickup' || tipo === 'takeaway' || tipo === 'retiro' || tipo === 'tienda' || tipo === 'mostrador';
-                return esAct && retira;
-            });
+            pedidosFiltrados = pedidosLista.filter(p => esPedidoActivo(p) && esModalidadRetiro(p));
         } else if (tabPedidos === 'delivery') {
-            pedidosFiltrados = pedidosLista.filter(p => {
-                const st = (p.estado || 'pending').toLowerCase();
-                const esAct = st !== 'delivered' && st !== 'rejected' && st !== 'cancelled' && st !== 'cancelled_by_client' && st !== 'cancelled_timeout';
-                const tipo = String(p.tipo_entrega || '').toLowerCase();
-                const retira = tipo === 'pickup' || tipo === 'takeaway' || tipo === 'retiro' || tipo === 'tienda' || tipo === 'mostrador';
-                return esAct && !retira;
-            });
+            pedidosFiltrados = pedidosLista.filter(p => esPedidoActivo(p) && !esModalidadRetiro(p));
         } else if (tabPedidos === 'historial') {
             pedidosFiltrados = pedidosLista.filter(p => {
-                const st = (p.estado || 'pending').toLowerCase();
-                const esFin = st === 'delivered' || st === 'rejected' || st === 'cancelled' || st === 'cancelled_by_client' || st === 'cancelled_timeout';
-                if (!esFin) return false;
+                if (!esPedidoFinalizado(p)) return false;
                 if (busquedaHistorial) {
                     const q = busquedaHistorial.toLowerCase();
                     const pool = `${p.id || ''} ${p.cliente_nombre || ''} ${p.ticket_id || ''}`.toLowerCase();
@@ -636,7 +638,7 @@
 
             contenedor.innerHTML = `
                 <div style="text-align:center; padding:36px 20px; background:#fff; border-radius:18px; border:1px dashed #cbd5e1; margin-top:4px;">
-                    <span style="font-size:32px; display:block; margin-bottom:6px;">🛵</span>
+                    <div style="margin-bottom:8px; display:flex; justify-content:center; color:#94a3b8;">${SVG_ICONOS.box}</div>
                     <h4 style="margin:0 0 4px; font-size:14px; font-weight:800; color:#1e293b;">${msgTitulo}</h4>
                     <p style="margin:0; font-size:12px; color:#64748b; max-width:300px; margin:0 auto;">${msgSub}</p>
                 </div>
@@ -658,37 +660,36 @@
             const esEmbalado = estadoLower === 'ready' || estadoLower === 'embalado';
             const esEntregado = estadoLower === 'delivered';
 
-            const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
-            const esRetiroEnTienda = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+            const esRetiroEnTienda = esModalidadRetiro(p);
             const badgeTipoEntrega = esRetiroEnTienda
-                ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🏪 En Tienda</span>`
-                : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">🛵 Con Delivery</span>`;
+                ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">${SVG_ICONOS.store}<span>Retira</span></span>`
+                : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; display:inline-flex; align-items:center; gap:3px; flex-shrink:0;">${SVG_ICONOS.bike}<span>Delivery</span></span>`;
 
             let badgeEstadoHtml = '';
             if (esCanceladoCliente) {
-                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONOS.cruz} CANCELADO</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONOS.cruz} <span>CANCELADO</span></span>`;
             } else if (esRechazadoComercio) {
-                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONOS.cruz} RECHAZADO</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap; display:inline-flex; align-items:center; gap:2px;">${SVG_ICONOS.cruz} <span>RECHAZADO</span></span>`;
             } else if (esTimeout) {
-                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">⏰ CANCELADO (1H)</span>`;
+                badgeEstadoHtml = `<span style="background:#fee2e2; color:#b91c1c; border:1px solid #fca5a5; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">CANCELADO (1H)</span>`;
             } else if (esEntregado) {
                 badgeEstadoHtml = `<span style="background:#f1f5f9; color:#475569; border:1px solid #cbd5e1; font-size:9.5px; font-weight:800; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">✓ ${esRetiroEnTienda ? 'RETIRADO' : 'ENTREGADO'}</span>`;
             } else if (esRetiroEnTienda) {
                 if (esEmbalado) {
-                    badgeEstadoHtml = `<span style="background:#ecfdf5; color:#065f46; border:1px solid #10b981; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">🛍️ LISTO</span>`;
+                    badgeEstadoHtml = `<span style="background:#ecfdf5; color:#065f46; border:1px solid #10b981; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">LISTO</span>`;
                 } else if (esConfirmado) {
-                    badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">👨‍🍳 PREPARANDO</span>`;
+                    badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">PREPARANDO</span>`;
                 } else {
-                    badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">🔔 NUEVO</span>`;
+                    badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">NUEVO</span>`;
                 }
             } else if (esEmbalado) {
-                badgeEstadoHtml = `<span style="background:#fef9c3; color:#713f12; border:1px solid #facc15; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">📦 EMBALADO</span>`;
+                badgeEstadoHtml = `<span style="background:#fef9c3; color:#713f12; border:1px solid #facc15; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">EMBALADO</span>`;
             } else if (p.repartidor_nombre || p.repartidor_id) {
-                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">🛵 EN CAMINO</span>`;
+                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">EN CAMINO</span>`;
             } else if (esConfirmado) {
-                badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">⏳ CHOFER</span>`;
+                badgeEstadoHtml = `<span style="background:#fefce8; color:#a16207; border:1px solid #fde047; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">ASIGNANDO</span>`;
             } else {
-                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">🔔 NUEVO</span>`;
+                badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">NUEVO</span>`;
             }
 
             // Método de pago para badge rápido
@@ -698,23 +699,23 @@
             const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
             const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
 
-            let pagoBadgeTexto = '💵 Efectivo';
+            let pagoBadgeTexto = 'Efectivo';
             let pagoBadgeBg = '#fef3c7';
             let pagoBadgeColor = '#92400e';
             let pagoBadgeBorder = '#fde68a';
 
             if (esTransfer) {
-                pagoBadgeTexto = '🏦 Transf.';
+                pagoBadgeTexto = 'Transf.';
                 pagoBadgeBg = '#eff6ff';
                 pagoBadgeColor = '#1e40af';
                 pagoBadgeBorder = '#bfdbfe';
             } else if (esTarj) {
-                pagoBadgeTexto = '💳 Tarjeta';
+                pagoBadgeTexto = 'Tarjeta';
                 pagoBadgeBg = '#f0fdf4';
                 pagoBadgeColor = '#166534';
                 pagoBadgeBorder = '#bbf7d0';
             } else if (esMP) {
-                pagoBadgeTexto = '📱 MPago';
+                pagoBadgeTexto = 'MPago';
                 pagoBadgeBg = '#ecfdf5';
                 pagoBadgeColor = '#065f46';
                 pagoBadgeBorder = '#a7f3d0';
@@ -734,15 +735,15 @@
                 botonAccionRapidaHtml = `
                     <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)"
                         style="background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(16,185,129,0.25);">
-                        <span>📦</span>
-                        <span>Embalar</span>
+                        ${SVG_ICONOS.box}
+                        <span>${esRetiroEnTienda ? 'Listo' : 'Embalar'}</span>
                     </button>
                 `;
             } else if (esEmbalado && esRetiroEnTienda) {
                 botonAccionRapidaHtml = `
                     <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})"
                         style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:8px; padding:5px 9px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px; box-shadow:0 2px 5px rgba(2,132,199,0.25);">
-                        <span>🛍️</span>
+                        ${SVG_ICONOS.check}
                         <span>Entregar</span>
                     </button>
                 `;
@@ -750,7 +751,7 @@
                 botonAccionRapidaHtml = `
                     <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
                         style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:8px; padding:5px 8px; font-size:11px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:3px;">
-                        <span>🛵</span>
+                        ${SVG_ICONOS.bike}
                         <span>Despacho</span>
                     </button>
                 `;
@@ -869,11 +870,10 @@
         const esRechazadoComercio = estadoLower === 'rejected';
         const esRechazado = esRechazadoComercio || esCanceladoCliente || esTimeout;
 
-        const tipoEntregaNormalizado = String(p.tipo_entrega || '').toLowerCase();
-        const esRetiroEnTienda = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+        const esRetiroEnTienda = esModalidadRetiro(p);
         const badgeTipoEntrega = esRetiroEnTienda
-            ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">🏪 En Tienda</span>`
-            : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">🛵 Con Delivery</span>`;
+            ? `<span style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">${SVG_ICONOS.store} <span>En Tienda</span></span>`
+            : `<span style="background:#eff6ff; color:#1d4ed8; border:1px solid #bfdbfe; font-size:10px; font-weight:900; padding:2px 7px; border-radius:6px; display:inline-flex; align-items:center; gap:3px;">${SVG_ICONOS.bike} <span>Con Delivery</span></span>`;
 
         const itemsArray = Array.isArray(p.items) ? p.items : [];
         const cantItems = itemsArray.reduce((acc, item) => acc + (Number(item.quantity || item.cantidad || 1)), 0);
@@ -890,7 +890,6 @@
         const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
         const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
 
-        let iconoP = '💵';
         let tituloP = 'Efectivo contra entrega';
         let subtextoP = 'Cobrar en mano al entregar el pedido';
         let badgeTextoP = 'COBRAR EN EFECTIVO';
@@ -901,7 +900,6 @@
         let boxBorderP = '#fde047';
 
         if (esTransfer) {
-            iconoP = '🏦';
             tituloP = 'Transferencia Bancaria';
             subtextoP = 'Verificar comprobante bancario antes de despachar';
             badgeTextoP = 'VERIFICAR PAGO';
@@ -911,7 +909,6 @@
             boxBgP = '#eff6ff';
             boxBorderP = '#bfdbfe';
         } else if (esTarj) {
-            iconoP = '💳';
             tituloP = 'Tarjeta Débito / Crédito';
             subtextoP = 'Cobro procesado con tarjeta / Posnet';
             badgeTextoP = 'PAGO CON TARJETA';
@@ -921,7 +918,6 @@
             boxBgP = '#f0fdf4';
             boxBorderP = '#86efac';
         } else if (esMP) {
-            iconoP = '📱';
             tituloP = 'Pago Online (Mercado Pago / Web)';
             subtextoP = 'Acreditado y confirmado vía web';
             badgeTextoP = 'PAGADO ONLINE';
@@ -950,7 +946,7 @@
             botonesAccionModal = `
                 <button type="button" onclick="window.RepartoFacilDespacho.marcarEmbalado(${argumentoPedido(p.id)}, 0, 0)"
                     style="background:#10b981; color:#ffffff; border:1.5px solid #059669; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(16,185,129,0.3);">
-                    <span>📦</span>
+                    ${SVG_ICONOS.box}
                     <span>${esRetiroEnTienda ? 'Listo p/ Retirar' : 'Embalar'}</span>
                 </button>
             `;
@@ -958,7 +954,7 @@
             botonesAccionModal = `
                 <button type="button" onclick="window.RepartoFacilDespacho.entregarPedidoMostrador(${argumentoPedido(p.id)})"
                     style="background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:10px; padding:9px 14px; font-size:12px; font-weight:900; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 2px 8px rgba(2,132,199,0.3);">
-                    <span>🛍️</span>
+                    ${SVG_ICONOS.check}
                     <span>Entregar al Cliente</span>
                 </button>
             `;
@@ -978,7 +974,7 @@
                 <div style="background:#2D3277; color:#ffffff; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
                     <div>
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <span style="font-size:16px;">🧾</span>
+                            ${SVG_ICONOS.ticket}
                             <span style="font-size:15px; font-weight:900; color:#FFE600; font-family:monospace; letter-spacing:0.5px;">
                                 #${formatearIdCorto(p.id).toUpperCase()}
                             </span>
@@ -1004,7 +1000,7 @@
                             <div style="font-size:13.5px; font-weight:900; color:#1e293b; margin-top:1px;">
                                 ${escaparTextoChat(capitalizarNombre(p.cliente_nombre || 'Cliente'))}
                             </div>
-                            ${p.cliente_telefono ? `<div style="font-size:11px; color:#475569; font-weight:700; margin-top:2px;">📞 ${escaparTextoChat(p.cliente_telefono)}</div>` : ''}
+                            ${p.cliente_telefono ? `<div style="font-size:11px; color:#475569; font-weight:700; margin-top:2px;">Tel: ${escaparTextoChat(p.cliente_telefono)}</div>` : ''}
                         </div>
                         ${p.cliente_telefono ? `
                             <a href="https://wa.me/${String(p.cliente_telefono).replace(/[^0-9]/g, '')}?text=Hola,%20nos%20comunicamos%20desde%20Cobro%20Fácil%20por%20tu%20pedido%20${encodeURIComponent(p.id)}" target="_blank" rel="noopener noreferrer"
@@ -1017,7 +1013,7 @@
                     <!-- MODALIDAD DE ENTREGA / DOMICILIO -->
                     ${esRetiroEnTienda ? `
                         <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:12px; padding:10px 12px; font-size:11.5px; color:#065f46; font-weight:800; display:flex; align-items:center; gap:6px;">
-                            <span style="font-size:16px;">🏪</span>
+                            ${SVG_ICONOS.store}
                             <div>
                                 <div style="font-weight:900;">RETIRO EN MOSTRADOR / TIENDA</div>
                                 <div style="font-size:10.5px; font-weight:600; opacity:0.9;">El comprador retira directamente en el local físico.</div>
@@ -1027,8 +1023,9 @@
                         <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:10px 12px; display:flex; align-items:flex-start; justify-content:space-between; gap:8px;">
                             <div style="flex:1;">
                                 <div style="font-size:10px; color:#854d0e; font-weight:800; text-transform:uppercase;">Domicilio de entrega</div>
-                                <div style="font-size:12px; font-weight:800; color:#2D3277; margin-top:2px; line-height:1.35;">
-                                    🛵 ${escaparTextoChat(limpiarDireccion(p.direccion_entrega || 'Domicilio'))}
+                                <div style="font-size:12px; font-weight:800; color:#2D3277; margin-top:2px; line-height:1.35; display:flex; align-items:center; gap:4px;">
+                                    ${SVG_ICONOS.bike}
+                                    <span>${escaparTextoChat(limpiarDireccion(p.direccion_entrega || 'Domicilio'))}</span>
                                 </div>
                             </div>
                             <a href="https://www.google.com/maps/dir/?api=1&destination=${(p.delivery_lat && p.delivery_lng) ? (p.delivery_lat + ',' + p.delivery_lng) : encodeURIComponent(p.direccion_entrega || '')}" target="_blank" rel="noopener noreferrer"
@@ -1089,12 +1086,9 @@
 
                     <!-- CONDICIÓN Y MÉTODO DE PAGO -->
                     <div style="background:${boxBgP}; border:1.5px solid ${boxBorderP}; border-radius:12px; padding:9px 12px; font-size:12px; display:flex; align-items:center; justify-content:space-between; gap:6px;">
-                        <div style="display:flex; align-items:center; gap:8px;">
-                            <span style="font-size:18px;">${iconoP}</span>
-                            <div>
-                                <div style="font-weight:900; color:#2D3277;">${tituloP}</div>
-                                <div style="font-size:10.5px; color:#64748b; font-weight:700;">${subtextoP}</div>
-                            </div>
+                        <div>
+                            <div style="font-weight:900; color:#2D3277;">${tituloP}</div>
+                            <div style="font-size:10.5px; color:#64748b; font-weight:700;">${subtextoP}</div>
                         </div>
                         <span style="background:${badgeBgP}; color:${badgeColorP}; border:1px solid ${badgeBorderP}; font-size:9.5px; font-weight:900; padding:3px 8px; border-radius:6px; white-space:nowrap; flex-shrink:0;">
                             ${badgeTextoP}
@@ -1347,6 +1341,33 @@
             console.error('[RepartoFacil] Error al embalar:', e);
             alert('Error al conectar con el servidor.');
             if (btn) btn.disabled = false;
+        }
+    }
+
+    // Acción: Entregar pedido en mostrador al cliente
+    async function entregarPedidoMostrador(orderId) {
+        if (!confirm(`¿Confirmás que el cliente retiró el pedido #${escaparTextoChat(orderId)} en el mostrador?`)) {
+            return;
+        }
+        try {
+            mostrarToast(`Entregando pedido #${escaparTextoChat(orderId)} en mostrador…`);
+            const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/entregar-mostrador`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+            const data = await resp.json();
+            if (data && data.success) {
+                mostrarToast(`✓ Pedido #${escaparTextoChat(orderId)} entregado en mostrador.`);
+                if (pedidoModal === String(orderId)) {
+                    cerrarModal();
+                }
+                cargarPedidos(true);
+            } else {
+                alert(`Error: ${data && data.error ? data.error : 'No se pudo entregar el pedido'}`);
+            }
+        } catch (e) {
+            console.error('[RepartoFacil] Error al entregar en mostrador:', e);
+            alert(`Error de conexión: ${e.message}`);
         }
     }
 
@@ -1757,25 +1778,23 @@
                     <!-- Fila Superior: Enlace con Servidor de la Tienda Física + Controles de Pedidos -->
                     <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; border-bottom:1px dashed #fde047; padding-bottom:8px;">
                         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                            <span style="display:inline-block; width:10px; height:10px; border-radius:999px; background:#10b981; box-shadow:0 0 6px rgba(16,185,129,0.8); animation:pulse 2s infinite;"></span>
+                            <span style="display:inline-block; width:9px; height:9px; border-radius:999px; background:#10b981; box-shadow:0 0 6px rgba(16,185,129,0.8); animation:pulse 2s infinite;"></span>
                             <span style="font-size:11.5px; font-weight:900; color:#2D3277; text-transform:uppercase; letter-spacing:0.3px;">
-                                Servidor Tienda Física En Línea
-                            </span>
-                            <span style="background:#fefce8; color:#854d0e; border:1px solid #fde047; font-size:9.5px; font-weight:800; padding:1px 6px; border-radius:6px;">
-                                TPV Omnicanal
+                                SERVIDOR EN LÍNEA
                             </span>
                             <span id="repartoFacilCountBadge" style="display:none; background:#ef4444; color:#ffffff; border:1px solid #dc2626; font-size:10px; font-weight:900; padding:1px 7px; border-radius:999px; box-shadow:0 2px 5px rgba(239,68,68,0.4);">0</span>
                         </div>
                         <div style="display:flex; align-items:center; gap:6px;">
-                            <button type="button" id="btnToggleSonidoReparto" onclick="window.RepartoFacilDespacho.toggleSonido()" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:11px; padding:5px 8px; cursor:pointer; color:#2D3277; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Activar / Silenciar alerta sonora">
-                                <span id="iconoSonidoReparto">${sonidoHabilitado ? '🔔' : '🔕'}</span>
-                                <span id="lblSonidoReparto" style="font-size:9.5px; font-weight:900;">${sonidoHabilitado ? 'ON' : 'OFF'}</span>
+                            <button type="button" id="btnToggleSonidoReparto" onclick="window.RepartoFacilDespacho.toggleSonido()" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:11px; padding:5px 8px; cursor:pointer; color:#2D3277; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 3px rgba(0,0,0,0.04);" title="Activar / Silenciar timbre">
+                                <span id="iconoSonidoReparto">${sonidoHabilitado ? SVG_ICONOS.bell : SVG_ICONOS.bellOff}</span>
+                                <span id="lblSonidoReparto" style="font-size:10px; font-weight:900;">${sonidoHabilitado ? 'ON' : 'OFF'}</span>
                             </button>
                             <button type="button" onclick="window.RepartoFacilDespacho.cargarPedidos(true)" style="background:#ffffff; border:1.5px solid #fde047; border-radius:10px; font-size:13px; font-weight:900; padding:5px 8px; cursor:pointer; color:#2D3277; box-shadow:0 1px 3px rgba(0,0,0,0.04); display:inline-flex; align-items:center; justify-content:center;" title="Refrescar pedidos">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                ${SVG_ICONOS.refresh}
                             </button>
-                            <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:10px; font-weight:900; padding:5px 9px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(234,179,8,0.25);">
-                                <span>⚡ Sincronizar Stock</span>
+                            <button type="button" onclick="window.RepartoFacilDespacho.sincronizarStockTpv()" style="background:#FFE600; color:#2D3277; border:1.5px solid #eab308; border-radius:10px; font-size:10.5px; font-weight:900; padding:5px 9px; cursor:pointer; display:inline-flex; align-items:center; gap:4px; box-shadow:0 1px 4px rgba(234,179,8,0.25);">
+                                ${SVG_ICONOS.sync}
+                                <span>Sincronizar Stock</span>
                             </button>
                         </div>
                     </div>
@@ -1783,7 +1802,7 @@
                     <!-- Fila Inferior: Las 3 tarjetas de Pedidos Web exclusivas -->
                     <div style="display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:4px; text-align:center;">
                         <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
-                            <span style="font-size:8.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🏪 Retiro Local</span>
+                            <span style="font-size:9px; color:#64748b; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">RETIRO LOCAL</span>
                             <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.retiro_local_monto || 0)}
                             </b>
@@ -1793,7 +1812,7 @@
                         </div>
 
                         <div style="background:#fffef5; border:1.5px solid #fde047; border-radius:12px; padding:7px 2px; min-width:0;">
-                            <span style="font-size:8.5px; color:#64748b; font-weight:800; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">🛵 Con Delivery</span>
+                            <span style="font-size:9px; color:#64748b; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">CON DELIVERY</span>
                             <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.delivery_monto || 0)}
                             </b>
@@ -1803,7 +1822,7 @@
                         </div>
 
                         <div style="background:#FFE600; border:1.5px solid #eab308; border-radius:12px; padding:7px 2px; min-width:0; box-shadow:0 2px 6px rgba(234,179,8,0.25);">
-                            <span style="font-size:8.5px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">📦 Pedidos Web</span>
+                            <span style="font-size:9px; color:#2D3277; font-weight:900; display:block; text-transform:uppercase; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">PEDIDOS WEB</span>
                             <b style="font-size:12px; font-weight:900; color:#2D3277; font-family:monospace; display:block; margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                                 ${formatMoneyNum(data.total_web_monto != null ? data.total_web_monto : data.monto_web_total)}
                             </b>
