@@ -4,6 +4,29 @@ import uuid
 from datetime import datetime
 from flask import current_app, jsonify, request
 
+try:
+    from zoneinfo import ZoneInfo
+    _ZONA_ARG = ZoneInfo("America/Argentina/Buenos_Aires")
+except Exception:
+    _ZONA_ARG = None
+
+def _hora_argentina_str():
+    try:
+        if _ZONA_ARG:
+            return datetime.now(_ZONA_ARG).strftime("%H:%M")
+    except Exception:
+        pass
+    return datetime.now().strftime("%H:%M")
+
+
+def _fecha_argentina_hoy():
+    try:
+        if _ZONA_ARG:
+            return datetime.now(_ZONA_ARG).strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    return datetime.now().strftime("%Y-%m-%d")
+
 from app.database import get_db
 from app.routes.api import api_bp
 from app.services.pos_base import filas_de
@@ -488,7 +511,7 @@ def aceptar_repartofacil_pedido(order_id):
         forzar_sin_stock = data.get("forzar_sin_stock", False)
         ticket_id = str(random.randint(1090000, 1099999))
         msg_id = f"msg-store-{uuid.uuid4()}"
-        hora_str = datetime.now().strftime("%H:%M")
+        hora_str = _hora_argentina_str()
 
         with get_db(empresa_id=empresa_id) as conn:
             # Traer datos del pedido
@@ -537,8 +560,8 @@ def aceptar_repartofacil_pedido(order_id):
             if items_aceptados:
                 texto += f" (Aceptación parcial: {len(items_aceptados)} de {len(items_pedido)} items)"
 
-            # 1. Actualizar estado y ticket del pedido con pago Web
-            update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, metodo_pago = 'Web', updated_at = NOW() WHERE id = %s"
+            # 1. Actualizar estado y ticket del pedido manteniendo intacto el metodo_pago original
+            update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'confirmed', ticket_id = %s, updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (ticket_id, order_id))
 
             # 2. Notificar en chat tripartito
@@ -593,7 +616,7 @@ def aceptar_repartofacil_pedido(order_id):
                         f"{it.get('quantity', 1)} {it.get('unit', 'KG')} {it.get('name', 'Corte')}"
                         for it in (items_a_procesar or [])
                     ]) or "Pedido Web Reparto Fácil"
-                    fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+                    fecha_hoy = _fecha_argentina_hoy()
                     tipo_str = "En Tienda" if str(order_row.get("tipo_entrega") or "").lower() in ("pickup", "takeaway", "retiro", "tienda") else "Delivery"
                     aux_conn.execute(
                         """
@@ -637,7 +660,7 @@ def rechazar_repartofacil_pedido(order_id):
         data = request.get_json(silent=True) or {}
         motivo = data.get("motivo") or "Falta de stock o fuera de horario comercial"
         msg_id = f"msg-store-{uuid.uuid4()}"
-        hora_str = datetime.now().strftime("%H:%M")
+        hora_str = _hora_argentina_str()
         texto = f"Pedido no aceptado por Frigorífico Maciel: {motivo}."
 
         with get_db(empresa_id=empresa_id) as conn:
@@ -696,7 +719,7 @@ def get_repartofacil_metricas_omnicanal():
 
     try:
         with get_db(empresa_id=empresa_id) as conn:
-            fecha_hoy = datetime.now().strftime("%Y-%m-%d")
+            fecha_hoy = _fecha_argentina_hoy()
 
             # 1. Ventas físicas en mostrador
             vm_row = conn.execute(
@@ -868,7 +891,7 @@ def marcar_pedido_embalado(order_id):
             recargo_espera = 0
 
         msg_id = f"msg-store-{uuid.uuid4()}"
-        hora_str = datetime.now().strftime("%H:%M")
+        hora_str = _hora_argentina_str()
 
         with get_db(empresa_id=empresa_id) as conn:
             pedido, error = _pedido_repartofacil_bloqueado(
@@ -930,7 +953,7 @@ def entregar_pedido_mostrador(order_id):
         return error
     try:
         msg_id = f"msg-store-{uuid.uuid4()}"
-        hora_str = datetime.now().strftime("%H:%M")
+        hora_str = _hora_argentina_str()
         texto = "Pedido entregado con éxito en el mostrador 🏪✅ ¡Muchas gracias por tu compra!"
 
         with get_db(empresa_id=empresa_id) as conn:
@@ -981,7 +1004,7 @@ def liberar_pedido_custodio(order_id):
         data = request.get_json(silent=True) or {}
         motivo = data.get("motivo") or "inactividad y falta de respuesta del chofer"
         msg_id = f"msg-custodio-{uuid.uuid4()}"
-        hora_str = datetime.now().strftime("%H:%M")
+        hora_str = _hora_argentina_str()
 
         with get_db(empresa_id=empresa_id) as conn:
             # Obtener estado actual
@@ -1175,7 +1198,7 @@ def send_repartofacil_chat_mensaje(order_id):
             return jsonify({"success": False, "error": "El mensaje es demasiado largo."}), 400
             
         msg_id = f"msg-store-{uuid.uuid4()}"
-        hora_str = datetime.now().strftime("%H:%M")
+        hora_str = _hora_argentina_str()
         
         with get_db(empresa_id=0) as conn:
             pedido = conn.execute(

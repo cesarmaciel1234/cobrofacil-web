@@ -103,11 +103,39 @@
     function formatFecha(fechaStr) {
         if (!fechaStr) return '';
         try {
-            const d = new Date(fechaStr);
-            return d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
-        } catch (e) {
-            return '';
+            const str = String(fechaStr).trim();
+            const iso = (str.includes('Z') || str.includes('+')) ? str : (str.replace(' ', 'T') + 'Z');
+            const d = new Date(iso);
+            if (!isNaN(d.getTime())) {
+                return d.toLocaleTimeString('es-AR', {
+                    timeZone: 'America/Argentina/Buenos_Aires',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+            }
+        } catch (e) {}
+        return '';
+    }
+
+    function formatHoraChat(m) {
+        if (!m) return '';
+        if (m.created_at) {
+            try {
+                const str = String(m.created_at).trim();
+                const iso = (str.includes('Z') || str.includes('+')) ? str : (str.replace(' ', 'T') + 'Z');
+                const d = new Date(iso);
+                if (!isNaN(d.getTime())) {
+                    return d.toLocaleTimeString('es-AR', {
+                        timeZone: 'America/Argentina/Buenos_Aires',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: false
+                    });
+                }
+            } catch (e) {}
         }
+        return m.timestamp_str || '';
     }
 
     function formatearIdCorto(id) {
@@ -686,7 +714,7 @@
                     badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">NUEVO</span>`;
                 }
             } else if (esEmbalado) {
-                badgeEstadoHtml = `<span style="background:#fef9c3; color:#713f12; border:1px solid #facc15; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">EMBALADO</span>`;
+                badgeEstadoHtml = `<span style="background:#ecfdf5; color:#065f46; border:1px solid #10b981; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">EMBALADO</span>`;
             } else if (p.repartidor_nombre || p.repartidor_id) {
                 badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap;">EN CAMINO</span>`;
             } else if (esConfirmado) {
@@ -695,12 +723,12 @@
                 badgeEstadoHtml = `<span style="background:#FFE600; color:#2D3277; border:1px solid #eab308; font-size:9.5px; font-weight:900; padding:1.5px 6px; border-radius:6px; white-space:nowrap; box-shadow:0 0 8px rgba(255,230,0,0.5);">NUEVO</span>`;
             }
 
-            // Método de pago para badge rápido
+            // Método de pago para badge rápido (preserva método original)
             const metodoLower = String(p.metodo_pago || 'cash').toLowerCase();
-            const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash');
+            const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash') || !metodoLower || metodoLower === 'contado';
             const esTransfer = metodoLower.includes('transfer');
             const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
-            const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
+            const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online');
 
             let pagoBadgeTexto = 'Efectivo';
             let pagoBadgeBg = '#fef3c7';
@@ -752,10 +780,10 @@
                 `;
             } else if (esEmbalado && !esRetiroEnTienda) {
                 botonAccionRapidaHtml = `
-                    <button type="button" onclick="event.stopPropagation(); window.RepartoFacilDespacho.abrirModal(${argumentoPedido(p.id)})"
-                        style="width:100%; height:40px; background:#0284c7; color:#ffffff; border:1.5px solid #0369a1; border-radius:10px; font-size:11.5px; font-weight:900; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap; box-sizing:border-box;">
-                        ${SVG_ICONOS.bike}
-                        <span>Despacho</span>
+                    <button type="button" disabled
+                        style="width:100%; height:40px; background:#ecfdf5; color:#065f46; border:1px solid #a7f3d0; border-radius:10px; font-size:11px; font-weight:900; display:flex; align-items:center; justify-content:center; gap:4px; white-space:nowrap; box-sizing:border-box; opacity:0.95; cursor:default;" title="Pedido embalado, esperando chofer para despacho">
+                        ${SVG_ICONOS.check}
+                        <span>✓ Embalado</span>
                     </button>
                 `;
             } else if (esEntregado) {
@@ -916,10 +944,10 @@
         const descuentoVal = Math.max(0, Math.round(((subtotalProd + costoEnvioVal) - totalVal) * 100) / 100);
 
         const metodoLower = String(p.metodo_pago || 'cash').toLowerCase();
-        const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash');
+        const esEfectivo = metodoLower.includes('efectivo') || metodoLower.includes('cash') || !metodoLower || metodoLower === 'contado';
         const esTransfer = metodoLower.includes('transfer');
         const esTarj = metodoLower.includes('tarjeta') || metodoLower.includes('card');
-        const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online') || metodoLower.includes('web');
+        const esMP = metodoLower.includes('mercado') || metodoLower.includes('mp') || metodoLower.includes('qr') || metodoLower.includes('online');
 
         let tituloP = 'Efectivo contra entrega';
         let subtextoP = 'Cobrar en mano al entregar el pedido';
@@ -1169,8 +1197,9 @@
 
     // Acción: ACEPTAR PEDIDO (Cobro Fácil emite Ticket y publica a repartidores)
     async function aceptarPedido(orderId, forzarSinStock = false) {
+        const idCorto = formatearIdCorto(orderId);
         try {
-            mostrarToast(`⏳ Aceptando pedido #${escaparTextoChat(orderId)} y emitiendo Ticket…`);
+            mostrarToast(`⏳ Aceptando pedido #${idCorto} y emitiendo Ticket…`);
             const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/aceptar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1178,7 +1207,7 @@
             });
             const data = await resp.json();
             if (data && data.success) {
-                mostrarToast(`✅ Pedido #${escaparTextoChat(orderId)} aceptado con Ticket #${escaparTextoChat(data.ticket_id)}. Publicado a repartidores en zona.`);
+                mostrarToast(`✅ Pedido #${idCorto} aceptado con Ticket #${escaparTextoChat(data.ticket_id)}. Publicado a repartidores en zona.`);
                 cargarPedidos(true);
             } else if (data.error === 'Stock insuficiente') {
                 // Mostrar modal mejorado de aceptación parcial
@@ -1279,8 +1308,9 @@
     }
 
     async function aceptarPedidoConItems(orderId, items) {
+        const idCorto = formatearIdCorto(orderId);
         try {
-            mostrarToast(`⏳ Aceptando pedido #${escaparTextoChat(orderId)} con ${items.length} items…`);
+            mostrarToast(`⏳ Aceptando pedido #${idCorto} con ${items.length} items…`);
             const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/aceptar`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1288,7 +1318,7 @@
             });
             const data = await resp.json();
             if (data && data.success) {
-                mostrarToast(`✅ Pedido #${escaparTextoChat(orderId)} aceptado con Ticket #${escaparTextoChat(data.ticket_id)}.`);
+                mostrarToast(`✅ Pedido #${idCorto} aceptado con Ticket #${escaparTextoChat(data.ticket_id)}.`);
                 cargarPedidos(true);
             } else {
                 alert('No se pudo aceptar: ' + (data.error || 'Error'));
@@ -1301,7 +1331,8 @@
 
     // Acción: RECHAZAR PEDIDO
     async function rechazarPedido(orderId) {
-        const conf = confirm(`¿Rechazar el pedido #${orderId}? Se notificará al comprador.`);
+        const idCorto = formatearIdCorto(orderId);
+        const conf = confirm(`¿Rechazar el pedido #${idCorto}? Se notificará al comprador.`);
         if (!conf) return;
 
         try {
@@ -1312,7 +1343,7 @@
             });
             const data = await resp.json();
             if (data && data.success) {
-                mostrarToast(`Pedido #${escaparTextoChat(orderId)} rechazado.`);
+                mostrarToast(`Pedido #${idCorto} rechazado.`);
                 cargarPedidos(true);
             } else {
                 alert('No se pudo rechazar el pedido: ' + (data.error || 'Error'));
@@ -1325,15 +1356,18 @@
 
     // Acción de marcar EMBALADO con impacto de demora y compensación al chofer
     async function marcarEmbalado(orderId, recargoEspera = 0, minutosDemora = 0) {
-        const order = pedidosLista.find(p => p.id === orderId);
-        const card = Array.from(document.querySelectorAll('.rf-order-card'))
-            .find(element => element.dataset.orderId === String(orderId));
-        const btn = card ? card.querySelector('.btn-embalar-pedido') : null;
+        const order = pedidosLista.find(p => String(p.id) === String(orderId));
+        const estadoAnterior = order ? order.estado : 'confirmed';
 
-        if (btn) {
-            btn.disabled = true;
-            btn.innerHTML = `<span>⏳</span><span>Embalando…</span>`;
+        // Actualización optimista inmediata en frontend
+        if (order) {
+            order.estado = 'ready';
         }
+        if (pedidoModal && String(pedidoModal.id) === String(orderId)) {
+            pedidoModal.estado = 'ready';
+        }
+        renderizarCards();
+        renderizarComandaModal();
 
         try {
             const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/embalar`, {
@@ -1349,12 +1383,13 @@
             if (data && data.success) {
                 const tipoEntregaNormalizado = String(order ? order.tipo_entrega : '').toLowerCase();
                 const esRetiro = tipoEntregaNormalizado === 'pickup' || tipoEntregaNormalizado === 'takeaway' || tipoEntregaNormalizado === 'retiro' || tipoEntregaNormalizado === 'tienda' || tipoEntregaNormalizado === 'mostrador';
+                const idCorto = formatearIdCorto(orderId);
                 if (esRetiro) {
-                    mostrarToast(`🛍️ Pedido #${escaparTextoChat(formatearIdCorto(orderId))} listo para retirar en mostrador.`);
+                    mostrarToast(`🛍️ Pedido #${idCorto} listo para retirar en mostrador.`);
                 } else if (recargoEspera > 0) {
                     mostrarToast(`✅ Pedido embalado. Chofer esperando: se acreditó +$${Number(recargoEspera).toLocaleString('es-AR')} extra de compensación 📦⏱️`);
                 } else {
-                    mostrarToast(`✅ Pedido #${escaparTextoChat(formatearIdCorto(orderId))} embalado. Mensaje enviado al repartidor: "Pedido listo y embalado" 📦`);
+                    mostrarToast(`✅ Pedido #${idCorto} embalado. Mensaje enviado al repartidor: "Pedido listo y embalado" 📦`);
                 }
 
                 if (order) {
@@ -1364,31 +1399,47 @@
                     }
                 }
                 renderizarCards();
+                renderizarComandaModal();
             } else {
                 alert('No se pudo marcar como embalado: ' + (data.error || 'Error'));
-                if (btn) btn.disabled = false;
+                if (order) {
+                    order.estado = estadoAnterior;
+                }
+                if (pedidoModal && String(pedidoModal.id) === String(orderId)) {
+                    pedidoModal.estado = estadoAnterior;
+                }
+                renderizarCards();
+                renderizarComandaModal();
             }
         } catch (e) {
             console.error('[RepartoFacil] Error al embalar:', e);
             alert('Error al conectar con el servidor.');
-            if (btn) btn.disabled = false;
+            if (order) {
+                order.estado = estadoAnterior;
+            }
+            if (pedidoModal && String(pedidoModal.id) === String(orderId)) {
+                pedidoModal.estado = estadoAnterior;
+            }
+            renderizarCards();
+            renderizarComandaModal();
         }
     }
 
     // Acción: Entregar pedido en mostrador al cliente
     async function entregarPedidoMostrador(orderId) {
-        if (!confirm(`¿Confirmás que el cliente retiró el pedido #${escaparTextoChat(orderId)} en el mostrador?`)) {
+        const idCorto = formatearIdCorto(orderId);
+        if (!confirm(`¿Confirmás que el cliente retiró el pedido #${idCorto} en el mostrador?`)) {
             return;
         }
         try {
-            mostrarToast(`Entregando pedido #${escaparTextoChat(orderId)} en mostrador…`);
+            mostrarToast(`Entregando pedido #${idCorto} en mostrador…`);
             const resp = await fetch(`/api/repartofacil/pedidos/${encodeURIComponent(orderId)}/entregar-mostrador`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' }
             });
             const data = await resp.json();
             if (data && data.success) {
-                mostrarToast(`✓ Pedido #${escaparTextoChat(orderId)} entregado en mostrador.`);
+                mostrarToast(`✓ Pedido #${idCorto} entregado en mostrador.`);
                 if (pedidoModal === String(orderId)) {
                     cerrarModal();
                 }
@@ -1662,7 +1713,7 @@
                                 <div style="background:#fffbeb; border:1px solid #fde68a; border-radius:12px; padding:10px 12px; font-size:12px; text-align:center; box-shadow:0 1px 3px rgba(0,0,0,0.04);">
                                     <div style="font-size:10px; font-weight:800; color:#b45309; text-transform:uppercase; margin-bottom:3px; display:flex; align-items:center; justify-content:center; gap:4px;">
                                         <span>🛡️</span>
-                                        <span>${escaparTextoChat(m.author_name || 'Custodio del Sistema')} · ${escaparTextoChat(m.timestamp_str || '')}</span>
+                                        <span>${escaparTextoChat(m.author_name || 'Custodio del Sistema')} · ${escaparTextoChat(formatHoraChat(m))}</span>
                                     </div>
                                     <div style="color:#78350f; font-weight:600;">${escaparTextoChat(m.content)}</div>
                                 </div>
@@ -1680,7 +1731,7 @@
 
                     return `
                         <div style="align-self:${esMio ? 'flex-end' : 'flex-start'}; max-width:82%; display:flex; flex-direction:column; align-items:${esMio ? 'flex-end' : 'flex-start'};">
-                            <span style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:2px; padding:0 4px;">${escaparTextoChat(emisor)} · ${escaparTextoChat(m.timestamp_str || '')} ${esMio ? checksHtml : ''}</span>
+                            <span style="font-size:10px; color:#64748b; font-weight:700; margin-bottom:2px; padding:0 4px;">${escaparTextoChat(emisor)} · ${escaparTextoChat(formatHoraChat(m))} ${esMio ? checksHtml : ''}</span>
                             <div style="background:${esMio ? '#FFE600' : (esChofer ? '#2D3277' : '#ffffff')}; color:${esMio ? '#2D3277' : (esChofer ? '#ffffff' : '#0f172a')}; padding:8px 12px; border-radius:14px; font-size:12.5px; font-weight:${esMio ? '700' : '500'}; border:1.5px solid ${esMio ? '#eab308' : (esChofer ? '#1e293b' : '#fde047')}; box-shadow:0 1px 3px rgba(0,0,0,0.06); word-break:break-word;">
                                 ${escaparTextoChat(m.content)}
                             </div>
