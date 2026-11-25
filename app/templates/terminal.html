@@ -58,11 +58,23 @@
     <link rel="stylesheet" href="/static/css/perfil-empresa.css?v=8.7">
     <style>
         .topbar-central-pill {
+            height: 40px !important;
+            min-height: 40px !important;
+            box-sizing: border-box;
             transition: all 0.15s ease-in-out;
         }
         .topbar-central-pill:hover, .topbar-central-pill:focus-within {
             border-color: #0d6efd !important;
             box-shadow: 0 2px 6px rgba(13, 110, 253, 0.15) !important;
+        }
+        .sucursal-filtro-select-central {
+            min-height: 0 !important;
+            height: 36px !important;
+            line-height: 36px !important;
+            font-size: 13px !important;
+            max-width: 175px;
+            box-sizing: border-box;
+            vertical-align: middle;
         }
         @media (max-width: 400px) {
             .sucursal-filtro-select-central {
@@ -217,9 +229,9 @@
             <div class="topbar-mobile-title" style="display: none; font-size: 16px; font-weight: 800; color: var(--text-primary); text-align: center; flex: 1; letter-spacing: -0.02em;">Cobro Fácil</div>
             
             <div style="display: flex; align-items: center; justify-content: center; flex: 1; min-width: 0;" class="topbar-greeting-block">
-                <div id="topbarNormalMode" class="topbar-central-pill" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 0 12px; height: 36px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 100%; cursor: pointer;">
-                    <span style="font-size: 15px; line-height: 1; flex-shrink: 0;" aria-hidden="true">🏪</span>
-                    <select id="topbarSucursalSelect" class="sucursal-filtro-select-central" aria-label="Filtrar por sucursal" style="border: none; background: transparent; font-size: 13px; font-weight: 800; color: #1e293b; outline: none; cursor: pointer; padding: 0; text-align: center; max-width: 175px; text-overflow: ellipsis; white-space: nowrap; line-height: 1;">
+                <div id="topbarNormalMode" class="topbar-central-pill" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #ffffff; border: 1.5px solid #cbd5e1; border-radius: 20px; padding: 0 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); max-width: 100%; cursor: pointer;">
+                    <span style="font-size: 16px; line-height: 1; display: inline-flex; align-items: center; flex-shrink: 0;" aria-hidden="true">🏪</span>
+                    <select id="topbarSucursalSelect" class="sucursal-filtro-select-central" aria-label="Filtrar por sucursal" style="border: none; background: transparent; font-weight: 800; color: #1e293b; outline: none; cursor: pointer; padding: 0; text-align: center; text-overflow: ellipsis; white-space: nowrap;">
                         <option value="">{{ empresa_nombre|upper }} · TODAS</option>
                     </select>
                     <strong id="empresaNombre" style="display: none;">{{ empresa_nombre|upper }}</strong>
