@@ -104,8 +104,8 @@ class PostgresCursorWrapper:
 
         is_insert = query.strip().upper().startswith("INSERT")
         if is_insert and "RETURNING" not in query.upper():
-            # sync_nodos y repartofacil_chat_lecturas no tienen columna 'id' serial única. Pedir id corta el guardado con 500.
-            if not re.search(r"\bINTO\s+(?:public\.)?(?:sync_nodos|repartofacil_chat_lecturas)\b", query, re.IGNORECASE):
+            # sync_nodos, repartofacil_chat_lecturas y login_throttles no tienen columna 'id' serial única. Pedir id corta el guardado con 500.
+            if not re.search(r"\bINTO\s+(?:public\.)?(?:sync_nodos|repartofacil_chat_lecturas|login_throttles)\b", query, re.IGNORECASE):
                 query += " RETURNING id"
 
         self.cursor.execute(query, vars)

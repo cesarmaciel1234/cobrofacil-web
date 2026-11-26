@@ -28,7 +28,7 @@
 ## 3. Fondo (Arquitectura y Servicios)
 - **Application Factory:** `app/__init__.py:create_app()` inicializa blueprints, CORS, compresión, extensiones y migraciones.
 - **Base de Datos Multi-Tenant:** `app/database.py`:
-  - En PostgreSQL (Neon): Cada empresa opera en su propio esquema (`empresa_1`, `empresa_2`, etc.).
+  - En PostgreSQL (Render `crm_libro_local`): Esquema `public` unificado con aislamiento estricto por `empresa_id` y `sucursal_id` e índices compuestos.
   - Pool de conexiones thread-safe (`ThreadedConnectionPool`) con `keepalives=1, keepalives_idle=30, connect_timeout=10` para tolerancia a cortes de red en Windows/Render.
   - En SQLite: Modo fallback para desarrollo y testing aislado (`Config.DB_PATH`).
 - **Seguridad y Permisos:** `app/security.py`:

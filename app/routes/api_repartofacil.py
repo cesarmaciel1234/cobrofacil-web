@@ -1,7 +1,7 @@
 import json
 import random
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from flask import current_app, jsonify, request
 
 try:
@@ -133,9 +133,10 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
     """
     Deduce el stock de los items del pedido del inventario.
     Prioriza MariaDB 192.168.0.8, si no está disponible usa pos_base.
+    Retorna True si el stock fue descontado y la novedad registrada con éxito, False en caso contrario.
     """
     if not items or not isinstance(items, list):
-        return
+        return False
 
     eid = empresa_id if empresa_id is not None else (session.get("empresa_id") or 1)
 
@@ -188,7 +189,7 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
                                 cur.execute("UPDATE productos SET stock = %s WHERE id = %s", (nuevo_stock, prod["id"]))
 
                     conn_mb.close()
-                    return
+                    return True
             except Exception:
                 pass
     except Exception:
@@ -203,7 +204,7 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
             col_p, filas_p = filas_de("articulos", sucursal_id, empresa_id=eid)
 
         if not col_p or not filas_p:
-            return
+            return False
 
         idx = {col: i for i, col in enumerate(col_p)}
         mapa_productos = {}
@@ -229,7 +230,10 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
             ).fetchall()
 
         if not partes:
-            return
+            return False
+
+        stock_deducido = False
+        novedad_ok = True
 
         for parte in partes:
             cols = parte["columnas"] if isinstance(parte["columnas"], list) else json.loads(parte["columnas"])
@@ -272,13 +276,22 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
                             _anotar_novedad(conn, p_sid, "productos", cols, f, f_id, False, ahora_iso, eid)
                     except Exception as e_nov:
                         print(f"[Stock] Advertencia al anotar novedad: {e_nov}")
+                        novedad_ok = False
 
                     if hasattr(conn, "commit"):
                         conn.commit()
+                if novedad_ok:
+                    stock_deducido = True
 
         _olvidar_tabla("productos")
+        return stock_deducido and novedad_ok
     except Exception as e:
         print(f"[Stock] Error al deducir stock de pos_base: {e}")
+        return False
+
+
+# Alias de compatibilidad
+_descontar_stock_items = _deducir_stock_items
 
 
 def _restituir_stock_items(items, empresa_id=None, sucursal_id=None):
@@ -608,8 +621,13 @@ def aceptar_repartofacil_pedido(order_id):
                 }), 400
 
             # Deducción de stock (si hay items con stock)
+            stock_deducido = False
             if validacion["items_con_stock"]:
-                _deducir_stock_items(validacion["items_con_stock"], empresa_id, order_row.get("sucursal_id"))
+                try:
+                    stock_deducido = bool(_deducir_stock_items(validacion["items_con_stock"], empresa_id, order_row.get("sucursal_id")))
+                except Exception as e_stock:
+                    print(f"[Stock] Error al descontar stock: {e_stock}")
+                    stock_deducido = False
 
             tipo_entrega = str(order_row.get("tipo_entrega") or "").strip().lower()
             es_retiro = tipo_entrega in ("pickup", "takeaway", "retiro", "tienda", "mostrador")
@@ -678,12 +696,13 @@ def aceptar_repartofacil_pedido(order_id):
                     ]) or "Pedido Web Reparto Fácil"
                     fecha_hoy = _fecha_argentina_hoy()
                     tipo_str = "En Tienda" if str(order_row.get("tipo_entrega") or "").lower() in ("pickup", "takeaway", "retiro", "tienda") else "Delivery"
+                    p_sid = order_row.get("sucursal_id") if order_row else None
                     aux_conn.execute(
                         """
                         INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at, empresa_id, sucursal_id)
                         VALUES (%s, %s, %s, 'CONTADO', %s, NOW(), %s, %s)
                         """,
-                        (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:180]} (Web - {tipo_str})", total_val, fecha_hoy, eid, p_sid)
+                        (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:180]} (Web - {tipo_str})", total_val, fecha_hoy, empresa_id, p_sid)
                     )
                 except Exception as vm_err:
                     print(f"[VentasMostrador] Aviso no bloqueante al asentar venta web: {vm_err}")
@@ -700,7 +719,7 @@ def aceptar_repartofacil_pedido(order_id):
             "estado": "confirmed",
             "pago": "Web",
             "mensaje": texto,
-            "stock_deducido": True,
+            "stock_deducido": stock_deducido,
             "items_sin_stock": validacion.get("items_sin_stock", [])
         })
     except Exception as e:

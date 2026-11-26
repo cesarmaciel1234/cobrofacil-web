@@ -16,8 +16,10 @@ No crear `regla_*.md` ni notas sueltas en la raíz. Antes de editar cualquier ar
 
 ---
 
-## 2. Arquitectura Multi-Tenant (Neon PostgreSQL)
-- **Aislamiento por Esquema:** Cada empresa tiene su propio esquema en PostgreSQL (`empresa_1`, `empresa_2`, etc.). La empresa por defecto en sesión activa suele ser `empresa_id = 2` ("Maciel").
+## 2. Arquitectura Multi-Tenant Unificada (PostgreSQL en esquema `public`)
+- **Esquema Unificado `public`:** Todas las empresas, sucursales y terminales residen en el esquema `public`. Queda terminantemente prohibido crear esquemas dinámicos (`empresa_1`, `empresa_2`, etc.).
+- **Discriminador de Tenant e Índices:** El aislamiento multi-tenant se logra mediante las columnas `empresa_id` y `sucursal_id`, con índices compuestos `idx_<tabla>_emp_suc` para máxima velocidad.
+- **Backend Único Centralizado:** `cobrofacil` (`crm-frigorifico`) es la única autoridad de backend para los TPVs físicos locales y para la tienda online `Reparto Fácil` (`https://repartofacil.onrender.com`), proveyendo autenticación JWT unificada (`/api/auth/*`), sincronización TPV (`/api/pos/*`) y catálogo omnicanal (`/api/cobrofacil/*`).
 - **Conexiones Seguras:** Usar siempre el pool de conexiones thread-safe (`_get_pg_pool()` en `app/database.py`) con `keepalives` configurados.
 - **Tolerancia Offline (SQLite):** Si no hay `DATABASE_URL` (en pruebas locales o CI), el sistema recurre de forma transparente a SQLite (`crm.db`). Las migraciones deben mantener compatibilidad dual SQLite / PostgreSQL.
 

@@ -1,9 +1,10 @@
-# 🏛️ ARQUITECTURA PIRAMIDAL: MULTI-TENANT, MULTI-SUCURSAL Y TERMINALES TPV
+# 🏛️ ARQUITECTURA PIRAMIDAL UNIFICADA: MULTI-TENANT, MULTI-SUCURSAL Y OMNICANALIDAD
 
-> **Sistemas Integrados:**
-> - **Cobro Fácil (ERP / TPV en la nube):** `https://cobrofacil.onrender.com/` (Repo: `crm-frigorifico`)
-> - **Reparto Fácil (E-Commerce / Delivery / Retiro):** `https://repartofacil.onrender.com/` (Repo: `RepartoFacil-web`)
-> - **Base de Datos Unificada:** PostgreSQL `crm_libro_local` en Render.
+> **ESTRUCTURA DE PRODUCCIÓN VIGENTE (2 WEBS + 1 BACKEND + 1 BASE EN `public`):**
+> - 🌐 **Reparto Fácil (E-Commerce / Delivery / Retiro):** `https://repartofacil.onrender.com/` (Repo: `RepartoFacil-web`)
+> - 🏢 **Cobro Fácil (ERP / TPV en la nube & Backend Único):** `https://cobrofacil.onrender.com/` (Repo: `crm-frigorifico`)
+> - 🗄️ **Base de Datos Unificada:** PostgreSQL `crm_libro_local` en Render (**100% en esquema `public`**).
+> - ❌ **Backend legado eliminado:** `repartofacil-backend` (FastAPI) ha sido deprecado y eliminado de Render y del código. Todas las rutas `/api/auth/*`, `/api/db/*`, `/api/cobrofacil/*` son atendidas por `cobrofacil`.
 
 ---
 
@@ -34,7 +35,7 @@
  └───────────────┘ └───────────────┘            └───────────────┘ └───────────────┘
 
                                           ▲
-                                          │ Omnicanalidad en Vivo
+                                          │ Omnicanalidad en Vivo (Sync 0ms)
                                           │
                   ┌───────────────────────┴──────────────────────┐
                   │             CANAL ONLINE: TIENDA WEB         │
@@ -45,33 +46,44 @@
 
 ---
 
-## 2. ⚡ REGLAS CRÍTICAS DE NEGOCIO
+## 2. ⚡ REGLAS CRÍTICAS DE ARQUITECTURA
 
-### A. Las PCs se conectan a Sucursales, NO a la Empresa en abstracto
+### A. 2 Webs, 1 Backend Único
+1. **Cobro Fácil (`crm-frigorifico`)** es la única autoridad de backend para ambos productos:
+   - Resuelve autenticación JWT (`/api/auth/*`), sincronización TPV (`/api/pos/*`), sucursales (`/api/sucursales/*`) y catálogo de inventario (`/api/cobrofacil/*`).
+2. **Reparto Fácil (`RepartoFacil-web`)** es la aplicación Next.js cliente orientada al comprador y repartidor:
+   - Consume sus APIs a través de su proxy unificado que delega hacia `https://cobrofacil.onrender.com`.
+   - Comparte el mismo secreto de validación de tokens:
+     - En `cobrofacil`: `JWT_SECRET_KEY`
+     - En `repartofacil`: `JWT_SECRET` (idéntico valor)
+   - Accede directamente a PostgreSQL mediante `DATABASE_URL` solo para consultas de persistencia directa y lecturas optimizadas.
+
+### B. 100% de la Base de Datos en Esquema `public`
+- **Prohibido el uso de esquemas dinámicos (`empresa_2`, `empresa_3`, etc.)**: Todo el modelo multi-tenant se maneja en el esquema `public` con "una sola bolsa y etiqueta de tenant".
+- Cada tabla multi-tenant posee:
+  - `empresa_id INTEGER NOT NULL DEFAULT 1 REFERENCES empresas(id)`
+  - `sucursal_id INTEGER REFERENCES sucursales(id)` (cuando aplica a nivel local)
+  - Índice compuesto: `CREATE INDEX idx_<tabla>_emp_suc ON public.<tabla> (empresa_id, sucursal_id);`
+- En cada conexión entrante, el backend ejecuta automáticamente `SET search_path TO public`.
+
+### C. Resolución de Terminales y Cajas TPV
 - Cada computadora local TPV tiene su `identificador_pc` (ej. `DESKTOP-7Q2Q4VD`).
 - Al sincronizar con la nube (`/api/pos/base/tabla`), el backend resuelve automáticamente:
   `PC/Terminal` ➔ `Sucursal ID` ➔ `Empresa ID`.
-- Si la máquina no estuviera registrada previamente, el servidor la auto-detecta y la vincula a la sucursal activa o predeterminada sin interrumpir las ventas físicas.
+- Si la máquina no estuviera registrada previamente, el servidor la auto-detecta y la vincula a la sucursal activa sin interrumpir las ventas físicas.
 
-### B. Detección Inteligente: Negocio Único vs. Red Multi-Sucursal
+### D. Detección Inteligente: Negocio Único vs. Red Multi-Sucursal
 1. **Negocio Único (`COUNT(sucursales) <= 1`)**:
-   - **En Servidor:** `es_negocio_unico = true`.
-   - **En Reparto Fácil (Tienda Web):** El cliente accede directamente al catálogo y checkout sin modales de selección de sucursal (cero fricción).
-   - **En Cobro Fácil:** Se visualiza la sucursal como `⭐ Local Único`.
+   - `es_negocio_unico = true`.
+   - En Reparto Fácil: Cero fricción, el cliente accede directo al catálogo y checkout sin modales de selección de sucursal.
+   - En Cobro Fácil: Se visualiza como `⭐ Local Único`.
 2. **Red Multi-Sucursal (`COUNT(sucursales) > 1`)**:
-   - **En Servidor:** `es_negocio_unico = false`.
-   - **En Reparto Fácil (Tienda Web):** Permite al comprador elegir la sucursal más cercana o para retiro en mostrador, o auto-selecciona por coordenadas GPS.
-   - **En Cobro Fácil:** El panel superior permite filtrar por cada sucursal individual o ver el `— Todas las Sucursales — (Consolidado Master)`.
-
-### C. Omnicanalidad y Filtro Topbar en Cobro Fácil
-El selector del encabezado (`topbar`) ofrece tres niveles de consulta reactiva en memoria e IndexedDB (0ms):
-1. `🏢 — Todas las Sucursales — (Consolidado Master)`:
-   - Suma total de efectivo, tarjetas, transferencias, fiados, cartera de clientes y ventas físicas de todas las cajas + ventas online.
-   - Ideal para el dueño o el Centro de Distribución.
-2. `🏪 [Nombre de Sucursal]` (ej: `Casa Central - Alfaro 1964`):
-   - Muestra exclusivamente las ventas, caja chica, arqueo y fiados de ese local físico y sus terminales.
-3. `🌐 Tienda Web`:
-   - Aísla únicamente las ventas provenientes de la tienda online Reparto Fácil.
+   - `es_negocio_unico = false`.
+   - En Reparto Fácil: Permite al cliente elegir sucursal de retiro o auto-asigna por proximidad GPS (Haversine).
+   - En Cobro Fácil: Selector superior en topbar con 3 niveles:
+     - `🏢 — Todas las Sucursales — (Consolidado Master)`
+     - `🏪 [Nombre de Sucursal]` (ej: `Casa Central - Alfaro 1964`)
+     - `🌐 Tienda Web` (Ventas online de Reparto Fácil)
 
 ---
 
@@ -95,13 +107,14 @@ CREATE TABLE IF NOT EXISTS public.sucursales (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_sucursales_emp ON public.sucursales(empresa_id);
 ```
 
 ### Tabla: `public.terminales`
 ```sql
 CREATE TABLE IF NOT EXISTS public.terminales (
     id SERIAL PRIMARY KEY,
-    sucursal_id INTEGER NOT NULL REFERENCES public.sucursales(id),
+    sucursal_id INTEGER REFERENCES public.sucursales(id),
     empresa_id INTEGER NOT NULL REFERENCES public.empresas(id),
     nombre VARCHAR(100) NOT NULL,
     identificador_pc VARCHAR(100) NOT NULL,
@@ -118,7 +131,7 @@ ON public.terminales(empresa_id, identificador_pc);
 
 ---
 
-## 4. 🔌 ENDPOINTS API REST (Modularizados)
+## 4. 🔌 ENDPOINTS API REST (Centralizados en Cobro Fácil)
 
 | Método | Endpoint | Rol / Auth | Descripción |
 |---|---|---|---|
@@ -129,11 +142,15 @@ ON public.terminales(empresa_id, identificador_pc);
 | `GET` | `/api/sucursales/publicas/<empresa_id>` | Público | Endpoint consumido por Reparto Fácil para conocer sucursales activas. |
 | `GET` | `/api/pos/sucursales` | Sesión / Token | Devuelve la lista unificada para el filtro superior del TPV. |
 | `POST` | `/api/pos/base/tabla` | TPV Sync | Recibe datos de la PC local y resuelve su sucursal automáticamente. |
+| `POST` | `/api/auth/login` | Público | Autenticación unificada de usuarios (Web y Móvil). |
+| `GET` | `/api/auth/me` | Bearer Token / Cookie | Retorna la sesión y perfil del usuario autenticado. |
+| `GET` | `/api/cobrofacil/products` | Público | Retorna el catálogo omnicanal para Reparto Fácil. |
 
 ---
 
 ## 5. 🚀 GUÍA RÁPIDA PARA AGENTES Y DESARROLLADORES
 
-1. **Si vas a tocar ventas físicas:** Asegurate de que cualquier operación lleve `sucursal_id`.
-2. **Si vas a tocar pedidos web:** Comprobá si `tipo_entrega == 'pickup'` (Retiro en mostrador) o `'delivery'` y respetá `sucursal_id` de origen.
-3. **Si agregás una nueva caja o terminal:** No toques la base a mano; usá `sucursales_service.vincular_terminal` o dejá que el sync auto-resuelva mediante `resolver_sucursal_terminal`.
+1. **NO crear nuevos servicios de backend:** Cobro Fácil es el único backend de la arquitectura.
+2. **NO crear esquemas en PostgreSQL:** Toda tabla nueva va en `public` con `empresa_id` y `sucursal_id`.
+3. **Ventas físicas y pedidos web:** Toda venta física debe llevar su `sucursal_id` resuelta. Todo pedido web respetará `tipo_entrega` (`'pickup'` o `'delivery'`) y su `sucursal_id` de despacho.
+4. **Cajas locales:** Para registrar o mover una terminal, utilizar la función de resolución automática o `/api/sucursales/<id>/vincular-terminal`.
