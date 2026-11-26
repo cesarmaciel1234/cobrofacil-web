@@ -170,9 +170,29 @@
         `;
     }
 
+    let abortAuditoria = null;
+    let timerAuditoria = null;
+
     async function cargarCatalogoAuditoria(forzar = false) {
         const wrap = $('pedidosAuditoriaWrap');
         if (!wrap) return;
+
+        if (timerAuditoria) {
+            clearTimeout(timerAuditoria);
+            timerAuditoria = null;
+        }
+
+        // Si la pantalla de auditoría no está activa ni se fuerza, evitar peticiones de fondo innecesarias
+        const viewPedidos = $('view-pedidos');
+        const pedidosVisible = viewPedidos && viewPedidos.classList.contains('active');
+        if (!forzar && (!pedidosVisible || pantallaActiva !== 'auditoria')) {
+            return;
+        }
+
+        if (abortAuditoria) {
+            try { abortAuditoria.abort(); } catch (_) {}
+            abortAuditoria = null;
+        }
 
         const sid = global.activeSucursalId;
 
@@ -201,9 +221,12 @@
             } catch (_) {}
         }
 
+        const ctrl = new AbortController();
+        abortAuditoria = ctrl;
+
         try {
             const url = '/api/pos/inventario/auditoria' + (sid !== undefined && sid !== null ? ('?sucursal_id=' + encodeURIComponent(sid)) : '');
-            const res = await fetch(url);
+            const res = await fetch(url, { signal: ctrl.signal });
             if (!res.ok) throw new Error('HTTP ' + res.status);
             const data = await res.json();
             if (data.ok) {
@@ -218,6 +241,7 @@
                 throw new Error(data.error || 'Respuesta no exitosa');
             }
         } catch (err) {
+            if (err && err.name === 'AbortError') return;
             console.error('Error cargando catálogo de auditoría:', err);
             if (global.CrmBus) global.CrmBus.emit('toast', 'No se pudo cargar el inventario: ' + err.message, true);
             if (catalogo && catalogo.length > 0) {
@@ -240,6 +264,8 @@
                     });
                 }
             }
+        } finally {
+            if (abortAuditoria === ctrl) abortAuditoria = null;
         }
     }
 

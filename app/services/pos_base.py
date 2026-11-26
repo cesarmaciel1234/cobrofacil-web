@@ -1454,11 +1454,16 @@ def _filas_del_rango(tabla: str, sucursal_id: int | str | None, desde: str, hast
                 (eid, tabla, desde, hasta),
             ).fetchall()
         else:
+            # Para empresa 1 (Maciel), sucursal 1 (Alfaro 1964) incluye también sucursal 2 (alfaro-1964)
+            sids = [sid]
+            if eid == 1 and sid in (1, 2):
+                sids = [1, 2]
+            placeholders = ", ".join("?" for _ in sids)
             partes = conn.execute(
-                "SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
-                "FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id = ? AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
+                f"SELECT sucursal_id, sucursal_nombre, columnas, filas, cantidad, actualizado_en "
+                f"FROM pos_base WHERE empresa_id = ? AND tabla = ? AND sucursal_id IN ({placeholders}) AND ((dia >= ? AND dia <= ?) OR dia IS NULL OR dia = '') "
                 "ORDER BY parte",
-                (eid, tabla, sid, desde, hasta),
+                [eid, tabla] + sids + [desde, hasta],
             ).fetchall()
     columnas, filas = _armar_filas(partes)
     filas = _recortar_dias(columnas, filas, desde, hasta)

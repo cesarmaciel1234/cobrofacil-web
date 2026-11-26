@@ -1775,6 +1775,63 @@ def _armar_panel(
             "sucursal_id": sucursal_id,
         }
 
+    if nombre in ("contabilidad", "tesoreria"):
+        hoy = datetime.now(_ZONA).date().isoformat()
+        pedido = dict(filtro or {})
+        if not pedido.get("periodo") and periodo:
+            pedido["periodo"] = periodo
+        if not pedido.get("desde") and desde:
+            pedido["desde"] = desde
+        if not pedido.get("hasta") and hasta:
+            pedido["hasta"] = hasta
+        pedido.setdefault("alcance", "dia")
+        pedido.setdefault("metodo", "TODOS")
+        if pedido.get("periodo"):
+            from app.services.pos_vitrina import resolver_rango
+            desde_iso, hasta_iso, nombre_periodo = resolver_rango(
+                str(pedido.get("periodo")),
+                desde_custom=pedido.get("desde") or None,
+                hasta_custom=pedido.get("hasta") or None,
+            )
+            pedido["fecha_ini"] = desde_iso[:10]
+            pedido["fecha_fin"] = hasta_iso[:10]
+            ini, fin = pedido["fecha_ini"], pedido["fecha_fin"]
+            if nombre_periodo == "Hoy":
+                ini, fin = hoy, hoy
+                pedido["fecha_ini"] = ini
+                pedido["fecha_fin"] = fin
+                etiqueta = "Hoy · " + ini
+            elif nombre_periodo == "Período":
+                etiqueta = "Período · " + ini + (" → " + fin if fin != ini else "")
+            else:
+                etiqueta = nombre_periodo
+        else:
+            ini, fin = rango_fechas(
+                str(pedido.get("alcance") or "dia"),
+                str(pedido.get("fecha") or ""),
+                bool(pedido.get("historico")),
+                hoy,
+            )
+            etiqueta = _etiqueta_caja(pedido, ini, fin, hoy)
+        libro = historial_ventas(sucursal_id, pedido, hoy)
+        return {
+            "ok": True,
+            "libro": True,
+            "panel": "contabilidad",
+            "resumen": {"dia": ini, "es_hoy": (ini == hoy)},
+            "cartera": {},
+            "contabilidad": _contabilidad(
+                libro.get("medios") or [],
+                ini,
+                fin,
+                sucursal_id,
+                etiqueta,
+            ),
+            "desglose_sucursales": [],
+            "sucursales": sucursales_disp,
+            "sucursal_id": sucursal_id,
+        }
+
     from app.services.pos_vitrina import resolver_rango
     from app.services.pos_base import preparar_vista
 
@@ -1981,62 +2038,6 @@ def _armar_panel(
             "desglose_sucursales": desglose_suc,
             "ranking_cortes": ranking,
             "pulso": _pulso(resumen, desglose_suc, digitales, cartera, pedidos),
-            "sucursales": sucursales_disp,
-            "sucursal_id": sucursal_id,
-        }
-    if nombre in ("contabilidad", "tesoreria"):
-        hoy = datetime.now(_ZONA).date().isoformat()
-        pedido = dict(filtro or {})
-        if not pedido.get("periodo") and periodo:
-            pedido["periodo"] = periodo
-        if not pedido.get("desde") and desde:
-            pedido["desde"] = desde
-        if not pedido.get("hasta") and hasta:
-            pedido["hasta"] = hasta
-        pedido.setdefault("alcance", "dia")
-        pedido.setdefault("metodo", "TODOS")
-        if pedido.get("periodo"):
-            from app.services.pos_vitrina import resolver_rango
-            desde_iso, hasta_iso, nombre_periodo = resolver_rango(
-                str(pedido.get("periodo")),
-                desde_custom=pedido.get("desde") or None,
-                hasta_custom=pedido.get("hasta") or None,
-            )
-            pedido["fecha_ini"] = desde_iso[:10]
-            pedido["fecha_fin"] = hasta_iso[:10]
-            ini, fin = pedido["fecha_ini"], pedido["fecha_fin"]
-            if nombre_periodo == "Hoy":
-                ini, fin = hoy, hoy
-                pedido["fecha_ini"] = ini
-                pedido["fecha_fin"] = fin
-                etiqueta = "Hoy · " + ini
-            elif nombre_periodo == "Período":
-                etiqueta = "Período · " + ini + (" → " + fin if fin != ini else "")
-            else:
-                etiqueta = nombre_periodo
-        else:
-            ini, fin = rango_fechas(
-                str(pedido.get("alcance") or "dia"),
-                str(pedido.get("fecha") or ""),
-                bool(pedido.get("historico")),
-                hoy,
-            )
-            etiqueta = _etiqueta_caja(pedido, ini, fin, hoy)
-        libro = historial_ventas(sucursal_id, pedido, hoy)
-        return {
-            "ok": True,
-            "libro": True,
-            "panel": "contabilidad",
-            "resumen": resumen,
-            "cartera": _cartera_admin(sucursal_id),
-            "contabilidad": _contabilidad(
-                libro.get("medios") or [],
-                ini,
-                fin,
-                sucursal_id,
-                etiqueta,
-            ),
-            "desglose_sucursales": desglose_suc,
             "sucursales": sucursales_disp,
             "sucursal_id": sucursal_id,
         }

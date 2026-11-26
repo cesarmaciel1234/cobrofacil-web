@@ -273,24 +273,32 @@ def resolver_sucursal_terminal(empresa_id, identificador_pc, sucursal_id_sugerid
         term = conn.execute(
             f"""SELECT id, sucursal_id
                FROM {_tabla('terminales')}
-               WHERE empresa_id = ? AND identificador_pc = ? AND activo = 1
+               WHERE empresa_id = ? AND identificador_pc = ?
                LIMIT 1""",
             (empresa_id, id_pc),
         ).fetchone()
 
         if sid_sugerido is not None:
-            # La terminal especifica explícitamente su sucursal de origen: respetarla de forma inquebrantable
+            # Validar que la sucursal sugerida exista en sucursales
+            suc_valida = conn.execute(
+                f"SELECT id FROM {_tabla('sucursales')} WHERE empresa_id = ? AND id = ? AND activo = 1",
+                (empresa_id, sid_sugerido),
+            ).fetchone()
+            if not suc_valida:
+                # Si no existe (ej: TPV tiene sucursal 2 pero en DB es 1 Alfaro 1964)
+                primera = conn.execute(
+                    f"SELECT id FROM {_tabla('sucursales')} WHERE empresa_id = ? AND activo = 1 ORDER BY id ASC LIMIT 1",
+                    (empresa_id,),
+                ).fetchone()
+                if primera:
+                    sid_sugerido = int(primera["id"])
+
+            # La terminal especifica su sucursal de origen: registrarla y activarla
             if term:
-                if term["sucursal_id"] != sid_sugerido:
-                    conn.execute(
-                        f"UPDATE {_tabla('terminales')} SET sucursal_id = ?, ultimo_sync = CURRENT_TIMESTAMP WHERE id = ?",
-                        (sid_sugerido, term["id"]),
-                    )
-                else:
-                    conn.execute(
-                        f"UPDATE {_tabla('terminales')} SET ultimo_sync = CURRENT_TIMESTAMP WHERE id = ?",
-                        (term["id"],),
-                    )
+                conn.execute(
+                    f"UPDATE {_tabla('terminales')} SET sucursal_id = ?, activo = 1, ultimo_sync = CURRENT_TIMESTAMP WHERE id = ?",
+                    (sid_sugerido, term["id"]),
+                )
             else:
                 conn.execute(
                     f"""INSERT INTO {_tabla('terminales')}

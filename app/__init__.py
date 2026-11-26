@@ -10,6 +10,15 @@ from app.database import init_db
 from app.security import generate_secret, register_security
 
 
+def get_client_ip():
+    from flask import request
+
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.headers.get("CF-Connecting-IP") or request.remote_addr or "127.0.0.1"
+
+
 def create_app():
     prod_errors = Config.validate_production()
     if prod_errors and not Config.TESTING:
@@ -52,9 +61,9 @@ def create_app():
 
     storage_uri = os.environ.get("REDIS_URL", "memory://")
     limiter = Limiter(
-        get_remote_address,
+        get_client_ip,
         app=app,
-        default_limits=["200 per minute"],
+        default_limits=["1200 per minute"],
         storage_uri=storage_uri,
     )
     app.extensions["limiter"] = limiter
@@ -87,6 +96,25 @@ def create_app():
 
     limiter.limit("10 per minute")(app.view_functions["views.auth_login_json"])
     limiter.limit("5 per minute")(app.view_functions["views.login"])
+
+    for endpoint in [
+        "api.api_pos_inventario_auditoria",
+        "api_v1.api_pos_inventario_auditoria",
+        "api.api_pos_jefe",
+        "api_v1.api_pos_jefe",
+        "api.api_pos_sucursales",
+        "api_v1.api_pos_sucursales",
+        "api.api_pos_nodo",
+        "api_v1.api_pos_nodo",
+        "api.api_pos_inventario_historial",
+        "api_v1.api_pos_inventario_historial",
+        "api.api_pos_contabilidad_hoy",
+        "api_v1.api_pos_contabilidad_hoy",
+        "api.api_pos_base_tabla",
+        "api_v1.api_pos_base_tabla",
+    ]:
+        if endpoint in app.view_functions:
+            limiter.exempt(app.view_functions[endpoint])
 
     if not app.config["TESTING"] and not app.config["DEBUG"]:
         if not Config.MT_API_KEY:

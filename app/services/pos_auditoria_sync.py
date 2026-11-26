@@ -13,47 +13,90 @@ from app.database import get_db, is_postgres
 
 logger = logging.getLogger(__name__)
 
+_tablas_aseguradas = False
+
 
 def asegurar_tablas_auditoria_sync(conn) -> None:
     """Crea de forma idempotente las tablas de auditoría de sincronización."""
+    global _tablas_aseguradas
+    if _tablas_aseguradas:
+        return
     try:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS pos_tickets_faltantes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                empresa_id INTEGER NOT NULL DEFAULT 1,
-                sucursal_id INTEGER NOT NULL,
-                terminal_id INTEGER,
-                machine_id TEXT,
-                nro_ticket INTEGER NOT NULL,
-                estado TEXT DEFAULT 'PENDIENTE',
-                created_at TEXT DEFAULT (datetime('now', 'localtime')),
-                updated_at TEXT DEFAULT (datetime('now', 'localtime'))
-            )
-        """)
-        conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_falt_uq
-                ON pos_tickets_faltantes(empresa_id, sucursal_id, nro_ticket)
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS terminal_precios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                empresa_id INTEGER NOT NULL DEFAULT 1,
-                sucursal_id INTEGER NOT NULL,
-                terminal_id INTEGER NOT NULL,
-                machine_id TEXT NOT NULL,
-                producto_id TEXT NOT NULL,
-                codigo TEXT,
-                nombre TEXT,
-                precio REAL NOT NULL DEFAULT 0.0,
-                updated_at TEXT DEFAULT (datetime('now', 'localtime'))
-            )
-        """)
-        conn.execute("""
-            CREATE UNIQUE INDEX IF NOT EXISTS idx_term_precios_uq
-                ON terminal_precios(empresa_id, terminal_id, producto_id)
-        """)
+        if is_postgres():
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS pos_tickets_faltantes (
+                    id SERIAL PRIMARY KEY,
+                    empresa_id INTEGER NOT NULL DEFAULT 1,
+                    sucursal_id INTEGER NOT NULL,
+                    terminal_id INTEGER,
+                    machine_id TEXT,
+                    nro_ticket INTEGER NOT NULL,
+                    estado TEXT DEFAULT 'PENDIENTE',
+                    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_falt_uq
+                    ON pos_tickets_faltantes(empresa_id, sucursal_id, nro_ticket)
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS terminal_precios (
+                    id SERIAL PRIMARY KEY,
+                    empresa_id INTEGER NOT NULL DEFAULT 1,
+                    sucursal_id INTEGER NOT NULL,
+                    terminal_id INTEGER NOT NULL,
+                    machine_id TEXT NOT NULL,
+                    producto_id TEXT NOT NULL,
+                    codigo TEXT,
+                    nombre TEXT,
+                    precio REAL NOT NULL DEFAULT 0.0,
+                    updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                )
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_term_precios_uq
+                    ON terminal_precios(empresa_id, terminal_id, producto_id)
+            """)
+        else:
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS pos_tickets_faltantes (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    empresa_id INTEGER NOT NULL DEFAULT 1,
+                    sucursal_id INTEGER NOT NULL,
+                    terminal_id INTEGER,
+                    machine_id TEXT,
+                    nro_ticket INTEGER NOT NULL,
+                    estado TEXT DEFAULT 'PENDIENTE',
+                    created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                    updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_falt_uq
+                    ON pos_tickets_faltantes(empresa_id, sucursal_id, nro_ticket)
+            """)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS terminal_precios (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    empresa_id INTEGER NOT NULL DEFAULT 1,
+                    sucursal_id INTEGER NOT NULL,
+                    terminal_id INTEGER NOT NULL,
+                    machine_id TEXT NOT NULL,
+                    producto_id TEXT NOT NULL,
+                    codigo TEXT,
+                    nombre TEXT,
+                    precio REAL NOT NULL DEFAULT 0.0,
+                    updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+                )
+            """)
+            conn.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_term_precios_uq
+                    ON terminal_precios(empresa_id, terminal_id, producto_id)
+            """)
         if hasattr(conn, "commit"):
             conn.commit()
+        _tablas_aseguradas = True
     except Exception as exc:
         logger.warning("asegurar_tablas_auditoria_sync: %s", exc)
 
