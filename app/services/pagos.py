@@ -1,7 +1,7 @@
 from typing import Any, Optional
 from datetime import date
 from app.database import get_db
-from app.utils import fmt_plazo_dias
+from app.utils import fmt_plazo_dias, current_empresa_id, current_sucursal_id
 
 def calc_estado_vencimiento(fecha_vencimiento: Optional[str]) -> dict[str, Any]:
     """Calcula días al vencimiento, retraso y estado para tarjetas."""
@@ -132,8 +132,9 @@ def _calc_reserva_diaria(saldo: float, venc: dict) -> float:
     return saldo / 30.0
 
 
-def list_historial_pagos(limit: int = 500, tipo: Optional[str] = None) -> list[dict[str, Any]]:
+def list_historial_pagos(limit: int = 500, tipo: Optional[str] = None, empresa_id: int = None) -> list[dict[str, Any]]:
     """Historial global de pagos con datos de la operación."""
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     sql = """
             SELECT
                 p.id, p.operacion_id, p.numero_cuota, p.monto_cuota_esperado,
@@ -142,9 +143,9 @@ def list_historial_pagos(limit: int = 500, tipo: Optional[str] = None) -> list[d
                 o.plazo_dias, o.meses, o.recibido, o.pagar
             FROM pagos_cuotas p
             JOIN operaciones_financieras o ON o.id = p.operacion_id
-            WHERE 1=1
+            WHERE o.empresa_id = ?
             """
-    params: list[Any] = []
+    params: list[Any] = [eid]
     if tipo:
         sql += " AND LOWER(o.tipo) = ?"
         params.append(tipo.lower())
@@ -191,28 +192,32 @@ def list_historial_pagos(limit: int = 500, tipo: Optional[str] = None) -> list[d
     return out
 
 
-def get_pagos_operacion(op_id: int) -> list[dict]:
+def get_pagos_operacion(op_id: int, empresa_id: int = None) -> list[dict]:
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         rows = conn.execute(
             """
-            SELECT id, numero_cuota, monto_cuota_esperado, monto_pagado,
-                   interes_punitorio, descuento, fecha_pago
-            FROM pagos_cuotas WHERE operacion_id = ?
-            ORDER BY id DESC
+            SELECT p.id, p.numero_cuota, p.monto_cuota_esperado, p.monto_pagado,
+                   p.interes_punitorio, p.descuento, p.fecha_pago
+            FROM pagos_cuotas p
+            WHERE p.operacion_id = ? AND (p.empresa_id = ? OR p.empresa_id IS NULL)
+            ORDER BY p.id DESC
             """,
-            (op_id,),
+            (op_id, eid),
         ).fetchall()
     return [dict(r) for r in rows]
 
 
-def registrar_pago(op_id: int, numero_cuota: int, monto_pagado: float) -> dict[str, Any]:
+def registrar_pago(op_id: int, numero_cuota: int, monto_pagado: float, empresa_id: int = None) -> dict[str, Any]:
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
+    sid = current_sucursal_id()
     with get_db() as conn:
         row = conn.execute(
             """
             SELECT id, alias, tipo, pagar, cuotas, cuotas_pagadas, fecha_vencimiento
-            FROM operaciones_financieras WHERE id = ?
+            FROM operaciones_financieras WHERE id = ? AND empresa_id = ?
             """,
-            (op_id,),
+            (op_id, eid),
         ).fetchone()
         if not row:
             raise ValueError("Operación no encontrada")
@@ -242,8 +247,8 @@ def registrar_pago(op_id: int, numero_cuota: int, monto_pagado: float) -> dict[s
             """
             INSERT INTO pagos_cuotas
                 (operacion_id, numero_cuota, monto_cuota_esperado, monto_pagado,
-                 interes_punitorio, descuento)
-            VALUES (?, ?, ?, ?, ?, ?)
+                 interes_punitorio, descuento, empresa_id, sucursal_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 op_id,
@@ -252,12 +257,14 @@ def registrar_pago(op_id: int, numero_cuota: int, monto_pagado: float) -> dict[s
                 monto_pagado,
                 diff["interes_punitorio"],
                 diff["descuento"],
+                eid,
+                sid,
             ),
         )
         nuevas_pagadas = max(int(row_dict["cuotas_pagadas"] or 0), numero_cuota)
         conn.execute(
-            "UPDATE operaciones_financieras SET cuotas_pagadas = ? WHERE id = ?",
-            (nuevas_pagadas, op_id),
+            "UPDATE operaciones_financieras SET cuotas_pagadas = ? WHERE id = ? AND empresa_id = ?",
+            (nuevas_pagadas, op_id, eid),
         )
 
     return {

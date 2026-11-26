@@ -1,7 +1,7 @@
 from flask import jsonify, request
 from app.routes.api import api_bp, _guard_master_admin
 from app.database import get_db
-from app.utils import parse_operacion_payload, fmt_plazo_dias, _i, _f, resolve_remito_kg, pesos_piezas_to_json
+from app.utils import parse_operacion_payload, fmt_plazo_dias, _i, _f, resolve_remito_kg, pesos_piezas_to_json, current_empresa_id, current_sucursal_id
 from app.security import require_master_password_in_request, role_at_least
 from app.services.audit import log_audit
 from datetime import date
@@ -38,17 +38,19 @@ def api_remitos_endpoint():
         return jsonify({"error": str(e)}), 400
 
     try:
+        eid = current_empresa_id()
+        sid = current_sucursal_id()
         with get_db() as conn:
             # 1. Buscar o registrar cliente automáticamente
-            cid = buscar_o_crear_cliente(conn, cliente)
+            cid = buscar_o_crear_cliente(conn, cliente, eid)
             
             # 2. Obtener saldo actual y techo de deuda del cliente para validar límite
-            cli = conn.execute("SELECT nombre, techo_deuda, saldo_actual FROM clientes WHERE id = ?", (cid,)).fetchone()
+            cli = conn.execute("SELECT nombre, techo_deuda, saldo_actual FROM clientes WHERE id = ? AND empresa_id = ?", (cid, eid)).fetchone()
             if cli:
                 techo = float(cli["techo_deuda"])
                 saldo = float(cli["saldo_actual"])
             # 3. Aplicar descuento de stock FIFO y calcular costo de carne y logística
-            costo_carne, fracciones = fraccionar_lote_fifo(conn, kg)
+            costo_carne, fracciones = fraccionar_lote_fifo(conn, kg, eid)
             costo = sum(f["costo_logistica_porcion"] for f in fracciones)
             
             venta = round((kg * precio_por_kg) + costo, 2)
@@ -63,19 +65,19 @@ def api_remitos_endpoint():
                 cur = conn.execute(
                     """
                     INSERT INTO remitos_carga
-                        (fecha, cliente_id, tipo_corte, cantidad, pesos_piezas, kg, precio_por_kg, costo_total_logistica, precio_venta_total, plazo_cobro_dias, costo_carne, pagado)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                        (fecha, cliente_id, tipo_corte, cantidad, pesos_piezas, kg, precio_por_kg, costo_total_logistica, precio_venta_total, plazo_cobro_dias, costo_carne, pagado, empresa_id, sucursal_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                     """,
-                    (fecha, cid, tipo_corte, cantidad, pesos_json, kg, precio_por_kg, costo, venta, plazo, costo_carne),
+                    (fecha, cid, tipo_corte, cantidad, pesos_json, kg, precio_por_kg, costo, venta, plazo, costo_carne, eid, sid),
                 )
             else:
                 cur = conn.execute(
                     """
                     INSERT INTO remitos_carga
-                        (cliente_id, tipo_corte, cantidad, pesos_piezas, kg, precio_por_kg, costo_total_logistica, precio_venta_total, plazo_cobro_dias, costo_carne, pagado)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+                        (cliente_id, tipo_corte, cantidad, pesos_piezas, kg, precio_por_kg, costo_total_logistica, precio_venta_total, plazo_cobro_dias, costo_carne, pagado, empresa_id, sucursal_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)
                     """,
-                    (cid, tipo_corte, cantidad, pesos_json, kg, precio_por_kg, costo, venta, plazo, costo_carne),
+                    (cid, tipo_corte, cantidad, pesos_json, kg, precio_por_kg, costo, venta, plazo, costo_carne, eid, sid),
                 )
             rid = cur.lastrowid
             
@@ -83,10 +85,10 @@ def api_remitos_endpoint():
             for frac in fracciones:
                 conn.execute(
                     """
-                    INSERT INTO remitos_fracciones (remito_id, lote_id, kg_descontados, costo_porcion, costo_logistica_porcion)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO remitos_fracciones (remito_id, lote_id, kg_descontados, costo_porcion, costo_logistica_porcion, empresa_id, sucursal_id)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (rid, frac["lote_id"], frac["kg_descontados"], frac["costo_porcion"], frac["costo_logistica_porcion"])
+                    (rid, frac["lote_id"], frac["kg_descontados"], frac["costo_porcion"], frac["costo_logistica_porcion"], eid, sid)
                 )
                 
             # 6. Recalcular el saldo actual de deuda del cliente
@@ -103,8 +105,9 @@ def api_remitos_endpoint():
 
 @api_bp.route("/bulk", methods=["GET", "POST"])
 def api_bulk_endpoint():
+    eid = current_empresa_id()
     if request.method == "GET":
-        return jsonify(list_bulk_lots())
+        return jsonify(list_bulk_lots(eid))
 
     d = request.get_json(silent=True) or {}
     try:
@@ -119,9 +122,10 @@ def api_bulk_endpoint():
         return jsonify({"error": str(e)}), 400
 
     try:
+        sid = current_sucursal_id()
         lote_id = registrar_lote_bulk(
             kg_totales, costo_total_bulk, costo_reparto, fecha,
-            numero_lote, fecha_vencimiento, proveedor
+            numero_lote, fecha_vencimiento, proveedor, eid, sid
         )
         return jsonify({
             "id": lote_id,
@@ -142,8 +146,9 @@ def api_eliminar_bulk_endpoint(lid: int):
     if guard:
         return guard
     try:
+        eid = current_empresa_id()
         notify_tenant_refresh_from_request("delete_bulk")
-        result = eliminar_lote_bulk(lid)
+        result = eliminar_lote_bulk(lid, eid)
         log_audit(
             "DELETE",
             entidad="compras_bulk",
@@ -206,15 +211,16 @@ def api_remito_reset_pago_endpoint(rid: int):
         if guard:
             return guard
         from app.services.clientes import recalcular_saldo_cliente
+        eid = current_empresa_id()
         with get_db() as conn:
-            row = conn.execute("SELECT cliente_id FROM remitos_carga WHERE id = ?", (rid,)).fetchone()
+            row = conn.execute("SELECT cliente_id FROM remitos_carga WHERE id = ? AND empresa_id = ?", (rid, eid)).fetchone()
             if not row:
                 raise ValueError("Remito no encontrado")
             cliente_id = row["cliente_id"]
             
             conn.execute(
-                "UPDATE remitos_carga SET monto_pagado = 0.0, pagado = 0 WHERE id = ?",
-                (rid,)
+                "UPDATE remitos_carga SET monto_pagado = 0.0, pagado = 0 WHERE id = ? AND empresa_id = ?",
+                (rid, eid)
             )
             if cliente_id:
                 recalcular_saldo_cliente(conn, cliente_id)

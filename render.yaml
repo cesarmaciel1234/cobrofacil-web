@@ -28,6 +28,10 @@ services:
         generateValue: true
       - key: MT_API_KEY
         generateValue: true
+      - key: JWT_SECRET_KEY
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        value: https://repartofacil.onrender.com,https://repartofacil-web.onrender.com
       - key: AUDIT_DELETE_PASSWORD
         generateValue: true
       - key: SESSION_COOKIE_SECURE

@@ -1,6 +1,17 @@
+from flask import has_request_context, session, request
 from app.database import get_db
 from app.services.remitos import _estado_cobro
-from app.utils import pesos_piezas_from_json
+from app.utils import pesos_piezas_from_json, current_empresa_id, current_sucursal_id
+
+
+def _current_empresa_id(empresa_id=None):
+    if empresa_id is not None:
+        return int(empresa_id)
+    return current_empresa_id()
+
+
+def _current_sucursal_id(sucursal_id=None):
+    return current_sucursal_id(sucursal_id)
 
 # ==============================================================================
 # 🕵️ EL EXPERTO EN CLIENTES (clientes.py)
@@ -23,7 +34,9 @@ def registrar_cliente(
     cuit: str = None,
     direccion: str = None,
     email: str = None,
-    saldo_inicial: float = 0.0
+    saldo_inicial: float = 0.0,
+    empresa_id: int = None,
+    sucursal_id: int = None,
 ) -> int:
     nombre = nombre.strip()
     # 1. El experto es estricto: ¡No puedes abrir una cuenta sin decir tu nombre!
@@ -38,34 +51,39 @@ def registrar_cliente(
         raise ValueError("Scoring inválido. Debe ser A, B, C o D")
 
     saldo_inicial = float(saldo_inicial)
+    eid = _current_empresa_id(empresa_id)
+    sid = _current_sucursal_id(sucursal_id)
 
     # 3. Va a la bóveda y anota al cliente nuevo en el cajón de "clientes"
-    with get_db() as conn:
+    with get_db(eid) as conn:
+        dup = conn.execute("SELECT id FROM clientes WHERE LOWER(nombre) = LOWER(?) AND empresa_id = ?", (nombre, eid)).fetchone()
+        if dup:
+            raise ValueError("Ya existe otro cliente con este nombre")
         cur = conn.execute(
             """
-            INSERT INTO clientes (nombre, scoring, techo_deuda, saldo_actual, saldo_inicial, telefono, cuit, direccion, email)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO clientes (nombre, scoring, techo_deuda, saldo_actual, saldo_inicial, telefono, cuit, direccion, email, empresa_id, sucursal_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (nombre, scoring, techo_deuda, saldo_inicial, saldo_inicial, telefono, cuit, direccion, email)
+            (nombre, scoring, techo_deuda, saldo_inicial, saldo_inicial, telefono, cuit, direccion, email, eid, sid)
         )
         cliente_id = cur.lastrowid
         
     # 4. Le devuelve al Mozo el "número de cliente" para que le entregue su tarjeta
     return cliente_id
 
-def list_clientes(limit: int | None = None, offset: int = 0, *, solo_con_saldo: bool = False, sucursal_id: int | str | None = None) -> list[dict]:
+def list_clientes(limit: int | None = None, offset: int = 0, *, solo_con_saldo: bool = False, sucursal_id: int | str | None = None, empresa_id: int | None = None) -> list[dict]:
     import datetime
     conds = []
     params = []
+    eid = _current_empresa_id(empresa_id)
+    conds.append("c.empresa_id = ?")
+    params.append(eid)
     if solo_con_saldo:
         conds.append("c.saldo_actual > 0")
-    if sucursal_id not in (None, "", "null", "all", "Todas", "todas"):
-        try:
-            sid_int = int(sucursal_id)
-            conds.append("c.sucursal_id = ?")
-            params.append(sid_int)
-        except (ValueError, TypeError):
-            pass
+    sid = _current_sucursal_id(sucursal_id)
+    if sid:
+        conds.append("c.sucursal_id = ?")
+        params.append(sid)
     where_clause = f"WHERE {' AND '.join(conds)}" if conds else ""
     limit_clause = ""
     if limit is not None:
@@ -203,10 +221,11 @@ def recalcular_saldo_cliente(conn, cliente_id: int) -> float:
     return nuevo_saldo
 
 def get_cliente_detalle(cliente_id: int) -> dict:
+    eid = _current_empresa_id()
     with get_db() as conn:
         cli = conn.execute(
-            "SELECT id, nombre, scoring, techo_deuda, saldo_actual, saldo_inicial, telefono, cuit, direccion, email, created_at FROM clientes WHERE id = ?",
-            (cliente_id,)
+            "SELECT id, nombre, scoring, techo_deuda, saldo_actual, saldo_inicial, telefono, cuit, direccion, email, created_at FROM clientes WHERE id = ? AND empresa_id = ?",
+            (cliente_id, eid)
         ).fetchone()
         
         if not cli:
@@ -218,15 +237,15 @@ def get_cliente_detalle(cliente_id: int) -> dict:
             """
             SELECT id, fecha, tipo_corte, cantidad, pesos_piezas, kg, precio_por_kg, costo_total_logistica, precio_venta_total, plazo_cobro_dias, costo_carne, pagado, COALESCE(monto_pagado, 0) AS monto_pagado, created_at
             FROM remitos_carga
-            WHERE cliente_id = ?
+            WHERE cliente_id = ? AND empresa_id = ?
             ORDER BY id DESC
             """,
-            (cliente_id,)
+            (cliente_id, eid)
         ).fetchall()
         
         pagos = conn.execute(
-            "SELECT id, monto, fecha FROM pagos_clientes WHERE cliente_id = ? ORDER BY fecha DESC",
-            (cliente_id,)
+            "SELECT id, monto, fecha FROM pagos_clientes WHERE cliente_id = ? AND empresa_id = ? ORDER BY fecha DESC",
+            (cliente_id, eid)
         ).fetchall()
         
     list_rem = []
@@ -341,17 +360,19 @@ def registrar_pago_cliente_global(cliente_id: int, monto: float) -> dict:
         if not aplicaciones:
             raise ValueError("No se pudo aplicar el pago a ninguna factura pendiente")
 
+        eid = _current_empresa_id()
+        sid = _current_sucursal_id()
         # Insertar pago global
         cur_pago = conn.execute(
-            "INSERT INTO pagos_clientes (cliente_id, monto) VALUES (?, ?)",
-            (cliente_id, monto)
+            "INSERT INTO pagos_clientes (cliente_id, monto, empresa_id, sucursal_id) VALUES (?, ?, ?, ?)",
+            (cliente_id, monto, eid, sid)
         )
         pago_id = cur_pago.lastrowid
 
         for app in aplicaciones:
             conn.execute(
-                "INSERT INTO aplicacion_pagos (pago_id, remito_id, monto_aplicado) VALUES (?, ?, ?)",
-                (pago_id, app["remito_id"], app["monto"])
+                "INSERT INTO aplicacion_pagos (pago_id, remito_id, monto_aplicado, empresa_id, sucursal_id) VALUES (?, ?, ?, ?, ?)",
+                (pago_id, app["remito_id"], app["monto"], eid, sid)
             )
 
         conn.execute(
@@ -374,23 +395,25 @@ def registrar_pago_cliente_global(cliente_id: int, monto: float) -> dict:
     }
 
 
-def buscar_o_crear_cliente(conn, nombre: str) -> int:
+def buscar_o_crear_cliente(conn, nombre: str, empresa_id: int = None, sucursal_id: int = None) -> int:
     """
-    Busca un cliente por nombre de forma insensible a mayúsculas/minúsculas.
+    Busca un cliente por nombre de forma insensible a mayúsculas/minúsculas dentro de la empresa.
     Si no existe, lo crea con un límite de deuda por defecto de $500,000.
     """
     nombre_clean = nombre.strip()
+    eid = _current_empresa_id(empresa_id)
+    sid = _current_sucursal_id(sucursal_id)
     row = conn.execute(
-        "SELECT id FROM clientes WHERE LOWER(nombre) = LOWER(?)",
-        (nombre_clean,)
+        "SELECT id FROM clientes WHERE LOWER(nombre) = LOWER(?) AND (empresa_id = ? OR empresa_id = 1)",
+        (nombre_clean, eid)
     ).fetchone()
     
     if row:
         return int(row["id"])
         
     cur = conn.execute(
-        "INSERT INTO clientes (nombre, scoring, techo_deuda, saldo_actual) VALUES (?, 'A', 500000.0, 0)",
-        (nombre_clean,)
+        "INSERT INTO clientes (nombre, scoring, techo_deuda, saldo_actual, empresa_id, sucursal_id) VALUES (?, 'A', 500000.0, 0, ?, ?)",
+        (nombre_clean, eid, sid)
     )
     return cur.lastrowid
 
@@ -531,8 +554,9 @@ def actualizar_cliente(
     if saldo_inicial < 0:
         raise ValueError("El saldo inicial debe ser mayor o igual a 0")
 
-    with get_db() as conn:
-        dup = conn.execute("SELECT id FROM clientes WHERE nombre = ? AND id != ?", (nombre, cliente_id)).fetchone()
+    eid = _current_empresa_id()
+    with get_db(eid) as conn:
+        dup = conn.execute("SELECT id FROM clientes WHERE LOWER(nombre) = LOWER(?) AND id != ? AND empresa_id = ?", (nombre, cliente_id, eid)).fetchone()
         if dup:
             raise ValueError("Ya existe otro cliente con este nombre")
 
@@ -541,15 +565,16 @@ def actualizar_cliente(
             UPDATE clientes
             SET nombre = ?, scoring = ?, techo_deuda = ?, saldo_inicial = ?,
                 telefono = ?, cuit = ?, direccion = ?, email = ?
-            WHERE id = ?
+            WHERE id = ? AND empresa_id = ?
             """,
-            (nombre, scoring, techo_deuda, saldo_inicial, telefono, cuit, direccion, email, cliente_id)
+            (nombre, scoring, techo_deuda, saldo_inicial, telefono, cuit, direccion, email, cliente_id, eid)
         )
         recalcular_saldo_cliente(conn, cliente_id)
 
 def eliminar_pago_cliente(pago_id: int):
+    eid = _current_empresa_id()
     with get_db() as conn:
-        row = conn.execute("SELECT cliente_id FROM pagos_clientes WHERE id = ?", (pago_id,)).fetchone()
+        row = conn.execute("SELECT cliente_id FROM pagos_clientes WHERE id = ? AND empresa_id = ?", (pago_id, eid)).fetchone()
         if not row:
             raise ValueError("Pago no encontrado")
         cliente_id = row["cliente_id"]
@@ -560,14 +585,14 @@ def eliminar_pago_cliente(pago_id: int):
             remito_id = app["remito_id"]
             monto_aplicado = app["monto_aplicado"]
             conn.execute(
-                "UPDATE remitos_carga SET monto_pagado = COALESCE(monto_pagado, 0) - ?, pagado = 0 WHERE id = ?",
-                (monto_aplicado, remito_id)
+                "UPDATE remitos_carga SET monto_pagado = COALESCE(monto_pagado, 0) - ?, pagado = 0 WHERE id = ? AND empresa_id = ?",
+                (monto_aplicado, remito_id, eid)
             )
             # Asegurar que no quede negativo por errores de redondeo
-            conn.execute("UPDATE remitos_carga SET monto_pagado = 0 WHERE monto_pagado < 0 AND id = ?", (remito_id,))
+            conn.execute("UPDATE remitos_carga SET monto_pagado = 0 WHERE monto_pagado < 0 AND id = ? AND empresa_id = ?", (remito_id, eid))
 
-        # Eliminar el pago (sus aplicaciones se borran por CASCADE en BD, pero lo hacemos explícito si es necesario, o lo asume)
-        conn.execute("DELETE FROM pagos_clientes WHERE id = ?", (pago_id,))
+        # Eliminar el pago
+        conn.execute("DELETE FROM pagos_clientes WHERE id = ? AND empresa_id = ?", (pago_id, eid))
         
         recalcular_saldo_cliente(conn, cliente_id)
 

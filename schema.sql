@@ -2,7 +2,9 @@
 
 CREATE TABLE IF NOT EXISTS entidades_bancarias (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL UNIQUE,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
+    nombre TEXT NOT NULL,
     limite REAL NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now', 'localtime'))
 );
@@ -10,6 +12,8 @@ CREATE TABLE IF NOT EXISTS entidades_bancarias (
 CREATE TABLE IF NOT EXISTS operaciones_financieras (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     alias TEXT NOT NULL,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
     tipo TEXT NOT NULL DEFAULT 'otro',
     recibido REAL NOT NULL CHECK(recibido > 0),
     pagar REAL NOT NULL CHECK(pagar >= recibido),
@@ -27,6 +31,8 @@ CREATE TABLE IF NOT EXISTS operaciones_financieras (
 
 CREATE TABLE IF NOT EXISTS pagos_cuotas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
     operacion_id INTEGER NOT NULL,
     numero_cuota INTEGER NOT NULL,
     monto_cuota_esperado REAL NOT NULL,
@@ -39,6 +45,8 @@ CREATE TABLE IF NOT EXISTS pagos_cuotas (
 
 CREATE TABLE IF NOT EXISTS compras_bulk (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
     fecha TEXT NOT NULL DEFAULT (date('now', 'localtime')),
     kg_totales REAL NOT NULL CHECK(kg_totales > 0),
     kg_remanentes REAL NOT NULL CHECK(kg_remanentes >= 0),
@@ -52,7 +60,9 @@ CREATE TABLE IF NOT EXISTS compras_bulk (
 
 CREATE TABLE IF NOT EXISTS clientes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    nombre TEXT NOT NULL UNIQUE,
+    nombre TEXT NOT NULL,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
     scoring TEXT NOT NULL CHECK(scoring IN ('A', 'B', 'C', 'D')) DEFAULT 'A',
     techo_deuda REAL NOT NULL DEFAULT 500000,
     saldo_actual REAL NOT NULL DEFAULT 0,
@@ -70,18 +80,19 @@ CREATE TABLE IF NOT EXISTS clientes (
     tipo_cliente TEXT,
     estado_cuenta TEXT,
     pos_actualizado_en TEXT,
-    sucursal_id INTEGER,
     sucursal_nombre TEXT,
     plazo_dias INTEGER
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_sucursal_uid
-    ON clientes(COALESCE(sucursal_id, 0), pos_uid)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_empresa_pos_uid
+    ON clientes(empresa_id, COALESCE(sucursal_id, 0), pos_uid)
     WHERE pos_uid IS NOT NULL AND pos_uid <> '';
 
 CREATE TABLE IF NOT EXISTS remitos_carga (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     fecha TEXT NOT NULL DEFAULT (date('now', 'localtime')),
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
     cliente_id INTEGER,
     tipo_corte TEXT NOT NULL DEFAULT '',
     cantidad INTEGER NOT NULL DEFAULT 0,
@@ -109,6 +120,8 @@ CREATE TABLE IF NOT EXISTS perdidas_acumuladas (
 
 CREATE TABLE IF NOT EXISTS remitos_fracciones (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
     remito_id INTEGER NOT NULL,
     lote_id INTEGER NOT NULL,
     kg_descontados REAL NOT NULL CHECK(kg_descontados > 0),
@@ -136,6 +149,7 @@ CREATE TABLE IF NOT EXISTS auditoria_operaciones (
 
 CREATE TABLE IF NOT EXISTS pagos_clientes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
     cliente_id INTEGER NOT NULL,
     monto REAL NOT NULL CHECK(monto > 0),
     fecha TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
@@ -146,12 +160,14 @@ CREATE TABLE IF NOT EXISTS pagos_clientes (
     FOREIGN KEY (cliente_id) REFERENCES clientes(id)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_pagos_pos
-    ON pagos_clientes(COALESCE(sucursal_id, 0), pos_pago_id)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_pagos_empresa_pos
+    ON pagos_clientes(empresa_id, COALESCE(sucursal_id, 0), pos_pago_id)
     WHERE pos_pago_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS aplicacion_pagos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    empresa_id INTEGER NOT NULL DEFAULT 1,
+    sucursal_id INTEGER,
     pago_id INTEGER NOT NULL,
     remito_id INTEGER NOT NULL,
     monto_aplicado REAL NOT NULL CHECK(monto_aplicado > 0),
@@ -213,4 +229,22 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_firma
     ON pos_base(firma_unica);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_base_parte
     ON pos_base(COALESCE(sucursal_id, 0), tabla, parte);
+
+-- Usuarios de tienda y repartidores unificados (RepartoFacil)
+CREATE TABLE IF NOT EXISTS local_users (
+    id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT,
+    display_name TEXT,
+    role TEXT NOT NULL DEFAULT 'Driver',
+    is_anonymous TEXT NOT NULL DEFAULT 'true',
+    created_at TEXT DEFAULT (datetime('now', 'localtime'))
+);
+
+CREATE TABLE IF NOT EXISTS login_throttles (
+    account_key TEXT PRIMARY KEY,
+    attempts INTEGER NOT NULL,
+    expires_at TEXT NOT NULL
+);
+
 

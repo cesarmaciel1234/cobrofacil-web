@@ -251,42 +251,15 @@ def get_db(empresa_id=None):
 
             cur = conn.cursor()
             empresa_num = int(empresa_id or 0)
-            if empresa_num in _schemas_listos:
-                esquema = "public" if empresa_num in (0, 1) else f"empresa_{empresa_num}, public"
-                cur.execute(f"SET search_path TO {esquema}")
-            elif empresa_id == 0 or empresa_id == 1:
-                cur.execute("SET search_path TO public")
-                if empresa_id == 1 and table_exists(wrapper, "clientes"):
-                    try:
-                        ensure_tenant_migrations(wrapper)
-                        _schemas_listos.add(empresa_num)
-                    except Exception as e:
-                        print(f"Error en migraciones del tenant {empresa_id}: {e}")
-                else:
+            # Aislamiento multi-tenant estricto en public ("una sola bolsa con etiqueta"):
+            # Todas las tablas residen en public, filtradas por empresa_id y sucursal_id.
+            cur.execute("SET search_path TO public")
+            if empresa_num not in _schemas_listos:
+                try:
+                    ensure_tenant_migrations(wrapper)
                     _schemas_listos.add(empresa_num)
-            elif empresa_id > 1:
-                schema_name = f"empresa_{empresa_id}"
-                cur.execute("SELECT 1 FROM information_schema.tables WHERE table_schema = %s AND table_name = 'clientes'", (schema_name,))
-                tables_exist = cur.fetchone() is not None
-                
-                if not tables_exist:
-                    cur.execute(f"CREATE SCHEMA IF NOT EXISTS {schema_name}")
-                    conn.commit()
-                    cur.execute(f"SET search_path TO {schema_name}, public")
-                    # Initialize tables in this new schema
-                    with open(Config.SCHEMA_PATH, encoding="utf-8") as f:
-                        sql = f.read()
-                    wrapper.executescript(sql)
-                    _run_migrations(wrapper)
-                    conn.commit()
-                    _schemas_listos.add(empresa_num)
-                else:
-                    cur.execute(f"SET search_path TO {schema_name}, public")
-                    try:
-                        ensure_tenant_migrations(wrapper)
-                        _schemas_listos.add(empresa_num)
-                    except Exception as e:
-                        print(f"Error en migraciones del tenant {empresa_id}: {e}")
+                except Exception as e:
+                    print(f"Error en migraciones del tenant {empresa_id}: {e}")
 
             yield wrapper
             conn.commit()
@@ -607,6 +580,15 @@ def _run_migrations(conn):
         conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_pos_novedad_empresa ON pos_novedad(empresa_id, tabla, actualizado_en)"
         )
+
+    for table_name in ("clientes", "remitos_carga", "pagos_clientes", "ventas_mostrador", "operaciones_financieras", "local_users"):
+        if _table_exists(conn, table_name):
+            cols_tbl = _pg_column_names(conn, table_name) if is_pg else {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})")}
+            if "empresa_id" not in cols_tbl:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN empresa_id INTEGER NOT NULL DEFAULT 1")
+            if "sucursal_id" not in cols_tbl:
+                conn.execute(f"ALTER TABLE {table_name} ADD COLUMN sucursal_id INTEGER")
+            conn.execute(f"CREATE INDEX IF NOT EXISTS idx_{table_name}_emp_suc ON {table_name}(empresa_id, sucursal_id)")
     conn.executescript(
         """
         CREATE TABLE IF NOT EXISTS pagos_clientes (
@@ -701,9 +683,10 @@ def _run_migrations(conn):
                 final_type = pg_type if is_pg else col_type
                 conn.execute(f"ALTER TABLE clientes ADD COLUMN {name} {final_type}")
         conn.execute("DROP INDEX IF EXISTS idx_clientes_pos_uid")
+        conn.execute("DROP INDEX IF EXISTS idx_clientes_sucursal_uid")
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_sucursal_uid "
-            "ON clientes(COALESCE(sucursal_id, 0), pos_uid) "
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_clientes_empresa_pos_uid "
+            "ON clientes(empresa_id, COALESCE(sucursal_id, 0), pos_uid) "
             "WHERE pos_uid IS NOT NULL AND pos_uid <> ''"
         )
 
@@ -824,6 +807,8 @@ def _run_migrations(conn):
             tipo_pago TEXT NOT NULL CHECK(tipo_pago IN ('CONTADO', 'FIADO')) DEFAULT 'CONTADO',
             fecha TEXT NOT NULL DEFAULT (date('now', 'localtime')),
             created_at TEXT DEFAULT (datetime('now', 'localtime')),
+            empresa_id INTEGER NOT NULL DEFAULT 1,
+            sucursal_id INTEGER,
             FOREIGN KEY (cliente_id) REFERENCES clientes(id)
         );
         """
@@ -842,6 +827,10 @@ def _run_migrations(conn):
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_ventas_offline_id "
                 "ON ventas_mostrador(offline_id) WHERE offline_id IS NOT NULL"
             )
+        if "empresa_id" not in cols:
+            conn.execute("ALTER TABLE ventas_mostrador ADD COLUMN empresa_id INTEGER NOT NULL DEFAULT 1")
+        if "sucursal_id" not in cols:
+            conn.execute("ALTER TABLE ventas_mostrador ADD COLUMN sucursal_id INTEGER")
 
     if _table_exists(conn, "usuarios"):
         if is_pg:
@@ -1024,9 +1013,10 @@ def _ensure_performance_indexes(conn) -> None:
         }.items():
             if name not in pago_existentes:
                 conn.execute(f"ALTER TABLE pagos_clientes ADD COLUMN {name} {col_type}")
+        conn.execute("DROP INDEX IF EXISTS idx_pagos_pos")
         conn.execute(
-            "CREATE UNIQUE INDEX IF NOT EXISTS idx_pagos_pos "
-            "ON pagos_clientes(COALESCE(sucursal_id, 0), pos_pago_id) "
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_pagos_empresa_pos "
+            "ON pagos_clientes(empresa_id, COALESCE(sucursal_id, 0), pos_pago_id) "
             "WHERE pos_pago_id IS NOT NULL"
         )
     if _table_exists(conn, "aplicacion_pagos"):

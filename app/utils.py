@@ -234,3 +234,54 @@ def parse_operacion_payload(d: dict, sync_mode: bool = False) -> dict[str, Any]:
         "fecha_inicio": d.get("fecha_inicio") or None,
         "impuesto_cheque": impuesto_cheque,
     }
+
+
+def current_empresa_id() -> int:
+    """Retorna el ID de empresa para el request actual (multi-tenant isolation)."""
+    try:
+        from flask import g, has_request_context, session, request
+        if has_request_context():
+            if getattr(g, "empresa_id", None) is not None:
+                return int(g.empresa_id)
+            sid = session.get("empresa_id")
+            if sid is not None and str(sid).isdigit():
+                return int(sid)
+            hdr = request.headers.get("X-Empresa-ID") or request.headers.get("X-Company-ID")
+            if hdr and hdr.isdigit():
+                return int(hdr)
+            arg = request.args.get("empresa_id") or request.args.get("company_id")
+            if arg and arg.isdigit():
+                return int(arg)
+    except Exception:
+        pass
+    return 1
+
+
+def current_sucursal_id(sucursal_id=None) -> Optional[int]:
+    """Retorna el ID de sucursal para el request actual."""
+    if sucursal_id not in (None, "", "null", "all", "Todas", "todas"):
+        try:
+            return int(sucursal_id)
+        except (ValueError, TypeError):
+            pass
+    try:
+        from flask import g, has_request_context, session, request
+        if has_request_context():
+            if getattr(g, "sucursal_id", None) is not None:
+                return int(g.sucursal_id)
+            sid = session.get("sucursal_id")
+            if sid not in (None, "", "null"):
+                try:
+                    return int(sid)
+                except (ValueError, TypeError):
+                    pass
+            hdr = request.headers.get("X-Sucursal-ID")
+            if hdr and hdr.isdigit():
+                return int(hdr)
+            arg = request.args.get("sucursal_id")
+            if arg and arg.isdigit():
+                return int(arg)
+    except Exception:
+        pass
+    return None
+

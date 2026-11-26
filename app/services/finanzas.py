@@ -1,7 +1,7 @@
 from typing import Any, Optional
 
 from app.database import get_db
-from app.utils import fmt_plazo_dias
+from app.utils import fmt_plazo_dias, current_empresa_id
 from app.services.pagos import calc_estado_vencimiento, calc_plan_cuotas
 
 _OPERACIONES_SQL = """
@@ -11,28 +11,31 @@ _OPERACIONES_SQL = """
            kg, precio_kg, plazo_dias, created_at,
            COALESCE(impuesto_cheque, 0) AS impuesto_cheque
     FROM operaciones_financieras
+    WHERE empresa_id = ?
 """
 
 
-def _get_operaciones_rows(conn=None) -> list[dict[str, Any]]:
+def _get_operaciones_rows(conn=None, empresa_id=None) -> list[dict[str, Any]]:
     """Carga operaciones_financieras una sola vez por request HTTP."""
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     try:
         from flask import g, has_request_context
 
-        if has_request_context() and getattr(g, "_operaciones_fin_rows", None) is not None:
-            return g._operaciones_fin_rows
+        cache_key = f"_operaciones_fin_rows_{eid}"
+        if has_request_context() and getattr(g, cache_key, None) is not None:
+            return getattr(g, cache_key)
     except ImportError:
         has_request_context = None
 
     if conn is not None:
-        rows = [dict(row) for row in conn.execute(_OPERACIONES_SQL).fetchall()]
+        rows = [dict(row) for row in conn.execute(_OPERACIONES_SQL, (eid,)).fetchall()]
     else:
         with get_db() as db_conn:
-            rows = [dict(row) for row in db_conn.execute(_OPERACIONES_SQL).fetchall()]
+            rows = [dict(row) for row in db_conn.execute(_OPERACIONES_SQL, (eid,)).fetchall()]
 
     try:
         if has_request_context and has_request_context():
-            g._operaciones_fin_rows = rows
+            setattr(g, f"_operaciones_fin_rows_{eid}", rows)
     except ImportError:
         pass
     return rows
@@ -146,7 +149,8 @@ def _deuda_pendiente_total(conn) -> tuple[float, float, float]:
             fin += saldo
     return total, prov, fin
 
-def panel_activo() -> dict[str, Any]:
+def panel_activo(empresa_id: int = None) -> dict[str, Any]:
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         rem = conn.execute(
             """
@@ -159,15 +163,18 @@ def panel_activo() -> dict[str, Any]:
                 COUNT(*) AS n,
                 COALESCE(AVG(plazo_cobro_dias), NULL) AS avg_cobro
             FROM remitos_carga
-            """
+            WHERE empresa_id = ?
+            """,
+            (eid,),
         ).fetchone()
         _, deuda_comercial, deuda_real = _deuda_pendiente_total(conn)
         _, deuda_neta, interes_neto = _desglose_deuda_financiera(conn)
         pago = conn.execute(
             """
             SELECT AVG(meses * 30.0) AS avg FROM operaciones_financieras
-            WHERE LOWER(tipo) != 'proveedor'
-            """
+            WHERE LOWER(tipo) != 'proveedor' AND empresa_id = ?
+            """,
+            (eid,),
         ).fetchone()
         
         # Consultas de inventario y caja para el Balance Dinámico
@@ -177,15 +184,18 @@ def panel_activo() -> dict[str, Any]:
                 COALESCE(SUM(kg_remanentes), 0) AS stock_kg,
                 COALESCE(SUM(kg_remanentes * costo_total_bulk / kg_totales), 0) AS stock_valorizado
             FROM compras_bulk
-            """
+            WHERE empresa_id = ?
+            """,
+            (eid,),
         ).fetchone()
         
-        bancos = conn.execute("SELECT COALESCE(SUM(limite), 0) AS total FROM entidades_bancarias").fetchone()
+        bancos = conn.execute("SELECT COALESCE(SUM(limite), 0) AS total FROM entidades_bancarias WHERE empresa_id = ?", (eid,)).fetchone()
         ops_row = conn.execute(
-            "SELECT COALESCE(SUM(recibido), 0) AS total FROM operaciones_financieras WHERE LOWER(tipo) != 'proveedor'"
+            "SELECT COALESCE(SUM(recibido), 0) AS total FROM operaciones_financieras WHERE LOWER(tipo) != 'proveedor' AND empresa_id = ?",
+            (eid,),
         ).fetchone()
-        pagos_row = conn.execute("SELECT COALESCE(SUM(monto_pagado), 0) AS total FROM pagos_cuotas").fetchone()
-        bulk_costo_row = conn.execute("SELECT COALESCE(SUM(costo_total_bulk), 0) AS total FROM compras_bulk").fetchone()
+        pagos_row = conn.execute("SELECT COALESCE(SUM(monto_pagado), 0) AS total FROM pagos_cuotas WHERE empresa_id = ?", (eid,)).fetchone()
+        bulk_costo_row = conn.execute("SELECT COALESCE(SUM(costo_total_bulk), 0) AS total FROM compras_bulk WHERE empresa_id = ?", (eid,)).fetchone()
 
     activo_costo = float(rem["costo_pendiente"])
     ganancia = float(rem["ganancia_total"])
@@ -265,7 +275,8 @@ def flujo_stock() -> dict[str, Any]:
 def indice_respiracion() -> dict[str, Any]:
     return flujo_stock()
 
-def proyeccion_liberacion(excedente_mensual_manual: Optional[float] = None) -> dict[str, Any]:
+def proyeccion_liberacion(excedente_mensual_manual: Optional[float] = None, empresa_id: int = None) -> dict[str, Any]:
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         _, _, deuda_real = _deuda_pendiente_total(conn)
         deuda_total = deuda_real
@@ -275,7 +286,9 @@ def proyeccion_liberacion(excedente_mensual_manual: Optional[float] = None) -> d
                 COALESCE(SUM(precio_venta_total - costo_total_logistica - costo_carne), 0) AS margen,
                 COALESCE(AVG(plazo_cobro_dias), 30) AS avg_cobro
             FROM remitos_carga
-            """
+            WHERE empresa_id = ?
+            """,
+            (eid,),
         ).fetchone()
         fin_row = conn.execute(
             """
@@ -283,7 +296,9 @@ def proyeccion_liberacion(excedente_mensual_manual: Optional[float] = None) -> d
                 CASE WHEN LOWER(tipo) = 'cheque' THEN 0 ELSE (pagar - recibido) / meses END
             ), 0) AS carga_mensual
             FROM operaciones_financieras
-            """
+            WHERE empresa_id = ?
+            """,
+            (eid,),
         ).fetchone()
     margen_bruto = float(rem_row["margen"])
     avg_cobro = max(float(rem_row["avg_cobro"]), 1.0)

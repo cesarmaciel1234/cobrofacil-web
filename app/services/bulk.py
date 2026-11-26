@@ -1,5 +1,6 @@
 from datetime import date
 from app.database import get_db
+from app.utils import current_empresa_id, current_sucursal_id
 
 def registrar_lote_bulk(
     kg_totales: float,
@@ -9,6 +10,8 @@ def registrar_lote_bulk(
     numero_lote: str = None,
     fecha_vencimiento: str = None,
     proveedor: str = None,
+    empresa_id: int = None,
+    sucursal_id: int = None,
 ) -> int:
     if kg_totales <= 0:
         raise ValueError("Los kilos totales deben ser mayores a 0")
@@ -20,11 +23,13 @@ def registrar_lote_bulk(
     if not fecha:
         fecha = date.today().isoformat()
         
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
+    sid = sucursal_id if sucursal_id is not None else current_sucursal_id()
     with get_db() as conn:
         cur = conn.execute(
             """
-            INSERT INTO compras_bulk (fecha, kg_totales, kg_remanentes, costo_total_bulk, costo_reparto, numero_lote, fecha_vencimiento, proveedor)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO compras_bulk (fecha, kg_totales, kg_remanentes, costo_total_bulk, costo_reparto, numero_lote, fecha_vencimiento, proveedor, empresa_id, sucursal_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 fecha,
@@ -35,19 +40,23 @@ def registrar_lote_bulk(
                 numero_lote.strip() if numero_lote else None,
                 fecha_vencimiento.strip() if fecha_vencimiento else None,
                 proveedor.strip() if proveedor else None,
+                eid,
+                sid,
             ),
         )
         lote_id = cur.lastrowid
     return lote_id
 
-def list_bulk_lots() -> list[dict]:
+def list_bulk_lots(empresa_id: int = None) -> list[dict]:
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         rows = conn.execute(
             """
             SELECT id, fecha, kg_totales, kg_remanentes, costo_total_bulk, costo_reparto,
                    numero_lote, fecha_vencimiento, proveedor, created_at
-            FROM compras_bulk ORDER BY id DESC
-            """
+            FROM compras_bulk WHERE empresa_id = ? ORDER BY id DESC
+            """,
+            (eid,),
         ).fetchall()
         
     out = []
@@ -70,12 +79,13 @@ def list_bulk_lots() -> list[dict]:
         })
     return out
 
-def eliminar_lote_bulk(lote_id: int) -> dict:
+def eliminar_lote_bulk(lote_id: int, empresa_id: int = None) -> dict:
     """Elimina un lote bulk sin ventas asociadas (carga errónea)."""
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         row = conn.execute(
-            "SELECT id, kg_totales, kg_remanentes, numero_lote FROM compras_bulk WHERE id = ?",
-            (lote_id,),
+            "SELECT id, kg_totales, kg_remanentes, numero_lote FROM compras_bulk WHERE id = ? AND empresa_id = ?",
+            (lote_id, eid),
         ).fetchone()
         if not row:
             raise ValueError("Lote no encontrado")
@@ -89,14 +99,14 @@ def eliminar_lote_bulk(lote_id: int) -> dict:
                 "No se puede eliminar: este lote ya tiene remitos de venta asociados. "
                 "Eliminá esos remitos primero."
             )
-        conn.execute("DELETE FROM compras_bulk WHERE id = ?", (lote_id,))
+        conn.execute("DELETE FROM compras_bulk WHERE id = ? AND empresa_id = ?", (lote_id, eid))
     return {
         "id": int(row["id"]),
         "kg_totales": float(row["kg_totales"]),
         "numero_lote": row["numero_lote"] or "",
     }
 
-def fraccionar_lote_fifo(conn, kg_venta: float) -> tuple[float, list[dict]]:
+def fraccionar_lote_fifo(conn, kg_venta: float, empresa_id: int = None) -> tuple[float, list[dict]]:
     """
     Descuenta kg_venta de los lotes de compras_bulk activos siguiendo la estrategia FIFO.
     Debe llamarse dentro de una transacción activa (usando la conexión `conn`).
@@ -105,8 +115,9 @@ def fraccionar_lote_fifo(conn, kg_venta: float) -> tuple[float, list[dict]]:
     if kg_venta <= 0:
         raise ValueError("Los kilos a fraccionar deben ser mayores a 0")
         
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     # Verificar stock total disponible
-    stock_row = conn.execute("SELECT COALESCE(SUM(kg_remanentes), 0) AS total FROM compras_bulk").fetchone()
+    stock_row = conn.execute("SELECT COALESCE(SUM(kg_remanentes), 0) AS total FROM compras_bulk WHERE empresa_id = ?", (eid,)).fetchone()
     stock_disponible = float(stock_row["total"])
     
     if stock_disponible < kg_venta:
@@ -117,9 +128,10 @@ def fraccionar_lote_fifo(conn, kg_venta: float) -> tuple[float, list[dict]]:
         """
         SELECT id, kg_remanentes, kg_totales, costo_total_bulk, costo_reparto
         FROM compras_bulk
-        WHERE kg_remanentes > 0
+        WHERE kg_remanentes > 0 AND empresa_id = ?
         ORDER BY id ASC
-        """
+        """,
+        (eid,)
     ).fetchall()
     
     restante = kg_venta

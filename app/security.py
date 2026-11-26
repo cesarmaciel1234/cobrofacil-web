@@ -193,11 +193,14 @@ def register_security(app):
     def _enforce_auth():
         if not auth_enabled():
             return None
+        if request.method == "OPTIONS":
+            return None
         path = request.path
         if path.startswith("/static/"):
             return None
         if (
             path in PUBLIC_PATHS 
+            or path.startswith("/api/auth/")
             or path.startswith("/api/repartofacil/") 
             or path.startswith("/api/sucursales/publicas/")
             or path.startswith("/api/pos/")
@@ -217,6 +220,7 @@ def register_security(app):
             return None
         if (
             not request.path.startswith("/api/")
+            or request.path.startswith("/api/auth/")
             or request.path.startswith("/api/repartofacil/")
             or request.path.startswith("/api/pos/")
         ):

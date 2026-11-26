@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask
+from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -31,6 +32,24 @@ def create_app():
 
     register_security(app)
 
+    cors_origins = [
+        "https://repartofacil.onrender.com",
+        "https://repartofacil-web.onrender.com",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ]
+    custom_cors = os.environ.get("CORS_ALLOWED_ORIGINS")
+    if custom_cors:
+        cors_origins.extend([o.strip() for o in custom_cors.split(",") if o.strip()])
+
+    CORS(
+        app,
+        resources={r"/api/*": {"origins": cors_origins}},
+        supports_credentials=True,
+        allow_headers=["Content-Type", "Authorization", "X-Empresa-ID", "X-Company-ID", "X-Sucursal-ID", "X-API-Key"],
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    )
+
     storage_uri = os.environ.get("REDIS_URL", "memory://")
     limiter = Limiter(
         get_remote_address,
@@ -55,10 +74,12 @@ def create_app():
 
     from app.routes.views import views_bp
     from app.routes.api import api_bp
+    from app.routes.api_auth import auth_bp
 
     app.register_blueprint(views_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(api_bp, url_prefix="/api/v1", name="api_v1")
+    app.register_blueprint(auth_bp)
 
     from app.services.nodo import arrancar
 

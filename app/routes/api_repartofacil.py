@@ -215,11 +215,17 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
             stock = float(fila[idx.get("stock", 0)] or 0.0) if "stock" in idx else 0.0
             mapa_productos[f"{nombre}_{codigo}"] = {"pos_base_id": pid, "stock": stock}
 
-        # Actualizar filas en pos_base
+        # Actualizar filas en pos_base y registrar novedad para el POS local
         partes = []
         with get_db(eid) as conn:
+            where_sql = "WHERE tabla = 'productos' AND empresa_id = %s"
+            params = [eid]
+            if sucursal_id:
+                where_sql += " AND (sucursal_id = %s OR sucursal_id IS NULL)"
+                params.append(sucursal_id)
             partes = conn.execute(
-                "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
+                f"SELECT id, columnas, filas, sucursal_id FROM pos_base {where_sql}",
+                tuple(params)
             ).fetchall()
 
         if not partes:
@@ -230,6 +236,7 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
             filas = parte["filas"] if isinstance(parte["filas"], list) else json.loads(parte["filas"])
             idx_p = {col: i for i, col in enumerate(cols)}
 
+            filas_modificadas = []
             actualizada = False
             for fila in filas:
                 nombre = str(fila[idx_p.get("nombre", 1)] or "").lower() if "nombre" in idx_p else ""
@@ -246,14 +253,26 @@ def _deducir_stock_items(items, empresa_id=None, sucursal_id=None):
                         stock_actual = float(fila[idx_p["stock"]] or 0.0)
                         fila[idx_p["stock"]] = max(0.0, stock_actual - cantidad)
                         actualizada = True
+                        filas_modificadas.append(fila)
                         break
 
             if actualizada:
+                ahora_iso = datetime.now(timezone.utc).isoformat()
                 with get_db(eid) as conn:
                     conn.execute(
                         "UPDATE pos_base SET filas = %s, actualizado_en = NOW() WHERE id = %s",
                         (json.dumps(filas), parte["id"])
                     )
+                    # Sincronización bidireccional: anotar en pos_novedad para que el POS local descargue el descuento
+                    try:
+                        from app.services.pos_base import _anotar_novedad
+                        p_sid = parte["sucursal_id"] or sucursal_id
+                        for f in filas_modificadas:
+                            f_id = str(f[idx_p.get("id", 0)] or "")
+                            _anotar_novedad(conn, p_sid, "productos", cols, f, f_id, False, ahora_iso, eid)
+                    except Exception as e_nov:
+                        print(f"[Stock] Advertencia al anotar novedad: {e_nov}")
+
                     if hasattr(conn, "commit"):
                         conn.commit()
 
@@ -329,8 +348,14 @@ def _restituir_stock_items(items, empresa_id=None, sucursal_id=None):
 
         partes = []
         with get_db(eid) as conn:
+            where_sql = "WHERE tabla = 'productos' AND empresa_id = %s"
+            params = [eid]
+            if sucursal_id:
+                where_sql += " AND (sucursal_id = %s OR sucursal_id IS NULL)"
+                params.append(sucursal_id)
             partes = conn.execute(
-                "SELECT id, columnas, filas FROM pos_base WHERE tabla = 'productos'"
+                f"SELECT id, columnas, filas, sucursal_id FROM pos_base {where_sql}",
+                tuple(params)
             ).fetchall()
 
         if not partes:
@@ -341,6 +366,7 @@ def _restituir_stock_items(items, empresa_id=None, sucursal_id=None):
             filas = parte["filas"] if isinstance(parte["filas"], list) else json.loads(parte["filas"])
             idx_p = {col: i for i, col in enumerate(cols)}
 
+            filas_modificadas = []
             actualizada = False
             for fila in filas:
                 nombre = str(fila[idx_p.get("nombre", 1)] or "").lower() if "nombre" in idx_p else ""
@@ -357,14 +383,26 @@ def _restituir_stock_items(items, empresa_id=None, sucursal_id=None):
                         stock_actual = float(fila[idx_p["stock"]] or 0.0)
                         fila[idx_p["stock"]] = stock_actual + cantidad
                         actualizada = True
+                        filas_modificadas.append(fila)
                         break
 
             if actualizada:
+                ahora_iso = datetime.now(timezone.utc).isoformat()
                 with get_db(eid) as conn:
                     conn.execute(
                         "UPDATE pos_base SET filas = %s, actualizado_en = NOW() WHERE id = %s",
                         (json.dumps(filas), parte["id"])
                     )
+                    # Sincronización bidireccional: anotar en pos_novedad para que el POS local restituya el stock
+                    try:
+                        from app.services.pos_base import _anotar_novedad
+                        p_sid = parte["sucursal_id"] or sucursal_id
+                        for f in filas_modificadas:
+                            f_id = str(f[idx_p.get("id", 0)] or "")
+                            _anotar_novedad(conn, p_sid, "productos", cols, f, f_id, False, ahora_iso, eid)
+                    except Exception as e_nov:
+                        print(f"[Stock] Advertencia al anotar novedad en restitución: {e_nov}")
+
                     if hasattr(conn, "commit"):
                         conn.commit()
 
@@ -571,7 +609,7 @@ def aceptar_repartofacil_pedido(order_id):
 
             # Deducción de stock (si hay items con stock)
             if validacion["items_con_stock"]:
-                _deducir_stock_items(validacion["items_con_stock"], empresa_id)
+                _deducir_stock_items(validacion["items_con_stock"], empresa_id, order_row.get("sucursal_id"))
 
             tipo_entrega = str(order_row.get("tipo_entrega") or "").strip().lower()
             es_retiro = tipo_entrega in ("pickup", "takeaway", "retiro", "tienda", "mostrador")
@@ -642,10 +680,10 @@ def aceptar_repartofacil_pedido(order_id):
                     tipo_str = "En Tienda" if str(order_row.get("tipo_entrega") or "").lower() in ("pickup", "takeaway", "retiro", "tienda") else "Delivery"
                     aux_conn.execute(
                         """
-                        INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at)
-                        VALUES (%s, %s, %s, 'CONTADO', %s, NOW())
+                        INSERT INTO ventas_mostrador (cliente_id, producto, monto, tipo_pago, fecha, created_at, empresa_id, sucursal_id)
+                        VALUES (%s, %s, %s, 'CONTADO', %s, NOW(), %s, %s)
                         """,
-                        (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:180]} (Web - {tipo_str})", total_val, fecha_hoy)
+                        (cli_id_val, f"Ticket #{ticket_id}: {summary_items[:180]} (Web - {tipo_str})", total_val, fecha_hoy, eid, p_sid)
                     )
                 except Exception as vm_err:
                     print(f"[VentasMostrador] Aviso no bloqueante al asentar venta web: {vm_err}")
@@ -699,7 +737,7 @@ def rechazar_repartofacil_pedido(order_id):
 
             # Si el pedido estaba confirmado con stock descontado, restituirlo a la tienda física
             if order_row and str(order_row.get("estado") or "").lower() in ("confirmed", "accepted"):
-                _restituir_stock_items(items_pedido, empresa_id)
+                _restituir_stock_items(items_pedido, empresa_id, order_row.get("sucursal_id"))
 
             update_sql = "UPDATE public.repartofacil_pedidos SET estado = 'rejected', updated_at = NOW() WHERE id = %s"
             conn.execute(update_sql, (order_id,))
@@ -745,8 +783,8 @@ def get_repartofacil_metricas_omnicanal():
 
             # 1. Ventas físicas en mostrador
             vm_row = conn.execute(
-                "SELECT COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cant FROM ventas_mostrador WHERE fecha = %s",
-                (fecha_hoy,)
+                "SELECT COALESCE(SUM(monto), 0) AS total, COUNT(*) AS cant FROM ventas_mostrador WHERE fecha = %s AND empresa_id = %s",
+                (fecha_hoy, empresa_id)
             ).fetchone()
             total_mostrador = float(vm_row["total"] or 0.0) if vm_row else 0.0
             cant_mostrador = int(vm_row["cant"] or 0) if vm_row else 0

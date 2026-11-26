@@ -750,52 +750,65 @@ def _filas_clientes(sucursal_id: int | str | None) -> tuple[list[str], list[list
     # Convivencia e-commerce y cartera física: integrar clientes de Reparto Fácil web SOLO si es consolidado o Tienda Web
     if sucursal_id is None or es_web:
         try:
-            from app.database import get_db
+            from app.database import get_db, is_postgres, table_exists
             from app.services.pos_base import _empresa_activa
             eid_actual = _empresa_activa()
             with get_db() as conn:
-                web_rows = conn.execute(
-                    """
-                    SELECT DISTINCT ON (LOWER(TRIM(cliente_nombre)))
-                        cliente_nombre, cliente_telefono, direccion_entrega, created_at
-                    FROM public.repartofacil_pedidos
-                    WHERE empresa_id = %s AND cliente_nombre IS NOT NULL AND cliente_nombre != ''
-                    ORDER BY LOWER(TRIM(cliente_nombre)), created_at DESC
-                    """,
-                    (eid_actual,)
-                ).fetchall()
-                
-                idx = _indice(columnas)
-                nom_idx = idx.get("nombre")
-                nombres_existentes = set()
-                if nom_idx is not None:
-                    for f in filas:
-                        if nom_idx < len(f) and f[nom_idx]:
-                            nombres_existentes.add(str(f[nom_idx]).strip().casefold())
-                
-                for wr in web_rows:
-                    c_nom = str(wr["cliente_nombre"] or "").strip()
-                    if not c_nom or c_nom.casefold() in nombres_existentes:
-                        continue
-                    nueva = [None] * len(columnas)
-                    for cname, cval in [
-                        ("id", f"web-{len(filas) + 1}"),
-                        ("nombre", c_nom),
-                        ("telefono", str(wr["cliente_telefono"] or "")),
-                        ("direccion", str(wr["direccion_entrega"] or "")),
-                        ("tipo_cliente", "Web"),
-                        ("deuda_actual", 0.0),
-                        ("limite_credito", 0.0),
-                        ("estado_cuenta", "activo"),
-                        ("fecha_registro", str(wr["created_at"] or "")[:19]),
-                    ]:
-                        pos = idx.get(cname)
-                        if pos is not None and pos < len(nueva):
-                            nueva[pos] = cval
-                    filas.append(nueva)
-                    nombres_existentes.add(c_nom.casefold())
+                if table_exists(conn, "repartofacil_pedidos"):
+                    if is_postgres():
+                        web_rows = conn.execute(
+                            """
+                            SELECT DISTINCT ON (LOWER(TRIM(cliente_nombre)))
+                                cliente_nombre, cliente_telefono, direccion_entrega, created_at
+                            FROM repartofacil_pedidos
+                            WHERE empresa_id = %s AND cliente_nombre IS NOT NULL AND cliente_nombre != ''
+                            ORDER BY LOWER(TRIM(cliente_nombre)), created_at DESC
+                            """,
+                            (eid_actual,)
+                        ).fetchall()
+                    else:
+                        web_rows = conn.execute(
+                            """
+                            SELECT cliente_nombre, cliente_telefono, direccion_entrega, created_at
+                            FROM repartofacil_pedidos
+                            WHERE empresa_id = ? AND cliente_nombre IS NOT NULL AND cliente_nombre != ''
+                            ORDER BY created_at DESC
+                            """,
+                            (eid_actual,)
+                        ).fetchall()
+                    
+                    idx = _indice(columnas)
+                    nom_idx = idx.get("nombre")
+                    nombres_existentes = set()
+                    if nom_idx is not None:
+                        for f in filas:
+                            if nom_idx < len(f) and f[nom_idx]:
+                                nombres_existentes.add(str(f[nom_idx]).strip().casefold())
+                    
+                    for wr in web_rows:
+                        c_nom = str(wr["cliente_nombre"] or "").strip()
+                        if not c_nom or c_nom.casefold() in nombres_existentes:
+                            continue
+                        nueva = [None] * len(columnas)
+                        for cname, cval in [
+                            ("id", f"web-{len(filas) + 1}"),
+                            ("nombre", c_nom),
+                            ("telefono", str(wr["cliente_telefono"] or "")),
+                            ("direccion", str(wr["direccion_entrega"] or "")),
+                            ("tipo_cliente", "Web"),
+                            ("deuda_actual", 0.0),
+                            ("limite_credito", 0.0),
+                            ("estado_cuenta", "activo"),
+                            ("fecha_registro", str(wr["created_at"] or "")[:19]),
+                        ]:
+                            pos = idx.get(cname)
+                            if pos is not None and pos < len(nueva):
+                                nueva[pos] = cval
+                        filas.append(nueva)
+                        nombres_existentes.add(c_nom.casefold())
         except Exception as e:
-            logger.warning("Error combinando clientes web en cartera: %s", e)
+            import logging
+            logging.getLogger(__name__).warning("Error combinando clientes web en cartera: %s", e)
 
     if filas:
         if sucursal_id is None:

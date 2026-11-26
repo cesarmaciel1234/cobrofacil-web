@@ -1,4 +1,5 @@
 from app.database import get_db
+from app.utils import current_empresa_id
 
 
 # ==============================================================================
@@ -23,9 +24,10 @@ def _estado_cobro(pagado: int, monto_pagado: float = 0) -> str:
 # El experto va a la Bóveda, saca la lista (SELECT), y con su calculadora
 # saca el "Margen Neto" (cuánta plata real nos quedó en el bolsillo).
 # ------------------------------------------------------------------------------
-def list_remitos(limit: int = 50, offset: int = 0) -> list[dict]:
+def list_remitos(limit: int = 50, offset: int = 0, empresa_id: int = None) -> list[dict]:
     limit = max(1, min(int(limit), 10_000))
     offset = max(0, int(offset))
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         # 1. Pide la lista a la Bóveda usando SQL
         rows = conn.execute(
@@ -35,9 +37,10 @@ def list_remitos(limit: int = 50, offset: int = 0) -> list[dict]:
                    r.plazo_cobro_dias, r.costo_carne, r.pagado, COALESCE(r.monto_pagado, 0) AS monto_pagado, r.created_at
             FROM remitos_carga r
             LEFT JOIN clientes c ON r.cliente_id = c.id
+            WHERE r.empresa_id = ?
             ORDER BY r.id DESC LIMIT ? OFFSET ?
             """,
-            (limit, offset),
+            (eid, limit, offset),
         ).fetchall()
     out = []
     for row in rows:
@@ -66,17 +69,18 @@ def list_remitos(limit: int = 50, offset: int = 0) -> list[dict]:
         )
     return out
 
-def registrar_pago_remito(remito_id: int, monto: float) -> dict:
+def registrar_pago_remito(remito_id: int, monto: float, empresa_id: int = None) -> dict:
     from app.services.clientes import recalcular_saldo_cliente
     if monto <= 0:
         raise ValueError("El monto debe ser mayor a cero")
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         row = conn.execute(
             """
             SELECT cliente_id, precio_venta_total, COALESCE(monto_pagado, 0) AS monto_pagado, pagado
-            FROM remitos_carga WHERE id = ?
+            FROM remitos_carga WHERE id = ? AND empresa_id = ?
             """,
-            (remito_id,),
+            (remito_id, eid),
         ).fetchone()
         if not row:
             raise ValueError("Remito no encontrado")
@@ -98,13 +102,13 @@ def registrar_pago_remito(remito_id: int, monto: float) -> dict:
 
         if cobrado_completo:
             conn.execute(
-                "UPDATE remitos_carga SET monto_pagado = ?, pagado = 1 WHERE id = ?",
-                (total, remito_id),
+                "UPDATE remitos_carga SET monto_pagado = ?, pagado = 1 WHERE id = ? AND empresa_id = ?",
+                (total, remito_id, eid),
             )
         else:
             conn.execute(
-                "UPDATE remitos_carga SET monto_pagado = ? WHERE id = ?",
-                (nuevo_pagado, remito_id),
+                "UPDATE remitos_carga SET monto_pagado = ? WHERE id = ? AND empresa_id = ?",
+                (nuevo_pagado, remito_id, eid),
             )
 
         cliente_id = row["cliente_id"]
@@ -124,19 +128,21 @@ def registrar_pago_remito(remito_id: int, monto: float) -> dict:
     }
 
 
-def marcar_remito_pagado(remito_id: int):
+def marcar_remito_pagado(remito_id: int, empresa_id: int = None):
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         row = conn.execute(
-            "SELECT precio_venta_total, COALESCE(monto_pagado, 0) AS monto_pagado FROM remitos_carga WHERE id = ?",
-            (remito_id,),
+            "SELECT precio_venta_total, COALESCE(monto_pagado, 0) AS monto_pagado FROM remitos_carga WHERE id = ? AND empresa_id = ?",
+            (remito_id, eid),
         ).fetchone()
         if not row:
             raise ValueError("Remito no encontrado")
         saldo = float(row["precio_venta_total"]) - float(row["monto_pagado"] or 0)
-    registrar_pago_remito(remito_id, saldo)
+    registrar_pago_remito(remito_id, saldo, eid)
 
 
-def get_remito_detalle(remito_id: int) -> dict:
+def get_remito_detalle(remito_id: int, empresa_id: int = None) -> dict:
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
         row = conn.execute(
             """
@@ -147,9 +153,9 @@ def get_remito_detalle(remito_id: int) -> dict:
                    c.telefono AS cliente_telefono, c.email AS cliente_email
             FROM remitos_carga r
             LEFT JOIN clientes c ON r.cliente_id = c.id
-            WHERE r.id = ?
+            WHERE r.id = ? AND r.empresa_id = ?
             """,
-            (remito_id,)
+            (remito_id, eid)
         ).fetchone()
         
         if not row:
@@ -200,9 +206,10 @@ def get_remito_detalle(remito_id: int) -> dict:
     }
 
 
-def eliminar_remito_logic(conn, remito_id: int):
+def eliminar_remito_logic(conn, remito_id: int, empresa_id: int = None):
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     # 0. Verificar que no tenga pagos aplicados
-    row = conn.execute("SELECT monto_pagado FROM remitos_carga WHERE id = ?", (remito_id,)).fetchone()
+    row = conn.execute("SELECT monto_pagado FROM remitos_carga WHERE id = ? AND empresa_id = ?", (remito_id, eid)).fetchone()
     if row and float(row["monto_pagado"] or 0) > 0:
         raise ValueError("Este remito tiene pagos aplicados. Por favor, elimine el pago primero.")
 
@@ -221,27 +228,28 @@ def eliminar_remito_logic(conn, remito_id: int):
                 WHEN kg_remanentes + ? > kg_totales THEN kg_totales 
                 ELSE kg_remanentes + ? 
             END
-            WHERE id = ?
+            WHERE id = ? AND empresa_id = ?
             """,
-            (frac["kg_descontados"], frac["kg_descontados"], frac["lote_id"])
+            (frac["kg_descontados"], frac["kg_descontados"], frac["lote_id"], eid)
         )
         
     # 3. Eliminar los registros de remitos_fracciones
     conn.execute("DELETE FROM remitos_fracciones WHERE remito_id = ?", (remito_id,))
     
     # 4. Eliminar el remito de remitos_carga
-    conn.execute("DELETE FROM remitos_carga WHERE id = ?", (remito_id,))
+    conn.execute("DELETE FROM remitos_carga WHERE id = ? AND empresa_id = ?", (remito_id, eid))
 
 
-def eliminar_remito(remito_id: int) -> int:
+def eliminar_remito(remito_id: int, empresa_id: int = None) -> int:
     from app.services.clientes import recalcular_saldo_cliente
+    eid = empresa_id if empresa_id is not None else current_empresa_id()
     with get_db() as conn:
-        row = conn.execute("SELECT cliente_id FROM remitos_carga WHERE id = ?", (remito_id,)).fetchone()
+        row = conn.execute("SELECT cliente_id FROM remitos_carga WHERE id = ? AND empresa_id = ?", (remito_id, eid)).fetchone()
         if not row:
             raise ValueError("Remito no encontrado")
         cliente_id = row["cliente_id"]
         
-        eliminar_remito_logic(conn, remito_id)
+        eliminar_remito_logic(conn, remito_id, eid)
         
         if cliente_id:
             recalcular_saldo_cliente(conn, cliente_id)

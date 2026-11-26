@@ -1,7 +1,7 @@
 from flask import jsonify, request
 from app.routes.api import api_bp, _guard_master_admin
 from app.database import get_db
-from app.utils import parse_operacion_payload, fmt_plazo_dias, _i, _f, resolve_remito_kg, pesos_piezas_to_json
+from app.utils import parse_operacion_payload, fmt_plazo_dias, _i, _f, resolve_remito_kg, pesos_piezas_to_json, current_empresa_id, current_sucursal_id
 from app.security import require_master_password_in_request, role_at_least
 from app.services.signal_bus import notify_tenant_refresh_from_request
 from app.services.audit import log_audit
@@ -68,10 +68,12 @@ def api_create_op():
     
     # 5. ¡Abre la Bóveda de acero!
     try:
+        eid = current_empresa_id()
+        sid = current_sucursal_id()
         with get_db() as conn:
             if uuid_val:
                 # Primero pregunta: "¿Ya guardé esto antes?"
-                row = conn.execute("SELECT id FROM operaciones_financieras WHERE uuid = ?", (uuid_val,)).fetchone()
+                row = conn.execute("SELECT id FROM operaciones_financieras WHERE uuid = ? AND empresa_id = ?", (uuid_val, eid)).fetchone()
                 if row:
                     return jsonify({"id": row["id"], "ok": True, "duplicate": True}), 200
 
@@ -81,27 +83,31 @@ def api_create_op():
                 fecha_inicio_val = f"{fecha_inicio_val} 12:00:00"
                 query = """
                 INSERT INTO operaciones_financieras
-                    (uuid, alias, tipo, recibido, pagar, meses, fecha_cierre, fecha_vencimiento, cuotas, kg, precio_kg, plazo_dias, impuesto_cheque, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (uuid, alias, tipo, recibido, pagar, meses, fecha_cierre, fecha_vencimiento, cuotas, kg, precio_kg, plazo_dias, impuesto_cheque, created_at, empresa_id, sucursal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 params = (
                     uuid_val, payload["alias"], payload["tipo"], payload["recibido"], payload["pagar"],
                     payload["meses"], payload["fecha_cierre"], payload["fecha_vencimiento"],
                     payload["cuotas"], payload.get("kg"), payload.get("precio_kg"), payload.get("plazo_dias"),
                     payload.get("impuesto_cheque"),
-                    fecha_inicio_val
+                    fecha_inicio_val,
+                    eid,
+                    sid
                 )
             else:
                 query = """
                 INSERT INTO operaciones_financieras
-                    (uuid, alias, tipo, recibido, pagar, meses, fecha_cierre, fecha_vencimiento, cuotas, kg, precio_kg, plazo_dias, impuesto_cheque)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    (uuid, alias, tipo, recibido, pagar, meses, fecha_cierre, fecha_vencimiento, cuotas, kg, precio_kg, plazo_dias, impuesto_cheque, empresa_id, sucursal_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """
                 params = (
                     uuid_val, payload["alias"], payload["tipo"], payload["recibido"], payload["pagar"],
                     payload["meses"], payload["fecha_cierre"], payload["fecha_vencimiento"],
                     payload["cuotas"], payload.get("kg"), payload.get("precio_kg"), payload.get("plazo_dias"),
                     payload.get("impuesto_cheque"),
+                    eid,
+                    sid
                 )
 
             cur = conn.execute(query, params)
@@ -138,13 +144,14 @@ def api_delete_op(op_id: int):
         return jsonify({"error": msg}), 403
     if not role_at_least("admin"):
         return jsonify({"error": "Solo administradores pueden eliminar operaciones"}), 403
+    eid = current_empresa_id()
     with get_db() as conn:
-        row = conn.execute("SELECT alias, recibido FROM operaciones_financieras WHERE id = ?", (op_id,)).fetchone()
+        row = conn.execute("SELECT alias, recibido FROM operaciones_financieras WHERE id = ? AND empresa_id = ?", (op_id, eid)).fetchone()
         if not row:
             return jsonify({"error": "No encontrada"}), 404
         notify_tenant_refresh_from_request("delete_operacion")
-        conn.execute("DELETE FROM pagos_cuotas WHERE operacion_id = ?", (op_id,))
-        conn.execute("DELETE FROM operaciones_financieras WHERE id = ?", (op_id,))
+        conn.execute("DELETE FROM pagos_cuotas WHERE operacion_id = ? AND empresa_id = ?", (op_id, eid))
+        conn.execute("DELETE FROM operaciones_financieras WHERE id = ? AND empresa_id = ?", (op_id, eid))
     log_audit(
         "ELIMINADO",
         entidad="operacion",
@@ -157,14 +164,15 @@ def api_delete_op(op_id: int):
 
 @api_bp.route("/operaciones/<int:op_id>/plan-pago")
 def api_plan_pago(op_id: int):
+    eid = current_empresa_id()
     with get_db() as conn:
         row = conn.execute(
             """
             SELECT id, alias, tipo, recibido, pagar, meses, fecha_cierre,
                    fecha_vencimiento, cuotas, COALESCE(cuotas_pagadas, 0) AS cuotas_pagadas
-            FROM operaciones_financieras WHERE id = ?
+            FROM operaciones_financieras WHERE id = ? AND empresa_id = ?
             """,
-            (op_id,),
+            (op_id, eid),
         ).fetchone()
     if not row:
         return jsonify({"error": "No encontrada"}), 404
@@ -181,7 +189,7 @@ def api_plan_pago(op_id: int):
             "alias": row_dict["alias"],
             "tipo": row_dict["tipo"],
             "total_pagar": round(row_dict["pagar"], 2),
-            "pagos": get_pagos_operacion(op_id),
+            "pagos": get_pagos_operacion(op_id, eid),
             **venc,
             **plan,
         }
@@ -189,6 +197,7 @@ def api_plan_pago(op_id: int):
 
 @api_bp.route("/operaciones/<int:op_id>/pagar", methods=["POST"])
 def api_pagar_cuota(op_id: int):
+    eid = current_empresa_id()
     d = request.get_json(silent=True) or {}
     try:
         numero_cuota = _i(d.get("numero_cuota"), "numero_cuota")
@@ -199,7 +208,7 @@ def api_pagar_cuota(op_id: int):
         return jsonify({"error": str(e)}), 400
 
     try:
-        result = registrar_pago(op_id, numero_cuota, monto_pagado)
+        result = registrar_pago(op_id, numero_cuota, monto_pagado, eid)
     except ValueError as e:
         return jsonify({"error": str(e)}), 400
     notify_tenant_refresh_from_request("pago_cuota")
@@ -207,6 +216,7 @@ def api_pagar_cuota(op_id: int):
 
 @api_bp.route("/operaciones/<int:op_id>/preview-pago")
 def api_preview_pago(op_id: int):
+    eid = current_empresa_id()
     numero = request.args.get("numero_cuota", type=int)
     monto = request.args.get("monto_pagado", type=float)
     if not numero or monto is None:
@@ -216,9 +226,9 @@ def api_preview_pago(op_id: int):
             row = conn.execute(
                 """
                 SELECT pagar, cuotas, cuotas_pagadas, tipo, fecha_vencimiento
-                FROM operaciones_financieras WHERE id = ?
+                FROM operaciones_financieras WHERE id = ? AND empresa_id = ?
                 """,
-                (op_id,),
+                (op_id, eid),
             ).fetchone()
         if not row:
             return jsonify({"error": "No encontrada"}), 404
