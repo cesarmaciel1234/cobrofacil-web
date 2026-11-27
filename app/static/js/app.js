@@ -3965,7 +3965,7 @@ const $ = id => document.getElementById(id);
                 Nodo.encargar(pieza, consulta).then((dato) => {
                     if (dato && !panelGuardadoVacio(dato)) {
                         aplicarDatosJefe(panel, dato, false);
-                    } else if (!habiaLocal) {
+                    } else {
                         return fetch('/api/pos/jefe?panel=' + encodeURIComponent(panel) + (consulta ? '&' + consulta : ''))
                             .then(r => r.ok ? r.json() : null)
                             .then(d => {
@@ -3974,17 +3974,15 @@ const $ = id => document.getElementById(id);
                             });
                     }
                 }).catch(() => {
-                    if (!habiaLocal) {
-                        fetch('/api/pos/jefe?panel=' + encodeURIComponent(panel) + (consulta ? '&' + consulta : ''))
-                            .then(r => r.ok ? r.json() : null)
-                            .then(d => {
-                                if (d) aplicarDatosJefe(panel, d, false);
-                                else aplicarDatosJefe(panel, { libro: false }, false);
-                            })
-                            .catch(() => {
-                                aplicarDatosJefe(panel, { libro: false }, false);
-                            });
-                    }
+                    fetch('/api/pos/jefe?panel=' + encodeURIComponent(panel) + (consulta ? '&' + consulta : ''))
+                        .then(r => r.ok ? r.json() : null)
+                        .then(d => {
+                            if (d) aplicarDatosJefe(panel, d, false);
+                            else aplicarDatosJefe(panel, { libro: false }, false);
+                        })
+                        .catch(() => {
+                            aplicarDatosJefe(panel, { libro: false }, false);
+                        });
                 });
                 if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
                 return;
@@ -7071,7 +7069,7 @@ const $ = id => document.getElementById(id);
                     Espejo.alActualizar(pintarDesdeEspejo);
                     void Espejo.asegurar();
                 }
-                const CRM_CACHE_EPOCH = '2026-11-17-epoch6';
+                const CRM_CACHE_EPOCH = '2026-11-27-epoch7';
                 if (localStorage.getItem('crm_cache_epoch') !== CRM_CACHE_EPOCH) {
                     localStorage.setItem('crm_cache_epoch', CRM_CACHE_EPOCH);
                     localStorage.removeItem('crm_sucursales_cache');

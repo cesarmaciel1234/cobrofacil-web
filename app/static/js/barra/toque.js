@@ -46,7 +46,7 @@
             try { navigator.vibrate(12); } catch (_) {}
         }
         if (nombre === vistaActual()) {
-            if (nombre === 'contabilidad' && document.getElementById('view-ticket')?.classList.contains('active')) {
+            if (nombre === 'contabilidad') {
                 pintar(nombre);
                 cargar(nombre);
                 return;

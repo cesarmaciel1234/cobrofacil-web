@@ -88,7 +88,13 @@
         // 1. Título y período
         const contaDia = $('contaDia');
         if (contaDia) {
-            contaDia.textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
+            let sucursalNombre = '';
+            const sel = $('topbarSucursalSelect');
+            if (sel && sel.selectedIndex >= 0 && sel.value) {
+                sucursalNombre = sel.options[sel.selectedIndex].text;
+            }
+            const diaTxt = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
+            contaDia.textContent = sucursalNombre ? `${diaTxt} (${sucursalNombre})` : diaTxt;
         }
 
         if (typeof global.pintarChipPeriodo === 'function') {
