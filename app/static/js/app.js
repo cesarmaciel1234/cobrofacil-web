@@ -4542,7 +4542,7 @@ const $ = id => document.getElementById(id);
             if (dato.nodo && panel !== 'contabilidad') return dato;
             const libro = window.Espejo && Espejo.ventas ? Espejo.ventas() : null;
             if (!espejoTieneFilas(libro) && panel !== 'contabilidad') return dato;
-            const serverMasNuevo = !!(libro.sello && dato.actualizado_en && libro.sello < dato.actualizado_en);
+            const serverMasNuevo = !!(libro && libro.sello && dato.actualizado_en && libro.sello < dato.actualizado_en);
             if (panel === 'reporte' || panel === 'jefe') {
                 if (serverMasNuevo && dato.vitrina && dato.vitrina.tickets && Number(dato.vitrina.tickets.cant) > 0) return dato;
                 const rango = Espejo.rangoPeriodo(window.vitrinaPeriodo, window.vitrinaDesde, window.vitrinaHasta);
@@ -4592,6 +4592,9 @@ const $ = id => document.getElementById(id);
                 }
             }
             if (panel === 'contabilidad') {
+                if (window.CajaMotor && typeof window.CajaMotor.cruzarConEspejo === 'function') {
+                    return window.CajaMotor.cruzarConEspejo(dato, activeSucursalId, periodoCaja, periodoCajaDesde, periodoCajaHasta);
+                }
                 const c = dato.contabilidad || {};
                 const cobrosServer = Number(c.cobros) || 0;
                 try {
@@ -4647,6 +4650,10 @@ const $ = id => document.getElementById(id);
             if (panel === 'contabilidad' && $('contaCuerpo')) {
                 if (window.renderAlertaSync) window.renderAlertaSync('alertaSyncCaja', dato);
                 if (cajaPantalla === 'digital') return;
+                if (window.CajaUI && typeof window.CajaUI.render === 'function') {
+                    window.CajaUI.render(dato, activeSucursalId, periodoCaja);
+                    return;
+                }
                 const c = dato.contabilidad || {};
                 if ($('contaDia')) $('contaDia').textContent = resumen.dia ? ('Libro · ' + resumen.dia) : 'Espejo de la caja';
                 if (!dato.libro) {

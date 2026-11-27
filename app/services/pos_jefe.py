@@ -2,12 +2,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from app.services.pos_base import _ambito_cache, filas_de, listar_sucursales, sellos_de, ultima_carga, unir_clientes
 from app.services.pos_historial import desglose_articulos, historial_ventas, rango_fechas
+
+logger = logging.getLogger(__name__)
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 _cartera_lock = threading.Lock()
@@ -139,7 +142,8 @@ def _ventas(sucursal_id: int | str | None = None, desde: str | None = None, hast
             )
 
     # Si es 'web' o consolidado (None), sumar ventas de pedidos web (Reparto Fácil)
-    if sucursal_id is None or es_web:
+    from app.database import is_postgres
+    if (sucursal_id is None or es_web) and is_postgres():
         try:
             from app.database import get_db
             from app.services.pos_base import _empresa_activa
@@ -1471,113 +1475,13 @@ def _filas_en_rango(tabla: str, ini: str | None, fin: str | None, sucursal_id: i
 
 
 def _etiqueta_caja(pedido: dict, ini: str | None, fin: str | None, hoy: str) -> str:
-    if pedido.get("historico"):
-        return "Todas"
-    if str(pedido.get("alcance") or "dia").lower() == "mes":
-        return "Mes · " + (ini or hoy)[:7]
-    dia = ini or hoy
-    return ("Hoy · " if dia == hoy else "Día · ") + dia
+    from app.services.caja import etiqueta_caja
+    return etiqueta_caja(pedido, ini, fin, hoy)
 
 
 def _contabilidad(medios_pago: list[dict], ini: str | None, fin: str | None, sucursal_id: int | str | None, etiqueta: str) -> dict:
-    medios_lista = medios_pago or []
-    total_medios = round(sum(_numero(m.get("monto")) for m in medios_lista), 2)
-    tickets = sum(int(m.get("tickets") or 0) for m in medios_lista)
-
-    es_web = str(sucursal_id or "").strip().lower().startswith("web")
-    if es_web:
-        return {
-            "ventas": total_medios,
-            "tickets": tickets,
-            "etiqueta": etiqueta,
-            "medios_pago": medios_lista,
-            "cobros": 0.0,
-            "cobros_cant": 0,
-            "cobros_por_medio": {},
-            "detalle_cobros": [],
-            "gastos": 0.0,
-            "resultado": total_medios,
-            "detalle_gastos": [],
-            "caja": [],
-        }
-
-    corte_ini, corte_fin = ini, fin
-    etiq = str(etiqueta or "").strip().lower()
-    if etiq.startswith("hoy") or etiq.startswith("día") or etiq.startswith("dia"):
-        hoy_real = datetime.now(_ZONA).date().isoformat()
-        corte_ini = min(ini, hoy_real) if ini else hoy_real
-        corte_fin = max(fin, hoy_real) if fin else hoy_real
-
-    idx_cc, movimientos = _filas_en_rango("cuenta_corriente", corte_ini, corte_fin, sucursal_id)
-    cobros = 0.0
-    detalle_cobros = []
-    cobros_por_medio: dict[str, dict] = {}
-    for fila in movimientos:
-        tipo = str(_valor(fila, idx_cc, "tipo") or "").upper()
-        if tipo == "ABONO":
-            monto = _numero(_valor(fila, idx_cc, "monto"))
-            cobros += monto
-            desc = str(_valor(fila, idx_cc, "descripcion") or "Cobro fiado").strip()
-            medio_raw = str(_valor(fila, idx_cc, "medio_pago") or "").strip()
-            medio = medio_raw.split(":", 1)[0].strip() if medio_raw else ""
-            if not medio and desc.endswith(")") and "(" in desc:
-                dentro = desc.rsplit("(", 1)[-1].rstrip(")").strip()
-                medio = dentro.split(":", 1)[0].strip() if ":" in dentro else dentro
-            if not medio:
-                medio = "Efectivo"
-            medio = medio.capitalize()
-            if medio.lower() in ("mercadopago", "mp"):
-                medio = "QR"
-
-            if medio not in cobros_por_medio:
-                cobros_por_medio[medio] = {"monto": 0.0, "cant": 0}
-            cobros_por_medio[medio]["monto"] = round(cobros_por_medio[medio]["monto"] + monto, 2)
-            cobros_por_medio[medio]["cant"] += 1
-
-            detalle_cobros.append({
-                "monto": round(monto, 2),
-                "descripcion": desc,
-                "medio": medio,
-            })
-
-    if cobros > 0 and not cobros_por_medio:
-        cobros_por_medio["Efectivo"] = {"monto": round(cobros, 2), "cant": len(detalle_cobros) or 1}
-
-    idx_g, gastos = _filas_en_rango("gastos", corte_ini, corte_fin, sucursal_id)
-    lista_gastos = []
-    total_gastos = 0.0
-    for fila in gastos:
-        estado = str(_valor(fila, idx_g, "status", "estado") or "").upper()
-        if estado in ("ANULADO", "CANCELADO", "RECHAZADO"):
-            continue
-        monto = _numero(_valor(fila, idx_g, "monto"))
-        total_gastos += monto
-        lista_gastos.append(
-            {
-                "categoria": str(_valor(fila, idx_g, "categoria") or "Gasto"),
-                "detalle": str(_valor(fila, idx_g, "descripcion") or ""),
-                "monto": round(monto, 2),
-            }
-        )
-    idx_caja, caja = _filas_en_rango("movimientos_caja", corte_ini, corte_fin, sucursal_id)
-    por_tipo: dict[str, float] = {}
-    for fila in caja:
-        tipo = str(_valor(fila, idx_caja, "tipo") or "Movimiento")
-        por_tipo[tipo] = por_tipo.get(tipo, 0.0) + _numero(_valor(fila, idx_caja, "monto"))
-    return {
-        "ventas": total_medios,
-        "tickets": tickets,
-        "etiqueta": etiqueta,
-        "medios_pago": medios_lista,
-        "cobros": round(cobros, 2),
-        "cobros_cant": len(detalle_cobros),
-        "cobros_por_medio": cobros_por_medio,
-        "detalle_cobros": detalle_cobros[:20],
-        "gastos": round(total_gastos, 2),
-        "resultado": round(total_medios + cobros - total_gastos, 2),
-        "detalle_gastos": lista_gastos[:40],
-        "caja": [{"tipo": tipo, "monto": round(monto, 2)} for tipo, monto in sorted(por_tipo.items())],
-    }
+    from app.services.caja import obtener_contabilidad_caja
+    return obtener_contabilidad_caja(medios_pago, ini, fin, sucursal_id, etiqueta)
 
 
 def _pulso(resumen: dict, desglose: list[dict], digitales: dict, cartera: dict, pedidos: dict) -> dict:
@@ -1776,61 +1680,15 @@ def _armar_panel(
         }
 
     if nombre in ("contabilidad", "tesoreria"):
-        hoy = datetime.now(_ZONA).date().isoformat()
-        pedido = dict(filtro or {})
-        if not pedido.get("periodo") and periodo:
-            pedido["periodo"] = periodo
-        if not pedido.get("desde") and desde:
-            pedido["desde"] = desde
-        if not pedido.get("hasta") and hasta:
-            pedido["hasta"] = hasta
-        pedido.setdefault("alcance", "dia")
-        pedido.setdefault("metodo", "TODOS")
-        if pedido.get("periodo"):
-            from app.services.pos_vitrina import resolver_rango
-            desde_iso, hasta_iso, nombre_periodo = resolver_rango(
-                str(pedido.get("periodo")),
-                desde_custom=pedido.get("desde") or None,
-                hasta_custom=pedido.get("hasta") or None,
-            )
-            pedido["fecha_ini"] = desde_iso[:10]
-            pedido["fecha_fin"] = hasta_iso[:10]
-            ini, fin = pedido["fecha_ini"], pedido["fecha_fin"]
-            if nombre_periodo == "Hoy":
-                ini, fin = hoy, hoy
-                pedido["fecha_ini"] = ini
-                pedido["fecha_fin"] = fin
-                etiqueta = "Hoy · " + ini
-            elif nombre_periodo == "Período":
-                etiqueta = "Período · " + ini + (" → " + fin if fin != ini else "")
-            else:
-                etiqueta = nombre_periodo
-        else:
-            ini, fin = rango_fechas(
-                str(pedido.get("alcance") or "dia"),
-                str(pedido.get("fecha") or ""),
-                bool(pedido.get("historico")),
-                hoy,
-            )
-            etiqueta = _etiqueta_caja(pedido, ini, fin, hoy)
-        libro = historial_ventas(sucursal_id, pedido, hoy)
-        return {
-            "ok": True,
-            "libro": True,
-            "panel": "contabilidad",
-            "resumen": {"dia": ini, "es_hoy": (ini == hoy)},
-            "cartera": {},
-            "contabilidad": _contabilidad(
-                libro.get("medios") or [],
-                ini,
-                fin,
-                sucursal_id,
-                etiqueta,
-            ),
-            "desglose_sucursales": [],
-            "sucursales": sucursales_disp,
-            "sucursal_id": sucursal_id,
-        }
+        from app.services.caja import armar_panel_caja
+        return armar_panel_caja(
+            sucursal_id=sucursal_id,
+            periodo=periodo,
+            desde=desde,
+            hasta=hasta,
+            filtro=filtro,
+            sucursales_disp=sucursales_disp,
+        )
 
     from app.services.pos_vitrina import resolver_rango
     from app.services.pos_base import preparar_vista

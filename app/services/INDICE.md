@@ -22,7 +22,8 @@
 
 ## 3. Qué archivos contiene
 - `pos_base.py`: Unificación por DNI/nombre, lectura de tablas y caché ágil TTL 5s.
-- `pos_jefe.py`: Lógica de paneles ejecutivos (Reporte, Jefe, Caja, Cartera, Pedidos WhatsApp).
+- `pos_jefe.py`: Lógica de paneles ejecutivos (Reporte, Jefe, Cartera, Pedidos WhatsApp).
+- `caja/`: Submódulo de arqueo y contabilidad diaria (`service_caja.py`).
 - `pos_historial.py`: Paginación progresiva de tickets (bloques de 400) para scroll infinito.
 - `pos_vitrina.py`: Motor de control de gestión y cálculo de las 12 tarjetas de KPI.
 - `pos_interes.py` & `finanzas.py`: Motor de tasas CFR, cálculo de mora e intereses.

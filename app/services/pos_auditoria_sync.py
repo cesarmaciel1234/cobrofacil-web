@@ -98,6 +98,7 @@ def asegurar_tablas_auditoria_sync(conn) -> None:
             conn.commit()
         _tablas_aseguradas = True
     except Exception as exc:
+        _tablas_aseguradas = True
         logger.warning("asegurar_tablas_auditoria_sync: %s", exc)
 
 

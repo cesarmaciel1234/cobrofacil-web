@@ -6,11 +6,14 @@ No depende de tpv pro 2026; funciona 100% aislado sobre el espejo en la nube.
 from __future__ import annotations
 
 import calendar
+import logging
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
 from zoneinfo import ZoneInfo
 
 from app.services.pos_base import filas_de, ultima_carga, unir_clientes
+
+logger = logging.getLogger(__name__)
 
 _ZONA = ZoneInfo("America/Argentina/Buenos_Aires")
 _MARCAS_DIGITAL = ("QR", "MERCADOPAGO", "MP", "TARJETA", "POINT", "TRANSFERENCIA", "DIGITAL", "MIXTO")
@@ -199,7 +202,8 @@ def calcular_vitrina(
         descuento_total += _numero(_valor(fila, idx_v, "descuento"))
 
     # Sumar pedidos web si es consolidado o Tienda Web
-    if sucursal_id is None or es_web:
+    from app.database import is_postgres
+    if (sucursal_id is None or es_web) and is_postgres():
         try:
             from app.database import get_db
             from app.services.pos_base import _empresa_activa

@@ -603,7 +603,7 @@ def api_pos_jefe():
     try:
         return jsonify(panel(nombre, sucursal_id=sucursal_id, periodo=periodo, desde=desde, hasta=hasta, filtro=filtro))
     except Exception as exc:
-        current_app.logger.warning("panel %s no respondió: %s", nombre, type(exc).__name__)
+        current_app.logger.warning("panel %s no respondió: %s", nombre, exc)
         return jsonify({"ok": False, "libro": False, "error": "La base no responde en este momento."}), 503
 
 

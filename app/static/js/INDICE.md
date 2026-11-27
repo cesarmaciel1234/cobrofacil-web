@@ -29,7 +29,7 @@
 - `pos-offline.js` & `sync-engine.js`: Motor Dexie/IndexedDB y cola de subida de tickets.
 - `crm-bus.js`: Conector EventSource con `/api/stream`.
 - `crm-format.js`, `crm-safe.js`, `crm-loader.js`, `crm-ui.js`: Utilidades y modales.
-- `barra/`: Subcarpeta modular de paneles específicos (Cartera, Pedidos, Ventas, etc.).
+- `barra/`: Subcarpeta modular de paneles específicos (`barra/caja/`, Cartera, Pedidos, etc.).
 
 ---
 

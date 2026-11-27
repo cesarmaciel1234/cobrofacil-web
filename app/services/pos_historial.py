@@ -1,11 +1,14 @@
 """Historial de cuenta de Cobro Fácil, leído de la copia en la nube."""
 from __future__ import annotations
 
+import logging
 import re
 from datetime import date, datetime, timedelta
 
 from app.services.pos_base import filas_de, hay_tabla
 from app.services.pos_interes import MARCA_INTERES, clave_ticket, proyectar_interes
+
+logger = logging.getLogger(__name__)
 
 _ACTIVACION = "2026-01-01 00:00:00"
 
@@ -659,7 +662,8 @@ def historial_ventas(sucursal_id: int | None, filtro: dict | None, hoy: str) -> 
         elegidas.append(venta)
 
     # Convivencia e-commerce y venta física: incluir pedidos web si es consolidado o Tienda Web
-    if sucursal_id is None or es_web:
+    from app.database import is_postgres
+    if (sucursal_id is None or es_web) and is_postgres():
         try:
             from app.database import get_db
             from app.services.pos_base import _empresa_activa

@@ -90,6 +90,8 @@ El núcleo del sistema procesa, valida y consolida la información de negocio di
 ## 4. Directorios Clave y sus Índices
 
 - [`app/services/INDICE.md`](file:///C:/Users/cesar/OneDrive/Desktop/crm-frigorifico/app/services/INDICE.md): Índice y plano técnico de los servicios de negocio.
+- [`app/services/caja/INDICE.md`](file:///C:/Users/cesar/OneDrive/Desktop/crm-frigorifico/app/services/caja/INDICE.md): Submódulo de arqueo y contabilidad diaria (Cerebro backend).
 - [`app/static/js/INDICE.md`](file:///C:/Users/cesar/OneDrive/Desktop/crm-frigorifico/app/static/js/INDICE.md): Índice y plano técnico de los controladores JavaScript de la SPA.
+- [`app/static/js/barra/caja/INDICE.md`](file:///C:/Users/cesar/OneDrive/Desktop/crm-frigorifico/app/static/js/barra/caja/INDICE.md): Submódulo de caja y arqueo diario (Cerebro y Cara frontend).
 - [`modularizacion.md`](file:///C:/Users/cesar/OneDrive/Desktop/crm-frigorifico/modularizacion.md): Guía de modularización piramidal del repositorio.
 - [`AGENTS.md`](file:///C:/Users/cesar/OneDrive/Desktop/crm-frigorifico/AGENTS.md): Reglas permanentes y leyes inviolables para desarrollo y agentes de IA.
