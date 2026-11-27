@@ -17,8 +17,8 @@ def client(monkeypatch):
         CREATE TABLE empresas (id INTEGER PRIMARY KEY, nombre TEXT NOT NULL);
         INSERT INTO empresas VALUES (1, 'Uno'), (2, 'Dos');
         CREATE TABLE repartofacil_empresa_perfiles (
-            empresa_id INTEGER PRIMARY KEY, nombre TEXT, descripcion TEXT, direccion TEXT,
-            latitud REAL, longitud REAL, whatsapp TEXT, horario TEXT,
+            empresa_id INTEGER PRIMARY KEY, nombre TEXT, descripcion TEXT,
+            rubro TEXT DEFAULT 'Carnicería', logo_url TEXT,
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE repartofacil_resenas (
@@ -51,9 +51,8 @@ def sesion(client, empresa_id=1, role="admin"):
 
 
 def perfil(**updates):
-    return dict(empresa_id=1, nombre="Comercio", descripcion="", direccion="Calle 123",
-                latitud=-32.9, longitud=-60.6, whatsapp="5493411234567",
-                horario="Lunes a viernes", **updates)
+    return dict(empresa_id=1, nombre="Comercio", descripcion="Ficha de marca",
+                rubro="Carnicería", logo_url="https://example.com/logo.png", **updates)
 
 
 def test_sesion_permisos_y_aislamiento(client):
@@ -71,31 +70,19 @@ def test_sesion_permisos_y_aislamiento(client):
     assert client.put("/api/repartofacil/mi-empresa", json=perfil()).status_code == 409
 
 
-def test_validacion_y_cambio_de_direccion_invalida_coordenadas(client):
+def test_validacion_perfil_marca(client):
     sesion(client)
     assert client.put("/api/repartofacil/mi-empresa", json=perfil()).status_code == 200
     cambio = perfil()
-    cambio["direccion"] = "Otra calle 42"
+    cambio["nombre"] = "Comercio Actualizado"
+    cambio["rubro"] = "Supermercado"
     result = client.put("/api/repartofacil/mi-empresa", json=cambio)
-    assert result.get_json()["perfil"]["latitud"] is None
-    cambio["whatsapp"] = "<no válido>"
-    assert client.put("/api/repartofacil/mi-empresa", json=cambio).status_code == 400
-    cambio["whatsapp"] = ""
-    cambio["longitud"] = 200
-    assert client.put("/api/repartofacil/mi-empresa", json=cambio).status_code == 400
-
-
-def test_direccion_puede_conservar_punto_confirmado_en_mapa(client):
-    sesion(client)
-    assert client.put("/api/repartofacil/mi-empresa", json=perfil()).status_code == 200
-    cambio = perfil()
-    cambio["direccion"] = "Otra calle 42"
-    cambio["ubicacion_confirmada"] = True
-    guardado = client.put("/api/repartofacil/mi-empresa", json=cambio)
-    assert guardado.status_code == 200
-    assert guardado.get_json()["perfil"]["latitud"] == -32.9
-    assert guardado.get_json()["perfil"]["longitud"] == -60.6
-    cambio["ubicacion_confirmada"] = "true"
+    assert result.status_code == 200
+    assert result.get_json()["perfil"]["nombre"] == "Comercio Actualizado"
+    assert result.get_json()["perfil"]["rubro"] == "Supermercado"
+    
+    # Nombre vacío falla
+    cambio["nombre"] = ""
     assert client.put("/api/repartofacil/mi-empresa", json=cambio).status_code == 400
 
 

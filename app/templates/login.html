@@ -386,15 +386,32 @@
         <div id="view-register" class="auth-view hidden">
             <form id="form-register">
                 <div class="field">
-                    <label for="reg-empresa">Nombre de la empresa</label>
+                    <label for="reg-empresa">Nombre de la Marca / Empresa *</label>
                     <input type="text" id="reg-empresa" placeholder="Ej: Frigorífico El Sol" autocapitalize="words" required>
                 </div>
+                <div style="border-top: 1px dashed rgba(255,255,255,0.15); margin: 14px 0 10px; padding-top: 10px;">
+                    <span style="display:block; font-size:11px; font-weight:800; color:#FFE600; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px;">
+                        🏪 Datos de la Primera Sucursal
+                    </span>
+                    <div class="field">
+                        <label for="reg-sucursal-nombre">Nombre del Local / Sucursal *</label>
+                        <input type="text" id="reg-sucursal-nombre" placeholder="Ej: Casa Central o Alfaro 1964" value="Casa Central" required>
+                    </div>
+                    <div class="field">
+                        <label for="reg-sucursal-direccion">Dirección Física del Local</label>
+                        <input type="text" id="reg-sucursal-direccion" placeholder="Ej: Doctor Aráoz Alfaro 1964, Pte. Derqui">
+                    </div>
+                    <div class="field">
+                        <label for="reg-sucursal-whatsapp">WhatsApp de Atención del Local</label>
+                        <input type="tel" id="reg-sucursal-whatsapp" placeholder="Ej: 1135627803">
+                    </div>
+                </div>
                 <div class="field">
-                    <label for="reg-password">Contraseña</label>
+                    <label for="reg-password">Contraseña *</label>
                     <input type="password" id="reg-password" placeholder="Mínimo 6 caracteres" autocapitalize="none" autocorrect="off" spellcheck="false" required minlength="6">
                 </div>
                 <div class="field">
-                    <label for="reg-password-confirm">Confirmar contraseña</label>
+                    <label for="reg-password-confirm">Confirmar contraseña *</label>
                     <input type="password" id="reg-password-confirm" placeholder="Repita la contraseña" autocapitalize="none" autocorrect="off" spellcheck="false" required minlength="6">
                 </div>
                 <div id="reg-error" class="error-box hidden"></div>
@@ -500,6 +517,9 @@
             errorBox.classList.add('hidden');
             
             const empresa_nombre = document.getElementById('reg-empresa').value.trim();
+            const sucursal_nombre = document.getElementById('reg-sucursal-nombre') ? document.getElementById('reg-sucursal-nombre').value.trim() : 'Casa Central';
+            const sucursal_direccion = document.getElementById('reg-sucursal-direccion') ? document.getElementById('reg-sucursal-direccion').value.trim() : '';
+            const sucursal_whatsapp = document.getElementById('reg-sucursal-whatsapp') ? document.getElementById('reg-sucursal-whatsapp').value.trim() : '';
             const password = document.getElementById('reg-password').value;
             const password_confirm = document.getElementById('reg-password-confirm') ? document.getElementById('reg-password-confirm').value : '';
 
@@ -513,7 +533,14 @@
                 const res = await fetch('/auth/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ empresa_nombre, password, password_confirm })
+                    body: JSON.stringify({
+                        empresa_nombre,
+                        sucursal_nombre,
+                        sucursal_direccion,
+                        sucursal_whatsapp,
+                        password,
+                        password_confirm
+                    })
                 });
                 
                 const data = await res.json();

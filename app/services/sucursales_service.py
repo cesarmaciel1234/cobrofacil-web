@@ -1,5 +1,8 @@
 """Servicio piramidal y modular de gestión de Sucursales y Terminales."""
 from datetime import datetime
+import json
+import urllib.parse
+import urllib.request
 from app.database import get_db, is_postgres
 
 
@@ -7,12 +10,32 @@ def _tabla(nombre):
     return f"public.{nombre}" if is_postgres() else nombre
 
 
+def geocodificar_direccion(direccion: str):
+    """Resuelve latitud y longitud automáticamente usando Nominatim OpenStreetMap."""
+    if not direccion or len(direccion.strip()) < 3:
+        return None, None
+    query = direccion.strip()
+    query_arg = query if "argentina" in query.lower() else f"{query}, Buenos Aires, Argentina"
+    try:
+        encoded = urllib.parse.quote(query_arg)
+        url = f"https://nominatim.openstreetmap.org/search?format=json&q={encoded}&limit=1&countrycodes=ar&addressdetails=1"
+        req = urllib.request.Request(url, headers={"User-Agent": "CobroFacil-Sucursal/1.0", "Accept-Language": "es"})
+        with urllib.request.urlopen(req, timeout=3.5) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+        if data and len(data) > 0:
+            return float(data[0]["lat"]), float(data[0]["lon"])
+    except Exception:
+        pass
+    return None, None
+
+
 def listar_sucursales(empresa_id):
     """Devuelve la lista de sucursales activas de la empresa con sus terminales."""
     with get_db(empresa_id=0) as conn:
         sucs = conn.execute(
-            f"""SELECT id, empresa_id, nombre, codigo, direccion, latitud, longitud,
-                      telefono, whatsapp, horario, es_centro_distribucion, activo, created_at, updated_at
+            f"""SELECT id, empresa_id, nombre, codigo, rubro, direccion, latitud, longitud,
+                      telefono, whatsapp, horario, costo_envio, monto_minimo_envio_gratis,
+                      es_centro_distribucion, activo, created_at, updated_at
                FROM {_tabla('sucursales')}
                WHERE empresa_id = ? AND activo = 1
                ORDER BY id ASC""",
@@ -104,7 +127,7 @@ def eliminar_terminal(empresa_id: int, terminal_id: int) -> dict:
 
 
 def guardar_sucursal(empresa_id, datos):
-    """Crea o actualiza una sucursal para la empresa."""
+    """Crea o actualiza una sucursal para la empresa con geocodificación automática."""
     if not isinstance(datos, dict):
         raise ValueError("Datos de sucursal inválidos.")
 
@@ -116,10 +139,25 @@ def guardar_sucursal(empresa_id, datos):
 
     direccion = (datos.get("direccion") or "").strip()
     codigo = (datos.get("codigo") or "").strip()[:50]
+    rubro = (datos.get("rubro") or "Carnicería").strip()[:60]
     telefono = (datos.get("telefono") or "").strip()[:30]
     whatsapp = (datos.get("whatsapp") or "").strip()[:30]
     horario = (datos.get("horario") or "").strip()[:250]
     es_cd = bool(datos.get("es_centro_distribucion", False))
+
+    costo_envio = 0.0
+    try:
+        if datos.get("costo_envio") not in (None, ""):
+            costo_envio = max(0.0, float(datos["costo_envio"]))
+    except (ValueError, TypeError):
+        costo_envio = 0.0
+
+    monto_minimo_envio_gratis = 0.0
+    try:
+        if datos.get("monto_minimo_envio_gratis") not in (None, ""):
+            monto_minimo_envio_gratis = max(0.0, float(datos["monto_minimo_envio_gratis"]))
+    except (ValueError, TypeError):
+        monto_minimo_envio_gratis = 0.0
 
     latitud = None
     longitud = None
@@ -134,30 +172,49 @@ def guardar_sucursal(empresa_id, datos):
         except (ValueError, TypeError):
             pass
 
+    # Geocodificación automática si no se especificaron coordenadas pero sí dirección
+    if (latitud is None or longitud is None) and direccion:
+        geo_lat, geo_lng = geocodificar_direccion(direccion)
+        if geo_lat is not None and geo_lng is not None:
+            latitud, longitud = geo_lat, geo_lng
+
     sucursal_id = datos.get("id")
     with get_db(empresa_id=0) as conn:
         if sucursal_id:
+            # Si no cambiaron coordenadas pero ya existían, conservarlas
+            if latitud is None or longitud is None:
+                prev = conn.execute(
+                    f"SELECT latitud, longitud FROM {_tabla('sucursales')} WHERE id = ? AND empresa_id = ?",
+                    (sucursal_id, empresa_id)
+                ).fetchone()
+                if prev:
+                    if latitud is None:
+                        latitud = prev["latitud"]
+                    if longitud is None:
+                        longitud = prev["longitud"]
+
             # Actualizar sucursal existente
             conn.execute(
                 f"""UPDATE {_tabla('sucursales')}
-                   SET nombre = ?, codigo = ?, direccion = ?, latitud = ?, longitud = ?,
-                       telefono = ?, whatsapp = ?, horario = ?, es_centro_distribucion = ?,
-                       updated_at = CURRENT_TIMESTAMP
+                   SET nombre = ?, codigo = ?, rubro = ?, direccion = ?, latitud = ?, longitud = ?,
+                       telefono = ?, whatsapp = ?, horario = ?, costo_envio = ?, monto_minimo_envio_gratis = ?,
+                       es_centro_distribucion = ?, updated_at = CURRENT_TIMESTAMP
                    WHERE id = ? AND empresa_id = ?""",
-                (nombre, codigo, direccion, latitud, longitud, telefono, whatsapp, horario,
-                 es_cd, sucursal_id, empresa_id),
+                (nombre, codigo, rubro, direccion, latitud, longitud, telefono, whatsapp, horario,
+                 costo_envio, monto_minimo_envio_gratis, es_cd, sucursal_id, empresa_id),
             )
             target_id = sucursal_id
         else:
             # Crear nueva sucursal
             cur = conn.execute(
                 f"""INSERT INTO {_tabla('sucursales')}
-                   (empresa_id, nombre, codigo, direccion, latitud, longitud,
-                    telefono, whatsapp, horario, es_centro_distribucion, activo)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+                   (empresa_id, nombre, codigo, rubro, direccion, latitud, longitud,
+                    telefono, whatsapp, horario, costo_envio, monto_minimo_envio_gratis,
+                    es_centro_distribucion, activo)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
                    RETURNING id""",
-                (empresa_id, nombre, codigo, direccion, latitud, longitud,
-                 telefono, whatsapp, horario, es_cd),
+                (empresa_id, nombre, codigo, rubro, direccion, latitud, longitud,
+                 telefono, whatsapp, horario, costo_envio, monto_minimo_envio_gratis, es_cd),
             )
             row = cur.fetchone()
             target_id = row["id"] if row else None

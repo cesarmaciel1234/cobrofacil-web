@@ -186,17 +186,65 @@ def auth_register():
                 (empresa_nombre_upper, slug)
             )
             empresa_id = cur_emp.lastrowid
-            
+            if not empresa_id:
+                emp_row = conn.execute("SELECT id FROM empresas WHERE slug = ?", (slug,)).fetchone()
+                empresa_id = emp_row["id"] if emp_row else 1
+
+            # Crear obligatoriamente su primera Sucursal (Casa Central o nombre ingresado)
+            suc_nombre = (data.get("sucursal_nombre") or request.form.get("sucursal_nombre") or "").strip() or "Casa Central"
+            suc_direccion = (data.get("sucursal_direccion") or request.form.get("sucursal_direccion") or "").strip()
+            suc_whatsapp = (data.get("sucursal_whatsapp") or request.form.get("sucursal_whatsapp") or "").strip()
+            rubro = (data.get("rubro") or request.form.get("rubro") or "Carnicería").strip()
+
+            from app.services.sucursales_service import geocodificar_direccion
+            lat, lng = geocodificar_direccion(suc_direccion) if suc_direccion else (None, None)
+
+            cur_suc = conn.execute(
+                """
+                INSERT INTO sucursales (empresa_id, nombre, codigo, rubro, direccion, latitud, longitud, whatsapp, activo)
+                VALUES (?, ?, 'CC-01', ?, ?, ?, ?, ?, 1)
+                """,
+                (empresa_id, suc_nombre, rubro, suc_direccion, lat, lng, suc_whatsapp)
+            )
+            sucursal_id = cur_suc.lastrowid
+            if not sucursal_id:
+                suc_row = conn.execute("SELECT id FROM sucursales WHERE empresa_id = ? ORDER BY id DESC LIMIT 1", (empresa_id,)).fetchone()
+                sucursal_id = suc_row["id"] if suc_row else 1
+
+            # Crear ficha de marca inicial
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO repartofacil_empresa_perfiles (empresa_id, nombre, rubro, descripcion, logo_url)
+                    VALUES (?, ?, ?, '', '')
+                    """,
+                    (empresa_id, empresa_nombre_upper, rubro)
+                )
+            except Exception:
+                pass
+
+            # Crear terminal TPV inicial vinculada a la primera sucursal
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO terminales (sucursal_id, empresa_id, nombre, identificador_pc, descripcion, activo)
+                    VALUES (?, ?, 'Caja Principal', ?, 'Caja mostrador inicial', 1)
+                    """,
+                    (sucursal_id, empresa_id, f"CAJA-{slug.upper()}-01")
+                )
+            except Exception:
+                pass
+
             # El username del administrador será el slug único de la empresa
             username = slug
-            
+
             # Insertar el usuario administrador
             conn.execute(
                 """
                 INSERT INTO usuarios (username, nombre, password_hash, role, activo, empresa_id)
-                VALUES (?, ?, ?, ?, 1, ?)
+                VALUES (?, ?, ?, 'admin', 1, ?)
                 """,
-                (username, empresa_nombre_upper, generate_password_hash(password), "admin", empresa_id),
+                (username, empresa_nombre_upper, generate_password_hash(password), empresa_id),
             )
             
         # Autenticar e iniciar sesión automáticamente

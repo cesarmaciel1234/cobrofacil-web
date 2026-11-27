@@ -104,8 +104,8 @@ class PostgresCursorWrapper:
 
         is_insert = query.strip().upper().startswith("INSERT")
         if is_insert and "RETURNING" not in query.upper():
-            # sync_nodos, repartofacil_chat_lecturas y login_throttles no tienen columna 'id' serial única. Pedir id corta el guardado con 500.
-            if not re.search(r"\bINTO\s+(?:public\.)?(?:sync_nodos|repartofacil_chat_lecturas|login_throttles)\b", query, re.IGNORECASE):
+            # Tablas sin columna 'id' serial única:
+            if not re.search(r"\bINTO\s+(?:public\.)?(?:sync_nodos|repartofacil_chat_lecturas|login_throttles|repartofacil_empresa_perfiles)\b", query, re.IGNORECASE):
                 query += " RETURNING id"
 
         self.cursor.execute(query, vars)
@@ -969,6 +969,145 @@ def _run_migrations(conn):
 
     _ensure_performance_indexes(conn)
     _migrate_drop_remitos_cliente_column(conn, is_pg)
+    _migrate_sucursales_y_empresas(conn, is_pg)
+
+
+def _migrate_sucursales_y_empresas(conn, is_pg: bool) -> None:
+    """Asegura la estructura y migración limpia de Sucursales y Empresa."""
+    if is_pg:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS public.sucursales (
+                id SERIAL PRIMARY KEY,
+                empresa_id INT NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
+                nombre VARCHAR(120) NOT NULL,
+                codigo VARCHAR(50),
+                rubro VARCHAR(60) DEFAULT 'Carnicería',
+                direccion VARCHAR(250),
+                latitud DOUBLE PRECISION,
+                longitud DOUBLE PRECISION,
+                telefono VARCHAR(30),
+                whatsapp VARCHAR(30),
+                horario VARCHAR(250),
+                costo_envio NUMERIC(10, 2) DEFAULT 0,
+                monto_minimo_envio_gratis NUMERIC(10, 2) DEFAULT 0,
+                es_centro_distribucion BOOLEAN DEFAULT FALSE,
+                activo INT DEFAULT 1,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sucursales_empresa ON public.sucursales(empresa_id, activo)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS public.terminales (
+                id SERIAL PRIMARY KEY,
+                sucursal_id INT REFERENCES public.sucursales(id) ON DELETE SET NULL,
+                empresa_id INT NOT NULL REFERENCES public.empresas(id) ON DELETE CASCADE,
+                nombre VARCHAR(100) NOT NULL,
+                identificador_pc VARCHAR(120),
+                descripcion VARCHAR(200),
+                ip_local VARCHAR(50),
+                activo INT DEFAULT 1,
+                ultimo_sync TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_terminales_sucursal ON public.terminales(sucursal_id, activo)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_terminales_empresa ON public.terminales(empresa_id, activo)")
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS public.repartofacil_empresa_perfiles (
+                empresa_id INT PRIMARY KEY REFERENCES public.empresas(id) ON DELETE CASCADE,
+                nombre VARCHAR(120) NOT NULL,
+                descripcion VARCHAR(500),
+                rubro VARCHAR(60) DEFAULT 'Carnicería',
+                logo_url VARCHAR(500),
+                direccion VARCHAR(250),
+                latitud DOUBLE PRECISION,
+                longitud DOUBLE PRECISION,
+                whatsapp VARCHAR(30),
+                horario VARCHAR(250),
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+    else:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sucursales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+                nombre TEXT NOT NULL,
+                codigo TEXT,
+                rubro TEXT DEFAULT 'Carnicería',
+                direccion TEXT,
+                latitud REAL,
+                longitud REAL,
+                telefono TEXT,
+                whatsapp TEXT,
+                horario TEXT,
+                costo_envio REAL DEFAULT 0,
+                monto_minimo_envio_gratis REAL DEFAULT 0,
+                es_centro_distribucion INTEGER DEFAULT 0,
+                activo INTEGER DEFAULT 1,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS terminales (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                sucursal_id INTEGER REFERENCES sucursales(id),
+                empresa_id INTEGER NOT NULL REFERENCES empresas(id),
+                nombre TEXT NOT NULL,
+                identificador_pc TEXT,
+                descripcion TEXT,
+                ip_local TEXT,
+                activo INTEGER DEFAULT 1,
+                ultimo_sync TEXT,
+                created_at TEXT DEFAULT (datetime('now', 'localtime')),
+                updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS repartofacil_empresa_perfiles (
+                empresa_id INTEGER PRIMARY KEY,
+                nombre TEXT,
+                descripcion TEXT,
+                rubro TEXT DEFAULT 'Carnicería',
+                logo_url TEXT,
+                direccion TEXT,
+                latitud REAL,
+                longitud REAL,
+                whatsapp TEXT,
+                horario TEXT,
+                updated_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
+
+    # Columnas nuevas en sucursales
+    if _table_exists(conn, "sucursales"):
+        if is_pg:
+            suc_cols = _pg_column_names(conn, "sucursales")
+        else:
+            suc_cols = {row[1] for row in conn.execute("PRAGMA table_info(sucursales)")}
+        for name, col_type in (
+            ("rubro", "VARCHAR(60) DEFAULT 'Carnicería'" if is_pg else "TEXT DEFAULT 'Carnicería'"),
+            ("costo_envio", "NUMERIC(10, 2) DEFAULT 0" if is_pg else "REAL DEFAULT 0"),
+            ("monto_minimo_envio_gratis", "NUMERIC(10, 2) DEFAULT 0" if is_pg else "REAL DEFAULT 0"),
+        ):
+            if name not in suc_cols:
+                conn.execute(f"ALTER TABLE sucursales ADD COLUMN {name} {col_type}")
+
+    # Columnas en repartofacil_empresa_perfiles
+    if _table_exists(conn, "repartofacil_empresa_perfiles"):
+        if is_pg:
+            perf_cols = _pg_column_names(conn, "repartofacil_empresa_perfiles")
+        else:
+            perf_cols = {row[1] for row in conn.execute("PRAGMA table_info(repartofacil_empresa_perfiles)")}
+        for name, col_type in (
+            ("rubro", "VARCHAR(60) DEFAULT 'Carnicería'" if is_pg else "TEXT DEFAULT 'Carnicería'"),
+            ("logo_url", "TEXT" if is_pg else "TEXT"),
+        ):
+            if name not in perf_cols:
+                conn.execute(f"ALTER TABLE repartofacil_empresa_perfiles ADD COLUMN {name} {col_type}")
 
 
 def _migrate_drop_remitos_cliente_column(conn, is_pg: bool) -> None:
