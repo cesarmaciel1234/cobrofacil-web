@@ -1458,7 +1458,7 @@ def _auditoria_cartera(
 
 
 def _filas_en_rango(tabla: str, ini: str | None, fin: str | None, sucursal_id: int | None = None):
-    columnas, filas = filas_de(tabla, sucursal_id)
+    columnas, filas = filas_de(tabla, sucursal_id, desde=ini, hasta=fin)
     idx = _indice(columnas)
     if not ini and not fin:
         return idx, list(filas)

@@ -87,15 +87,21 @@
     async function pedir(pieza, consulta) {
         const clave = claveDe(pieza, consulta);
         const url = '/api/pos/nodo?pieza=' + encodeURIComponent(pieza) + (consulta ? '&' + consulta : '');
-        const res = await fetch(url, { cache: 'no-store' });
-        if (!res.ok) return memoria[clave] || null;
-        const dato = await res.json();
-        if (!dato || dato.ok === false) return memoria[clave] || null;
-        memoria[clave] = dato;
-        if (dato.nodo && dato.nodo.sello) sello = dato.nodo.sello;
-        await guardar(clave, dato);
-        avisar(pieza, consulta || '', dato);
-        return dato;
+        try {
+            const ctrl = new AbortController();
+            const tid = setTimeout(() => ctrl.abort(), 10000);
+            const res = await fetch(url, { cache: 'no-store', signal: ctrl.signal }).finally(() => clearTimeout(tid));
+            if (!res.ok) return memoria[clave] || null;
+            const dato = await res.json();
+            if (!dato || dato.ok === false) return memoria[clave] || null;
+            memoria[clave] = dato;
+            if (dato.nodo && dato.nodo.sello) sello = dato.nodo.sello;
+            await guardar(clave, dato);
+            avisar(pieza, consulta || '', dato);
+            return dato;
+        } catch (_) {
+            return memoria[clave] || null;
+        }
     }
 
     function encargar(pieza, consulta) {

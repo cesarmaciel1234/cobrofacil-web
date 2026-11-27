@@ -3965,8 +3965,27 @@ const $ = id => document.getElementById(id);
                 Nodo.encargar(pieza, consulta).then((dato) => {
                     if (dato && !panelGuardadoVacio(dato)) {
                         aplicarDatosJefe(panel, dato, false);
+                    } else if (!habiaLocal) {
+                        return fetch('/api/pos/jefe?panel=' + encodeURIComponent(panel) + (consulta ? '&' + consulta : ''))
+                            .then(r => r.ok ? r.json() : null)
+                            .then(d => {
+                                if (d) aplicarDatosJefe(panel, d, false);
+                                else aplicarDatosJefe(panel, { libro: false }, false);
+                            });
                     }
-                }).catch(() => {});
+                }).catch(() => {
+                    if (!habiaLocal) {
+                        fetch('/api/pos/jefe?panel=' + encodeURIComponent(panel) + (consulta ? '&' + consulta : ''))
+                            .then(r => r.ok ? r.json() : null)
+                            .then(d => {
+                                if (d) aplicarDatosJefe(panel, d, false);
+                                else aplicarDatosJefe(panel, { libro: false }, false);
+                            })
+                            .catch(() => {
+                                aplicarDatosJefe(panel, { libro: false }, false);
+                            });
+                    }
+                });
                 if (jefeVistaEnCurso === clave) jefeVistaEnCurso = '';
                 return;
             }
@@ -4575,20 +4594,24 @@ const $ = id => document.getElementById(id);
             if (panel === 'contabilidad') {
                 const c = dato.contabilidad || {};
                 const cobrosServer = Number(c.cobros) || 0;
-                if (window.Espejo && Espejo.contabilidad) {
-                    const cEsp = Espejo.contabilidad(periodoCaja || 'Hoy', periodoCajaDesde, periodoCajaHasta, activeSucursalId);
-                    if (cEsp && cEsp.contabilidad) {
-                        const espCobros = Number(cEsp.contabilidad.cobros) || 0;
-                        if (espCobros > 0 && cobrosServer === 0) {
-                            c.cobros = espCobros;
-                            c.cobros_cant = cEsp.contabilidad.cobros_cant || 1;
-                            c.cobros_por_medio = cEsp.contabilidad.cobros_por_medio || {};
-                            c.resultado = Math.round(((Number(c.ventas) || 0) + espCobros - (Number(c.gastos) || 0)) * 100) / 100;
-                            dato.contabilidad = c;
-                        } else if (espCobros > 0 && cEsp.contabilidad.cobros_por_medio && (!c.cobros_por_medio || Object.keys(c.cobros_por_medio).length === 0)) {
-                            c.cobros_por_medio = cEsp.contabilidad.cobros_por_medio;
+                try {
+                    if (window.Espejo && Espejo.contabilidad) {
+                        const cEsp = Espejo.contabilidad(periodoCaja || 'Hoy', periodoCajaDesde, periodoCajaHasta, activeSucursalId);
+                        if (cEsp && cEsp.contabilidad) {
+                            const espCobros = Number(cEsp.contabilidad.cobros) || 0;
+                            if (espCobros > 0 && cobrosServer === 0) {
+                                c.cobros = espCobros;
+                                c.cobros_cant = cEsp.contabilidad.cobros_cant || 1;
+                                c.cobros_por_medio = cEsp.contabilidad.cobros_por_medio || {};
+                                c.resultado = Math.round(((Number(c.ventas) || 0) + espCobros - (Number(c.gastos) || 0)) * 100) / 100;
+                                dato.contabilidad = c;
+                            } else if (espCobros > 0 && cEsp.contabilidad.cobros_por_medio && (!c.cobros_por_medio || Object.keys(c.cobros_por_medio).length === 0)) {
+                                c.cobros_por_medio = cEsp.contabilidad.cobros_por_medio;
+                            }
                         }
                     }
+                } catch (e) {
+                    console.warn('[cruzarConEspejo] contabilidad fallback:', e);
                 }
             }
             return dato;
